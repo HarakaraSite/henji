@@ -136,7 +136,7 @@ proxy 必須環境で Google/Gemini provider だけ直通接続しようとし�
 
 proxy 設定時に `gccfg.HTTPClient = httpClient` も追加した。
 
-## P2: MCP tool call の timeout が実 call に効かない
+## Fixed: MCP tool call の timeout が実 call に効かない
 
 場所:
 
@@ -145,7 +145,7 @@ proxy 設定時に `gccfg.HTTPClient = httpClient` も追加した。
 
 状況:
 
-`toolCall(ctx, name, data)` は引数で `ctx` を受け取り、MCP client の初期化には使っている。しかし実際の tool 実行は以下のように `context.Background()` を渡している。
+以前は `toolCall(ctx, name, data)` が引数で `ctx` を受け取り、MCP client の初期化には使っていた。しかし実際の tool 実行は以下のように `context.Background()` を渡していた。
 
 ```go
 result, err := client.CallTool(context.Background(), request)
@@ -153,11 +153,11 @@ result, err := client.CallTool(context.Background(), request)
 
 影響:
 
-`mcp-timeout` が tool 実行本体に効かない。遅い/固まった tool があると CLI 全体が長時間待たされる可能性がある。
+`mcp-timeout` が tool 実行本体に効かなかった。遅い/固まった tool があると CLI 全体が長時間待たされる可能性があった。
 
-修正候補:
+修正:
 
-`client.CallTool(ctx, request)` に変更する。timeout/cancel の挙動を fake MCP client か integration-ish test で確認したい。
+`client.CallTool(ctx, request)` に変更した。server 初期化、tool 一覧取得、tool call 実行本体で同じ timeout context を使う。
 
 ## Fixed: 会話削除が cache 欠損で中途半端になる
 
@@ -181,7 +181,7 @@ DB と cache が既に不整合な状態で削除すると、DB だけ消えた�
 
 `Cache.Delete()` を idempotent にし、cache file missing を成功扱いにした。DB 側の delete も存在しない ID を成功扱いにしているため、削除操作の性質が揃う。
 
-## P3: `loadMsg` の URL 読み込みに timeout/status check がない
+## Fixed: `loadMsg` の URL 読み込みに timeout/status check がない
 
 場所:
 
@@ -190,19 +190,18 @@ DB と cache が既に不整合な状態で削除すると、DB だけ消えた�
 
 状況:
 
-`http.Get` を直接使っており、timeout がない。HTTP status も確認せず body を読む。
+以前は `http.Get` を直接使っており、timeout がなかった。HTTP status も確認せず body を読んでいた。
 
 影響:
 
-role に URL を指定したとき、接続先が応答しないと CLI が長時間止まる可能性がある。また 404/500 の HTML や error body を system prompt として取り込む可能性がある。
+role に URL を指定したとき、接続先が応答しないと CLI が長時間止まる可能性があった。また 404/500 の HTML や error body を system prompt として取り込む可能性があった。
 
-修正候補:
+修正:
 
-timeout 付き `http.Client` を使い、2xx 以外は error にする。既存仕様として redirect は Go default のままでよさそう。
+timeout 付き `http.Client` を使い、2xx 以外は error にするようにした。redirect は Go default のまま。
 
 ## 着手順案
 
-1. MCP tool call timeout
-2. `loadMsg` の timeout/status check
+現時点の一覧内で着手予定としていた項目は修正済み。
 
 まずは provider stream の終了契約を unit test で固定するとよい。`stream.Stream` interface の期待動作が provider ごとにずれているのが、いちばん大きな不安定要因に見える。

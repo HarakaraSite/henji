@@ -85,7 +85,7 @@ mods は「CLI の引数 prompt」と「stdin から渡された入力」を LLM
 - role の各文字列は `loadMsg()` を通す。
   - 通常文字列はそのまま。
   - `file://` はファイル内容を読む。
-  - `http://` / `https://` は URL body を読む。
+  - `http://` / `https://` は timeout 付き HTTP client で 2xx response の body を読む。
 
 ## 5. provider / model 要件
 
@@ -287,13 +287,12 @@ stdio は `command`, `env`, `args` を使う。sse/http は `url` を使う。
 - tools は provider request に渡される。
 - tool 名は `server_tool` 形式に変換される。
 - provider stream から tool call が返った場合、MCP tool を実行し、その結果を tool message として会話に追加して request を継続する。
-- timeout は `mcp-timeout`。ただし tool call 実行本体には timeout が効いていない潜在バグがある。
+- timeout は `mcp-timeout`。server 初期化、tool 一覧取得、tool call 実行本体に同じ context を渡す。
 
 方針:
 
 - MCP は残す。
 - ローカル LLM 使用時に MCP で機能を補う構想があるため、中核機能寄りとして扱う。
-- 次の改善候補は tool call 実行本体への `mcp-timeout` 適用。
 
 ## 10. CLI 補助機能
 

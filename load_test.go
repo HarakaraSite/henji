@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("http url", func(t *testing.T) {
-		withTestTransport(t, content)
+		withTestHTTPClient(t, http.StatusOK, content)
 
 		msg, err := loadMsg("http://example.test/message")
 		require.NoError(t, err)
@@ -37,11 +38,32 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("https url", func(t *testing.T) {
-		withTestTransport(t, content)
+		withTestHTTPClient(t, http.StatusOK, content)
 
 		msg, err := loadMsg("https://example.test/message")
 		require.NoError(t, err)
 		require.Equal(t, content, msg)
+	})
+
+	t.Run("http status error", func(t *testing.T) {
+		withTestHTTPClient(t, http.StatusNotFound, "not found")
+
+		msg, err := loadMsg("https://example.test/missing")
+		require.Empty(t, msg)
+		require.EqualError(t, err, "load https://example.test/missing: 404 Not Found")
+	})
+
+	t.Run("http request has timeout", func(t *testing.T) {
+		var hasDeadline bool
+		withTestRoundTripper(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			_, hasDeadline = req.Context().Deadline()
+			return testHTTPResponse(req, http.StatusOK, content), nil
+		}))
+
+		msg, err := loadMsg("https://example.test/message")
+		require.NoError(t, err)
+		require.Equal(t, content, msg)
+		require.True(t, hasDeadline)
 	})
 }
 
@@ -51,19 +73,33 @@ func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
 }
 
-func withTestTransport(t *testing.T, content string) {
+func withTestHTTPClient(t *testing.T, status int, content string) {
 	t.Helper()
 
-	originalTransport := http.DefaultTransport
-	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(content)),
-			Header:     make(http.Header),
-			Request:    req,
-		}, nil
-	})
+	withTestRoundTripper(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return testHTTPResponse(req, status, content), nil
+	}))
+}
+
+func withTestRoundTripper(t *testing.T, transport http.RoundTripper) {
+	t.Helper()
+
+	originalClient := loadHTTPClient
+	loadHTTPClient = &http.Client{
+		Transport: transport,
+		Timeout:   loadHTTPTimeout,
+	}
 	t.Cleanup(func() {
-		http.DefaultTransport = originalTransport
+		loadHTTPClient = originalClient
 	})
+}
+
+func testHTTPResponse(req *http.Request, status int, content string) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Status:     fmt.Sprintf("%d %s", status, http.StatusText(status)),
+		Body:       io.NopCloser(strings.NewReader(content)),
+		Header:     make(http.Header),
+		Request:    req,
+	}
 }

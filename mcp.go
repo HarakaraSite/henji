@@ -171,7 +171,7 @@ func toolCall(ctx context.Context, name string, data []byte) (string, error) {
 	request := mcp.CallToolRequest{}
 	request.Params.Name = tool
 	request.Params.Arguments = args
-	result, err := client.CallTool(context.Background(), request)
+	result, err := client.CallTool(ctx, request)
 	if err != nil {
 		return "", fmt.Errorf("mcp: %w", err)
 	}
