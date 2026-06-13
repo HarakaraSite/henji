@@ -182,6 +182,81 @@ func TestRemoveWhitespace(t *testing.T) {
 	})
 }
 
+func TestResolveModel(t *testing.T) {
+	mods := &Mods{}
+	newConfig := func() *Config {
+		return &Config{
+			APIs: APIs{
+				{
+					Name: "openai",
+					Models: map[string]Model{
+						"gpt-4o": {
+							Aliases:  []string{"4o"},
+							MaxChars: 100,
+							Fallback: "gpt-4o-mini",
+						},
+						"gpt-4o-mini": {
+							Aliases:  []string{"mini"},
+							MaxChars: 50,
+						},
+					},
+				},
+				{
+					Name: "anthropic",
+					Models: map[string]Model{
+						"claude-sonnet": {
+							Aliases:  []string{"sonnet"},
+							MaxChars: 200,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("resolves alias across configured APIs", func(t *testing.T) {
+		cfg := newConfig()
+		cfg.Model = "sonnet"
+
+		api, mod, err := mods.resolveModel(cfg)
+
+		require.NoError(t, err)
+		require.Equal(t, "anthropic", api.Name)
+		require.Equal(t, "claude-sonnet", cfg.Model)
+		require.Equal(t, "claude-sonnet", mod.Name)
+		require.Equal(t, "anthropic", mod.API)
+		require.EqualValues(t, 200, mod.MaxChars)
+	})
+
+	t.Run("respects explicit api", func(t *testing.T) {
+		cfg := newConfig()
+		cfg.API = "openai"
+		cfg.Model = "4o"
+
+		api, mod, err := mods.resolveModel(cfg)
+
+		require.NoError(t, err)
+		require.Equal(t, "openai", api.Name)
+		require.Equal(t, "gpt-4o", cfg.Model)
+		require.Equal(t, "gpt-4o", mod.Name)
+		require.Equal(t, "openai", mod.API)
+		require.Equal(t, "gpt-4o-mini", mod.Fallback)
+	})
+
+	t.Run("errors when explicit api does not contain model", func(t *testing.T) {
+		cfg := newConfig()
+		cfg.API = "openai"
+		cfg.Model = "sonnet"
+
+		_, _, err := mods.resolveModel(cfg)
+
+		require.Error(t, err)
+		var merr modsError
+		require.ErrorAs(t, err, &merr)
+		require.Contains(t, merr.reason, "does not contain")
+	})
+}
+
 var cutPromptTests = map[string]struct {
 	msg      string
 	prompt   string

@@ -14,6 +14,8 @@ var (
 	errManyMatches = errors.New("multiple conversations matched the input")
 )
 
+const sqliteTimestampFormat = "2006-01-02 15:04:05"
+
 func handleSqliteErr(err error) error {
 	sqerr := &sqlite.Error{}
 	if errors.As(err, &sqerr) {
@@ -159,6 +161,7 @@ func (c *convoDB) Delete(id string) error {
 
 func (c *convoDB) ListOlderThan(t time.Duration) ([]Conversation, error) {
 	var convos []Conversation
+	cutoff := time.Now().UTC().Add(-t).Format(sqliteTimestampFormat)
 	if err := c.db.Select(&convos, c.db.Rebind(`
 		SELECT
 		  *
@@ -166,7 +169,7 @@ func (c *convoDB) ListOlderThan(t time.Duration) ([]Conversation, error) {
 		  conversations
 		WHERE
 		  updated_at < ?
-		`), time.Now().Add(-t)); err != nil {
+		`), cutoff); err != nil {
 		return nil, fmt.Errorf("ListOlderThan: %w", err)
 	}
 	return convos, nil

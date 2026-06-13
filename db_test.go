@@ -169,3 +169,38 @@ func TestConvoDB(t *testing.T) {
 		}, results)
 	})
 }
+
+func TestListOlderThanUsesSQLiteTimestampFormat(t *testing.T) {
+	db := testDB(t)
+	originalLocal := time.Local
+	time.Local = time.FixedZone("Test/JST", 9*60*60)
+	t.Cleanup(func() {
+		time.Local = originalLocal
+	})
+
+	const oldID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const recentID = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	require.NoError(t, db.Save(oldID, "old", "openai", "gpt-4o"))
+	require.NoError(t, db.Save(recentID, "recent", "openai", "gpt-4o"))
+
+	now := time.Now().UTC()
+	recent := now.Add(-30 * time.Minute)
+	old := now.Add(-2 * time.Hour)
+	require.NoError(t, setConversationUpdatedAt(db, oldID, old))
+	require.NoError(t, setConversationUpdatedAt(db, recentID, recent))
+
+	convos, err := db.ListOlderThan(time.Hour)
+
+	require.NoError(t, err)
+	require.Len(t, convos, 1)
+	require.Equal(t, oldID, convos[0].ID)
+}
+
+func setConversationUpdatedAt(db *convoDB, id string, updatedAt time.Time) error {
+	_, err := db.db.Exec(db.db.Rebind(`
+		UPDATE conversations
+		SET updated_at = ?
+		WHERE id = ?
+	`), updatedAt.UTC().Format(sqliteTimestampFormat), id)
+	return err
+}
