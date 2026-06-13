@@ -90,14 +90,15 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 
 // Stream ollama stream.
 type Stream struct {
-	request  api.ChatRequest
-	err      error
-	done     bool
-	factory  func()
-	respCh   chan api.ChatResponse
-	message  api.Message
-	toolCall func(name string, data []byte) (string, error)
-	messages []proto.Message
+	request   api.ChatRequest
+	err       error
+	done      bool
+	finalized bool
+	factory   func()
+	respCh    chan api.ChatResponse
+	message   api.Message
+	toolCall  func(name string, data []byte) (string, error)
+	messages  []proto.Message
 }
 
 func (s *Stream) fn(resp api.ChatResponse) error {
@@ -136,6 +137,9 @@ func (s *Stream) Current() (proto.Chunk, error) {
 		chunk := proto.Chunk{
 			Content: resp.Message.Content,
 		}
+		if resp.Message.Role != "" {
+			s.message.Role = resp.Message.Role
+		}
 		s.message.Content += resp.Message.Content
 		s.message.ToolCalls = append(s.message.ToolCalls, resp.Message.ToolCalls...)
 		if resp.Done {
@@ -159,11 +163,16 @@ func (s *Stream) Next() bool {
 		return false
 	}
 	if s.done {
+		if !s.finalized {
+			s.messages = append(s.messages, toProtoMessage(s.message))
+			s.request.Messages = append(s.request.Messages, s.message)
+			s.finalized = true
+			return false
+		}
 		s.done = false
-		s.factory()
-		s.messages = append(s.messages, toProtoMessage(s.message))
-		s.request.Messages = append(s.request.Messages, s.message)
+		s.finalized = false
 		s.message = api.Message{}
+		s.factory()
 	}
 	return true
 }
