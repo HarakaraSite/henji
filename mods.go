@@ -160,12 +160,8 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.appendToOutput(m.Config.Prefix + "\n\n")
 		}
 
-		if m.Config.IncludePrompt > 0 {
-			parts := strings.Split(m.Input, "\n")
-			if len(parts) > m.Config.IncludePrompt {
-				parts = parts[0:m.Config.IncludePrompt]
-			}
-			m.appendToOutput(strings.Join(parts, "\n") + "\n")
+		if prompt := promptExcerpt(m.Input, m.Config.IncludePrompt); prompt != "" {
+			m.appendToOutput(prompt)
 		}
 		m.state = requestState
 		cmds = append(cmds, m.startCompletionCmd(msg.content))
@@ -365,6 +361,7 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			ccfg.HTTPClient = httpClient
 			accfg.HTTPClient = httpClient
 			occfg.HTTPClient = httpClient
+			gccfg.HTTPClient = httpClient
 		}
 
 		if mod.MaxChars == 0 {
@@ -652,6 +649,21 @@ func removeWhitespace(s string) string {
 		return ""
 	}
 	return s
+}
+
+func promptExcerpt(input string, lineCount int) string {
+	if input == "" || lineCount == 0 {
+		return ""
+	}
+	if lineCount < 0 {
+		return input + "\n"
+	}
+
+	parts := strings.Split(input, "\n")
+	if len(parts) > lineCount {
+		parts = parts[0:lineCount]
+	}
+	return strings.Join(parts, "\n") + "\n"
 }
 
 var tokenErrRe = regexp.MustCompile(`This model's maximum context length is (\d+) tokens. However, your messages resulted in (\d+) tokens`)

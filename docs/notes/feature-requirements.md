@@ -67,8 +67,7 @@ mods は「CLI の引数 prompt」と「stdin から渡された入力」を LLM
 - `--prompt-args` / `-p` は引数 prompt を応答前に出力へ含める。
 - `--prompt` / `-P` は stdin prompt の先頭 N 行を応答前に出力へ含める。
 - `-P` は値なし指定時に `-1` になる。
-- 方針: `-P` 値なし、つまり `IncludePrompt == -1` は stdin prompt 全体を応答前に出力へ含める仕様にする。
-- 現状実装は `IncludePrompt > 0` の時だけ処理しており、`-1` が効いていないため修正予定。
+- `-P` 値なし、つまり `IncludePrompt == -1` は stdin prompt 全体を応答前に出力へ含める。
 
 ## 4. formatting 要件
 
@@ -159,8 +158,7 @@ request に渡す主な値:
 
 ### HTTP proxy
 
-- `--http-proxy` / `MODS_HTTP_PROXY` があれば proxy URL を parse し、OpenAI / Anthropic / Ollama 用 HTTP client に設定する。
-- 現状 Google/Gemini には proxy client が入っていない。これは潜在バグとして別メモに記録済み。
+- `--http-proxy` / `MODS_HTTP_PROXY` があれば proxy URL を parse し、OpenAI / Anthropic / Ollama / Google 用 HTTP client に設定する。
 
 ## 6. conversation / cache 要件
 
@@ -357,12 +355,11 @@ OpenAI SDK の error は status code ごとに扱う。
   - `Config` と `config_template.yml` にはあるが、request では使われていない。
   - 削除影響が文面だけでは判断しづらいため、互換性確認後に削除/実装を決める。
 - Google/Gemini の会話保存
-  - 修正する。
-  - `Stream.Messages()` が `nil` を返すため、request messages と assistant response を返すようにする。
+  - 修正済み。
+  - `Stream.Messages()` は request messages と stream で受け取った assistant response を返す。
 - `--prompt` の no-arg `-1`
-  - 仕様として活かす。
+  - 仕様として活かす。修正済み。
   - `-P` 値なしは stdin prompt 全体を応答前に出力へ含める。
-  - 現状の `IncludePrompt > 0` 条件を修正する。
 - `system` config field
   - 削除方向。
   - 使われていないため、参照確認後に `Config.System` を削る。

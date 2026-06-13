@@ -62,7 +62,7 @@ EOF 時に `s.done = true` を設定する。可能なら EOF 後の `Next()` �
 
 Cohere provider は使わない方針のため削除済み。このバグは削除によって解消した。
 
-## P1: Google/Gemini の会話保存が空になる
+## Fixed: Google/Gemini の会話保存が空になる
 
 場所:
 
@@ -75,17 +75,17 @@ Cohere provider は使わない方針のため削除済み。このバグは削�
 
 状況:
 
-Google/Gemini の `Stream.Messages()` は常に `nil` を返す。共通側は stream 完了時に `m.messages = msg.stream.Messages()` とするため、Google 利用時は会話履歴が空になる。
+以前は Google/Gemini の `Stream.Messages()` が常に `nil` を返していた。共通側は stream 完了時に `m.messages = msg.stream.Messages()` とするため、Google 利用時は会話履歴が空になっていた。
 
-Issue #604 の修正で title は `Untitled conversation` に fallback するが、会話本文は保存されない。
+Issue #604 の修正で title は `Untitled conversation` に fallback するが、この時点では会話本文は保存されなかった。
 
 影響:
 
-Google/Gemini で `--title`, continue, show など保存会話機能を使うと、保存済み会話の中身が空になる可能性がある。
+Google/Gemini で `--title`, continue, show など保存会話機能を使うと、保存済み会話の中身が空になる可能性があった。
 
-修正候補:
+修正:
 
-Google stream 側で request messages と assistant response を保持し、`Messages()` が `[]proto.Message` を返すようにする。stream chunks を蓄積して assistant message を作るのが最小修正になりそう。
+Google stream 側で request messages と assistant response を保持し、`Messages()` が `[]proto.Message` を返すようにした。stream chunks を蓄積して assistant message を作る最小修正。
 
 ## Removed: Cohere の custom base-url が無視される
 
@@ -117,7 +117,7 @@ if api.BaseURL != "" {
 
 Cohere provider は使わない方針のため削除済み。この typo は削除によって解消した。
 
-## P2: `--http-proxy` が Google/Gemini に効かない
+## Fixed: `--http-proxy` が Google/Gemini に効かない
 
 場所:
 
@@ -126,15 +126,15 @@ Cohere provider は使わない方針のため削除済み。この typo は削�
 
 状況:
 
-`--http-proxy` 指定時に作った `httpClient` は OpenAI, Anthropic, Ollama config には入るが、Google config には入っていない。
+以前は `--http-proxy` 指定時に作った `httpClient` が OpenAI, Anthropic, Ollama config には入るが、Google config には入っていなかった。
 
 影響:
 
-proxy 必須環境で Google/Gemini provider だけ直通接続しようとして失敗する。
+proxy 必須環境で Google/Gemini provider だけ直通接続しようとして失敗する可能性があった。
 
-修正候補:
+修正:
 
-proxy 設定時に `gccfg.HTTPClient = httpClient` も追加する。
+proxy 設定時に `gccfg.HTTPClient = httpClient` も追加した。
 
 ## P2: MCP tool call の timeout が実 call に効かない
 
@@ -202,11 +202,8 @@ timeout 付き `http.Client` を使い、2xx 以外は error にする。既存�
 
 ## 着手順案
 
-1. Ollama の stream 終了処理
-2. Google/Gemini の `Messages()` 保存対応
-3. Google proxy 抜け
-4. MCP tool call timeout
-5. cache missing 時の削除挙動
-6. `loadMsg` の timeout/status check
+1. MCP tool call timeout
+2. cache missing 時の削除挙動
+3. `loadMsg` の timeout/status check
 
 まずは provider stream の終了契約を unit test で固定するとよい。`stream.Stream` interface の期待動作が provider ごとにずれているのが、いちばん大きな不安定要因に見える。
