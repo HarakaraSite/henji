@@ -26,7 +26,7 @@
   - provider 非依存の request/message/tool call 型。
 - `internal/stream/*`
   - provider 共通の streaming client / stream interface。
-- `internal/{openai,anthropic,cohere,google,ollama}/*`
+- `internal/{openai,anthropic,google,ollama}/*`
   - 各 provider 実装と proto 変換処理。
 
 ## エントリポイント
@@ -101,7 +101,7 @@ API key 解決は `mods.go` の `ensureKey()`。
 1. `api-key`
 2. `api-key-env`
 3. `api-key-cmd`
-4. provider ごとの default env、例: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `COHERE_API_KEY`, `AZURE_OPENAI_KEY`
+4. provider ごとの default env、例: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `AZURE_OPENAI_KEY`
 
 の順で探す。
 
@@ -140,10 +140,6 @@ provider 非依存の message/request 型は `internal/proto/proto.go`。
   - SDK は `github.com/anthropics/anthropic-sdk-go`。
   - system message と通常 messages を分ける変換を行う。
   - MCP tool calls に対応。
-- `internal/cohere/`
-  - Cohere ChatStream 用。
-  - SDK は `github.com/cohere-ai/cohere-go/v2`。
-  - `CallTools()` は未対応。
 - `internal/google/`
   - Gemini REST SSE 用。
   - SDK ではなく HTTP request/response stream を直接扱う実装。
@@ -158,7 +154,6 @@ provider 選択は `mods.go` の `startCompletionCmd()` にある `switch mod.AP
 
 - `anthropic` -> `anthropic.New(accfg)`
 - `google` -> `google.New(gccfg)`
-- `cohere` -> `cohere.New(cccfg)`
 - `ollama` -> `ollama.New(occfg)`
 - その他 -> `openai.New(ccfg)`
 
@@ -248,14 +243,14 @@ MCP 設定は `Config.MCPServers` / `MCPServerConfig` に入る。設定 YAML �
   - OpenAI 互換 API、Azure、Perplexity などの request/streaming に使う。
 - `github.com/anthropics/anthropic-sdk-go`
   - Anthropic Messages API に使う。
-- `github.com/cohere-ai/cohere-go/v2`
-  - Cohere ChatStream に使う。
 - `github.com/ollama/ollama`
   - Ollama local API に使う。
 
 Google/Gemini は専用 SDK ではなく、`internal/google` で `net/http` による REST SSE を直接扱っている。
 
 provider SDK は削れば依存削減効果が大きい一方、streaming、tool call、provider ごとの型差分を自前で持つことになるため、後回しが無難。
+
+補足: Cohere provider は利用しない方針のため削除済み。
 
 ### MCP
 
@@ -314,7 +309,7 @@ MCP support を残すなら中心依存。MCP 機能を optional にする設計
 3. DB helper
    - `sqlx` を `database/sql` に置き換える
 4. provider SDK
-   - OpenAI/Anthropic/Cohere/Ollama SDK を HTTP 直実装へ寄せる
+   - OpenAI/Anthropic/Ollama SDK を HTTP 直実装へ寄せる
 5. CLI/TUI の中核
    - Cobra や Bubble Tea 系。影響が大きいため最後に検討する
 
@@ -325,7 +320,6 @@ MCP support を残すなら中心依存。MCP 機能を optional にする設計
 - `github.com/charmbracelet/mods`
 - `github.com/charmbracelet/mods/internal/anthropic`
 - `github.com/charmbracelet/mods/internal/cache`
-- `github.com/charmbracelet/mods/internal/cohere`
 - `github.com/charmbracelet/mods/internal/google`
 - `github.com/charmbracelet/mods/internal/ollama`
 - `github.com/charmbracelet/mods/internal/openai`

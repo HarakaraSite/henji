@@ -27,7 +27,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/mods/internal/anthropic"
 	"github.com/charmbracelet/mods/internal/cache"
-	"github.com/charmbracelet/mods/internal/cohere"
 	"github.com/charmbracelet/mods/internal/google"
 	"github.com/charmbracelet/mods/internal/ollama"
 	"github.com/charmbracelet/mods/internal/openai"
@@ -283,7 +282,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		var api API
 		var ccfg openai.Config
 		var accfg anthropic.Config
-		var cccfg cohere.Config
 		var occfg ollama.Config
 		var gccfg google.Config
 
@@ -332,15 +330,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			}
 			gccfg = google.DefaultConfig(mod.Name, key)
 			gccfg.ThinkingBudget = mod.ThinkingBudget
-		case "cohere":
-			key, err := m.ensureKey(api, "COHERE_API_KEY", "https://dashboard.cohere.com/api-keys")
-			if err != nil {
-				return modsError{err, "Cohere authentication failed"}
-			}
-			cccfg = cohere.DefaultConfig(key)
-			if api.BaseURL != "" {
-				ccfg.BaseURL = api.BaseURL
-			}
 		case "azure", "azure-ad": //nolint:goconst
 			key, err := m.ensureKey(api, "AZURE_OPENAI_KEY", "https://aka.ms/oai/access")
 			if err != nil {
@@ -375,7 +364,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 			ccfg.HTTPClient = httpClient
 			accfg.HTTPClient = httpClient
-			cccfg.HTTPClient = httpClient
 			occfg.HTTPClient = httpClient
 		}
 
@@ -429,8 +417,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			client = anthropic.New(accfg)
 		case "google":
 			client = google.New(gccfg)
-		case "cohere":
-			client = cohere.New(cccfg)
 		case "ollama":
 			client, err = ollama.New(occfg)
 		default:

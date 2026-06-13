@@ -34,7 +34,7 @@ Ollama stream も OpenAI/Anthropic と同じように、通常完了時は一度
 
 また、Ollama の streamed response から蓄積する assistant message に `Role` が入っていなかったため、`resp.Message.Role` も保持するようにした。
 
-## Won't Fix: Cohere streams never finish after EOF
+## Removed: Cohere streams never finish after EOF
 
 場所:
 
@@ -60,7 +60,7 @@ EOF 時に `s.done = true` を設定する。可能なら EOF 後の `Next()` �
 
 判断:
 
-Cohere provider は今後使わず、機能そのものを削除する方針。そのため、このバグは個別修正せず、Cohere 削除作業の中で解消する。
+Cohere provider は使わない方針のため削除済み。このバグは削除によって解消した。
 
 ## P1: Google/Gemini の会話保存が空になる
 
@@ -87,7 +87,7 @@ Google/Gemini で `--title`, continue, show など保存会話機能を使うと
 
 Google stream 側で request messages と assistant response を保持し、`Messages()` が `[]proto.Message` を返すようにする。stream chunks を蓄積して assistant message を作るのが最小修正になりそう。
 
-## Won't Fix: Cohere の custom base-url が無視される
+## Removed: Cohere の custom base-url が無視される
 
 場所:
 
@@ -115,7 +115,7 @@ if api.BaseURL != "" {
 
 判断:
 
-Cohere provider は削除方針のため、この typo は個別修正しない。Cohere 関連コードを削除する際に消える。
+Cohere provider は使わない方針のため削除済み。この typo は削除によって解消した。
 
 ## P2: `--http-proxy` が Google/Gemini に効かない
 
@@ -126,7 +126,7 @@ Cohere provider は削除方針のため、この typo は個別修正しない�
 
 状況:
 
-`--http-proxy` 指定時に作った `httpClient` は OpenAI, Anthropic, Cohere, Ollama config には入るが、Google config には入っていない。
+`--http-proxy` 指定時に作った `httpClient` は OpenAI, Anthropic, Ollama config には入るが、Google config には入っていない。
 
 影響:
 
@@ -202,9 +202,9 @@ timeout 付き `http.Client` を使い、2xx 以外は error にする。既存�
 
 ## 着手順案
 
-1. Ollama/Cohere の stream 終了処理
+1. Ollama の stream 終了処理
 2. Google/Gemini の `Messages()` 保存対応
-3. Cohere `base-url` typo と Google proxy 抜け
+3. Google proxy 抜け
 4. MCP tool call timeout
 5. cache missing 時の削除挙動
 6. `loadMsg` の timeout/status check

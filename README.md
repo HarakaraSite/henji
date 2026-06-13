@@ -36,11 +36,10 @@ tool to add a sprinkle of AI in your command line and make your pipelines
 artificially intelligent.
 
 It works great with LLMs running locally through [LocalAI]. You can also use
-[OpenAI], [Cohere], [Groq], or [Azure OpenAI].
+[OpenAI], [Groq], or [Azure OpenAI].
 
 [LocalAI]: https://github.com/go-skynet/LocalAI
 [OpenAI]: https://platform.openai.com/account/api-keys
-[Cohere]: https://dashboard.cohere.com/api-keys
 [Groq]: https://console.groq.com/keys
 [Azure OpenAI]: https://azure.microsoft.com/en-us/products/cognitive-services/openai-service
 
@@ -234,13 +233,6 @@ can grab it the [OpenAI website](https://platform.openai.com/account/api-keys).
 
 Alternatively, set the [`AZURE_OPENAI_KEY`] environment variable to use Azure
 OpenAI. Grab a key from [Azure](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service).
-
-### Cohere
-
-Cohere provides enterprise optimized models.
-
-Set the `COHERE_API_KEY` environment variable. If you don't have one yet, you can
-get it from the [Cohere dashboard](https://dashboard.cohere.com/api-keys).
 
 ### Local AI
 

@@ -169,13 +169,6 @@ apis:
       claude-3-5-haiku-20241022:
         aliases: ["claude3.5-haiku", "haiku"]
         max-input-chars: 680000
-  cohere:
-    base-url: https://api.cohere.com/v1
-    models:
-      command-r-plus:
-        max-input-chars: 128000
-      command-r:
-        max-input-chars: 128000
   google:
     models: # https://ai.google.dev/gemini-api/docs/models/gemini
       gemini-1.5-pro-latest:
@@ -443,20 +436,6 @@ apis:
       ai21-labs/AI21-Jamba-1.5-Large:
         max-input-chars: 392000
       ai21-labs/AI21-Jamba-1.5-Mini:
-        max-input-chars: 392000
-      cohere/cohere-command-a:
-        max-input-chars: 392000
-      cohere/Cohere-command-r:
-        max-input-chars: 392000
-      cohere/Cohere-command-r-08-2024:
-        max-input-chars: 392000
-      cohere/Cohere-command-r-plus:
-        max-input-chars: 392000
-      cohere/Cohere-command-r-plus-08-2024:
-        max-input-chars: 392000
-      cohere/Cohere-embed-v3-english:
-        max-input-chars: 392000
-      cohere/Cohere-embed-v3-multilingual:
         max-input-chars: 392000
       core42/jais-30b-chat:
         max-input-chars: 392000
