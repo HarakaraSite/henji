@@ -84,6 +84,9 @@ func (c *Cache[T]) Delete(id string) error {
 		return fmt.Errorf("delete: %w", errInvalidID)
 	}
 	if err := os.Remove(filepath.Join(c.dir(), id+cacheExt)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
 		return fmt.Errorf("delete: %w", err)
 	}
 	return nil

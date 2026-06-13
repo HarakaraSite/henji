@@ -47,6 +47,12 @@ func TestCache(t *testing.T) {
 		require.ErrorIs(t, cache.Read("fake", nil), os.ErrNotExist)
 	})
 
+	t.Run("delete missing", func(t *testing.T) {
+		cache, err := NewConversations(t.TempDir())
+		require.NoError(t, err)
+		require.NoError(t, cache.Delete("fake"))
+	})
+
 	t.Run("invalid id", func(t *testing.T) {
 		t.Run("write", func(t *testing.T) {
 			cache, err := NewConversations(t.TempDir())

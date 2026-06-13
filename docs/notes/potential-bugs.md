@@ -159,7 +159,7 @@ result, err := client.CallTool(context.Background(), request)
 
 `client.CallTool(ctx, request)` に変更する。timeout/cancel の挙動を fake MCP client か integration-ish test で確認したい。
 
-## P2: 会話削除が cache 欠損で中途半端になる
+## Fixed: 会話削除が cache 欠損で中途半端になる
 
 場所:
 
@@ -171,15 +171,15 @@ result, err := client.CallTool(context.Background(), request)
 
 状況:
 
-削除処理は DB を先に削除し、その後 cache file を削除する。cache file が存在しない場合でも `Cache.Delete()` は `os.Remove` の error を返す。
+以前の削除処理は DB を先に削除し、その後 cache file を削除していた。cache file が存在しない場合でも `Cache.Delete()` は `os.Remove` の error を返していた。
 
 影響:
 
-DB と cache が既に不整合な状態で削除すると、DB だけ消えた後に error になる。複数削除では途中で停止し、ユーザーには「削除失敗」と見えるが一部は削除済みになる。
+DB と cache が既に不整合な状態で削除すると、DB だけ消えた後に error になっていた。複数削除では途中で停止し、ユーザーには「削除失敗」と見えるが一部は削除済みになる可能性があった。
 
-修正候補:
+修正:
 
-会話削除に限っては cache file missing を成功扱いにする、または cache を先に消してから DB を消す。ただし cache 先削除にすると逆方向の不整合が起きうるため、missing cache を許容する方が実用的。
+`Cache.Delete()` を idempotent にし、cache file missing を成功扱いにした。DB 側の delete も存在しない ID を成功扱いにしているため、削除操作の性質が揃う。
 
 ## P3: `loadMsg` の URL 読み込みに timeout/status check がない
 
@@ -203,7 +203,6 @@ timeout 付き `http.Client` を使い、2xx 以外は error にする。既存�
 ## 着手順案
 
 1. MCP tool call timeout
-2. cache missing 時の削除挙動
-3. `loadMsg` の timeout/status check
+2. `loadMsg` の timeout/status check
 
 まずは provider stream の終了契約を unit test で固定するとよい。`stream.Stream` interface の期待動作が provider ごとにずれているのが、いちばん大きな不安定要因に見える。
