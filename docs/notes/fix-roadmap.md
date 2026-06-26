@@ -1,7 +1,7 @@
 # mods フォーク 修正ロードマップ
 
 作成日: 2026-06-21  
-更新日: 2026-06-26 v4（全 PR 完了 → 次フェーズは README + モジュール名変更）  
+更新日: 2026-06-26 v5（コードレビュー指摘 3件を追加 → PR#14・#15 新設）  
 対象ブランチ: main（Codex作業済みコミット `23810ab` 以降）
 
 ---
@@ -52,7 +52,7 @@ fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `
 
 ---
 
-## 2. 優先順位付き修正リスト ✅ 全件完了
+## 2. 優先順位付き修正リスト（PR#1〜#13 完了、PR#14〜#15 追加）
 
 ### Tier 1: クラッシュ / データ競合（✅ 全件完了）
 
@@ -89,6 +89,29 @@ fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `
 
 ~~**2-D. `ptrOrNil` の 0 値扱い**~~ → **廃止**  
 ~~**2-E. `retry()` の blocking sleep**~~ → **廃止**
+
+---
+
+### Tier 2（新規追加）: コードレビュー指摘
+
+**R-1. `max-completion-tokens` が request に渡っていない** ⬜ PR#14
+- 箇所: `config.go:150`（`MaxCompletionTokens`）、`mods.go:374`（コメントのみ）、`internal/proto/proto.go:76`（フィールドなし）、`internal/openai/openai.go`
+- 問題: `Config.MaxCompletionTokens` は YAML/env から読まれるが `proto.Request` に渡されず、OpenAI リクエストにも設定されない。`mods.go:374` のコメント「We do set max_completion_tokens instead」は実装が伴っていない嘘コメント。o1 系モデルでは `max_tokens` を 0 にするが `max_completion_tokens` が設定されないためトークン上限が完全に無効になる。加えて `config_template.yml:229` 等に model レベルの `max-completion-tokens` が記述されているが `Model` struct にフィールドがないため YAML 上は無視される。
+- 対処:
+  1. `proto.Request` に `MaxCompletionTokens *int64` を追加
+  2. `mods.go` で `cfg.MaxCompletionTokens > 0` のとき `request.MaxCompletionTokens` に設定
+  3. `internal/openai/openai.go` で `MaxCompletionTokens` を OpenAI リクエストに渡す
+  4. `Model` struct に `MaxCompletionTokens int64 yaml:"max-completion-tokens"` を追加し、model レベル設定も有効化（オプション）
+  5. `mods.go:374` の誤コメントを実装に合わせて修正
+- リスク: 中（3ファイル変更。o1 以外への副作用注意）
+- 発見元: コードレビュー指摘 P1
+
+**R-2. `api-key-env` と `api-key-cmd` の優先順位バグ** ⬜ PR#14（R-1 と同一 PR）
+- 箇所: `mods.go:445`
+- 問題: `api.APIKeyCmd == ""` 条件のせいで、両方設定されると `api-key-env` がスキップされ `api-key-cmd` が使われる。`docs/notes/feature-requirements.md:125-127` の仕様は `api-key-env` > `api-key-cmd` の順。
+- 対処: `&& api.APIKeyCmd == ""` の条件を削除。1行変更。env を試してから cmd にフォールバックする流れになる。
+- リスク: 低（1行削除。両方設定している既存ユーザーは動作変化するが、仕様への準拠が優先）
+- 発見元: コードレビュー指摘 P2
 
 ---
 
@@ -196,6 +219,10 @@ PR #11 ✅ bd13dac  Dep [5]              ollama 更新
 PR #12 ✅ d36df0d  3-B + 3-D            context コメント整理 / Config.System 削除
 PR #13 ✅ 7c79cb0  Dep [6]              glamour + huh メジャー更新
 
+── コードレビュー指摘修正 ────────────────────────────────────────────────────
+PR #14 ⬜       R-1 + R-2            max-completion-tokens 配線 + api-key 優先順位修正
+PR #15 ⬜       doc                  overview.md の陳腐化修正（PR#7 で直った Google Messages() の記述）
+
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
        ⬜ モジュール名変更     go install 用に module パスを一括変更（import 全体に波及）
@@ -209,6 +236,7 @@ PR #13 ✅ 7c79cb0  Dep [6]              glamour + huh メジャー更新
 |---|---|---|
 | 2-D（ptrOrNil の 0 値） | **廃止** | `config_template.yml` で `temp:1.0 / topp:1.0 / topk:50` と正の値が設定済み。デフォルト通りに使う限り実害なし |
 | 2-E（retry blocking sleep） | **廃止** | `retry()` は tea.Cmd goroutine 内から呼ばれるため `time.Sleep` は Update ループをブロックしない。race条件も実害なし |
+| P3（overview.md 陳腐化） | PR#15 | コードバグではなくメモのズレ。PR#7 で修正済みの Google `Messages()` の記述が残っている。PR#15（doc 修正）で対処 |
 
 ---
 
@@ -240,3 +268,6 @@ PR #13 ✅ 7c79cb0  Dep [6]              glamour + huh メジャー更新
 - glamour v0.10→v1.0 / huh v0.8→v1.0: コード変更不要（高リスク予測は外れた）
 - mcp-go v0.45→v0.54.1: `go.sum` に追加エントリ（jsonschema-go, santhosh-tekuri/jsonschema）が必要。`go get` でサブモジュールも指定すれば解決
 - MCP 接続キャッシュ（PR#10）: `mcpClientPool` を `mcp.go` に定義し、`Mods` に `*mcpClientPool` ポインタを持たせることで `mods.go` への mcp-go import 追加を回避できた
+- `max-completion-tokens`（R-1）: `Config.MaxCompletionTokens` は YAML/env から読まれるが `proto.Request` にフィールドなし → OpenAI リクエストに未設定。`mods.go:374` コメントは実装と乖離。o1 系モデルでトークン上限が完全無効になる実害あり。`config_template.yml:229` 等の model レベル設定も `Model` struct にフィールドなく無視
+- `api-key-env` 優先順位（R-2）: `mods.go:445` の `&& api.APIKeyCmd == ""` 条件により、両方設定時に env がスキップされ cmd が使われる。仕様書の順序（env → cmd）と逆。1行削除で修正可能
+- `go test ./... -cover` の `covdata` ツール欠落エラー: Go toolchain 側の問題でコード失敗ではない（`go test -race` は全通過）
