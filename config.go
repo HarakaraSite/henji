@@ -267,7 +267,7 @@ func writeConfigFile(path string) error {
 func createConfigFile(path string) error {
 	tmpl := template.Must(template.New("config").Parse(configTemplate))
 
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return modsError{err, "Could not create configuration file."}
 	}

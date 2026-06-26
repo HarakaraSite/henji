@@ -71,12 +71,21 @@ max-input-chars: 12250
 # {{ index .Help "max-completion-tokens" }}
 max-completion-tokens: 100
 # {{ index .Help "apis" }}
+# API key priority (highest to lowest):
+#   1. api-key-cmd  — stdout of a shell command; recommended (keys never touch disk)
+#                     e.g. api-key-cmd: op read "op://vault/openai/key"
+#                          api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
+#                     Note: the command must write only the key to stdout.
+#   2. api-key-env  — read from a named environment variable
+#   3. api-key      — plaintext in this file; stored at 0600 but avoid committing
+#                     to version control. Use only when the above options are unavailable.
+#   4. default env  — provider-specific default (e.g. OPENAI_API_KEY)
 apis:
   openai:
     base-url: https://api.openai.com/v1
     api-key:
     api-key-env: OPENAI_API_KEY
-    # api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
+    # api-key-cmd: op read "op://vault/openai/key"
     models: # https://platform.openai.com/docs/models
       gpt-4o-mini:
         aliases: ["4o-mini"]

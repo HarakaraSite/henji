@@ -492,7 +492,7 @@ func resetSettings() error {
 		return modsError{err, "Couldn't open config file."}
 	}
 	defer inputFile.Close() //nolint:errcheck
-	outputFile, err := os.Create(config.SettingsPath + ".bak")
+	outputFile, err := os.OpenFile(config.SettingsPath+".bak", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return modsError{err, "Couldn't backup config file."}
 	}
