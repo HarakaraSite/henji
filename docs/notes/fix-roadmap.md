@@ -1,7 +1,7 @@
 # mods フォーク 修正ロードマップ
 
 作成日: 2026-06-21  
-更新日: 2026-06-26 v5（コードレビュー指摘 3件を追加 → PR#14・#15 新設）  
+更新日: 2026-06-26 v6（PR#14〜#16 完了・リファクタ検討項目を次バージョンセクションに追加）  
 対象ブランチ: main（Codex作業済みコミット `23810ab` 以降）
 
 ---
@@ -220,8 +220,9 @@ PR #12 ✅ d36df0d  3-B + 3-D            context コメント整理 / Config.Sys
 PR #13 ✅ 7c79cb0  Dep [6]              glamour + huh メジャー更新
 
 ── コードレビュー指摘修正 ────────────────────────────────────────────────────
-PR #14 ⬜       R-1 + R-2            max-completion-tokens 配線 + api-key 優先順位修正
-PR #15 ⬜       doc                  overview.md の陳腐化修正（PR#7 で直った Google Messages() の記述）
+PR #14 ✅ 73284c0  R-1 + R-2            max-completion-tokens 配線 + api-key 優先順位修正
+PR #15 ✅ 9839de9  doc                  overview.md の陳腐化修正
+PR #16 ✅ 649e925  refactor             mcp.go グローバル config 参照を *Config 引数渡しに統一
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
@@ -230,7 +231,39 @@ PR #15 ⬜       doc                  overview.md の陳腐化修正（PR#7 で�
 
 ---
 
-## 5. 廃止・後回しの根拠
+## 5. 次バージョンで検討（リファクタリング候補）
+
+Opus によるコードレビュー（2026-06-26）で「今は触らなくてよいが将来負債になりうる」と判定された項目。公開後・メンテナンスの余裕ができた段階で検討する。
+
+### R-A. `mods.go` の分割（781行、責務が4つ混在）
+
+自然な分割境界が4つ存在する:
+
+| 責務 | 現在の箇所 | 移動先候補 |
+|---|---|---|
+| Bubble Tea モデル層（`Init`/`Update`/`View`/viewport） | mods.go:38〜255, 642〜670 | `tui.go` |
+| completion 実行層（`startCompletionCmd`・`resolveModel`・`receiveCompletionStreamCmd`） | mods.go:272〜537 | `completion.go` |
+| キャッシュ/会話ID解決層（`findCacheOpsDetails` 等） | mods.go:539〜640 | `cache_ops.go` |
+| 小ユーティリティ（`removeWhitespace`・`cutPrompt`・`ptrOrNil` 等） | mods.go:672〜780 | `util.go` |
+
+特に `startCompletionCmd`（177行・1関数）は API 種別ごとのクライアント構築・proxy 設定・トークン調整・MCP・ストリーム開始まで全部抱えており、プロバイダ追加のたびに膨らむ構造的負債。
+
+### R-B. Stream ステートマシンの重複
+
+openai/anthropic/ollama の `Stream` が `done`/`factory`/`Next` での再ストリーム生成という同型パターンを各自実装している。tool call ラウンドの state 遷移が3箇所に分散しており、1箇所修正して他を直し忘れるリスクがある。ただし各 SDK の型が異なるため安易な統一は逆効果になりうる。実害が出た段階で検討。
+
+### R-C. 命名の小さな不整合
+
+- `proto.Request.ToolCaller`（フィールド）/ `stream.CallTool`（関数）/ `completionOutput.errh`（略称）が混在。`proto`/`stream` は公開に近いため揃える価値がある
+- `Mods.content`（`[]string` の未フラッシュ生出力バッファ）と `completionOutput.content`（chunk文字列）が同名で紛らわしい。前者は `pendingRaw` 等の意味的な名前の方が役割に合う
+
+### R-D. `Config` 構造体のフィールド分離
+
+`config.go:142-201` で YAML タグ付き永続設定値（`Format`・`MaxTokens` 等）とランタイム専用フラグ（`ShowHelp`・`Dirs`・`cacheReadFromID` 等）が1つの構造体に混在し、インデントも乱れている。「永続設定」と「セッション状態」を型で分離すると、グローバル `config` 問題の再発防止にもなる。大規模変更のため次バージョン向け。
+
+---
+
+## 6. 廃止・後回しの根拠（旧Tier）
 
 | 項目 | 判断 | 理由 |
 |---|---|---|
@@ -240,7 +273,7 @@ PR #15 ⬜       doc                  overview.md の陳腐化修正（PR#7 で�
 
 ---
 
-## 6. 主要ファイル一覧
+## 7. 主要ファイル一覧
 
 | ファイル | 関連修正 | 状態 |
 |---|---|---|
@@ -255,7 +288,7 @@ PR #15 ⬜       doc                  overview.md の陳腐化修正（PR#7 で�
 
 ---
 
-## 7. 検証メモ（調査で判明した事実）
+## 8. 検証メモ（調査で判明した事実）
 
 - `receiveCompletionStreamCmd` は `tea.Cmd`（goroutine）として実行される → `Current()` のブロッキング化は安全
 - `retry()` は tea.Cmd goroutine 内から呼ばれる → `time.Sleep` は Update ループをブロックしない
@@ -271,3 +304,5 @@ PR #15 ⬜       doc                  overview.md の陳腐化修正（PR#7 で�
 - `max-completion-tokens`（R-1）: `Config.MaxCompletionTokens` は YAML/env から読まれるが `proto.Request` にフィールドなし → OpenAI リクエストに未設定。`mods.go:374` コメントは実装と乖離。o1 系モデルでトークン上限が完全無効になる実害あり。`config_template.yml:229` 等の model レベル設定も `Model` struct にフィールドなく無視
 - `api-key-env` 優先順位（R-2）: `mods.go:445` の `&& api.APIKeyCmd == ""` 条件により、両方設定時に env がスキップされ cmd が使われる。仕様書の順序（env → cmd）と逆。1行削除で修正可能
 - `go test ./... -cover` の `covdata` ツール欠落エラー: Go toolchain 側の問題でコード失敗ではない（`go test -race` は全通過）
+- `mcp.go` グローバル `config` 参照（PR#16）: `enabledMCPs`・`isMCPEnabled` はグローバル `config` を読んでいたが、`(m *Mods) toolCall` もメソッドでありながら同様。本番は `m.Config == &config` で同一ポインタのため無害だが、テスト時に別 `Config` を注入すると MCP ロジックが壊れる。`*Config` を引数に変えて解消（`649e925`）
+- Opus リファクタリングレビュー（2026-06-26）: `stream.Stream` インターフェース・並行処理・エラーハンドリングは問題なし。主要な設計問題は `mcp.go` グローバル参照のみ（PR#16 で解消）。残りは次バージョン候補（セクション5）
