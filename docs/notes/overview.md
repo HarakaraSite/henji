@@ -144,7 +144,8 @@ provider 非依存の message/request 型は `internal/proto/proto.go`。
   - Gemini REST SSE 用。
   - SDK ではなく HTTP request/response stream を直接扱う実装。
   - `ThinkingBudget` は Google provider の generation config に入る。
-  - `CallTools()` は未対応、`Messages()` も streamed message の復元なし。
+  - `CallTools()` は未対応（Google API は tool call 非対応のため）。
+  - `Messages()` は PR#7 で修正済み。assistant content を `s.content` に蓄積し、会話履歴として返す。
 - `internal/ollama/`
   - Ollama local API 用。
   - SDK は `github.com/ollama/ollama/api`。
