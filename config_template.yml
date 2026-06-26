@@ -22,6 +22,9 @@ mcp-servers:
   #     - "ghcr.io/github/github-mcp-server"
 # {{ index .Help "mcp-timeout" }}
 mcp-timeout: 15s
+# {{ index .Help "max-tool-calls" }}
+# Recommended when using local MCP servers for agentic workflows (e.g. max-tool-calls: 50).
+# max-tool-calls: 0
 # {{ index .Help "roles" }}
 roles:
   "default": []

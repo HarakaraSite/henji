@@ -109,9 +109,10 @@ type completionInput struct {
 
 // completionOutput a tea.Msg that wraps the content returned from openai.
 type completionOutput struct {
-	content string
-	stream  stream.Stream
-	errh    func(error) tea.Msg
+	content       string
+	stream        stream.Stream
+	errh          func(error) tea.Msg
+	toolCallRound int // counts completed tool call rounds for MaxToolCalls enforcement
 }
 
 // Init implements tea.Model.
@@ -174,8 +175,9 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = responseState
 		}
 		cmds = append(cmds, m.receiveCompletionStreamCmd(completionOutput{
-			stream: msg.stream,
-			errh:   msg.errh,
+			stream:        msg.stream,
+			errh:          msg.errh,
+			toolCallRound: msg.toolCallRound,
 		}))
 	case modsError:
 		m.Error = &msg
@@ -476,9 +478,10 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 				return msg.errh(err)
 			}
 			return completionOutput{
-				content: chunk.Content,
-				stream:  msg.stream,
-				errh:    msg.errh,
+				content:       chunk.Content,
+				stream:        msg.stream,
+				errh:          msg.errh,
+				toolCallRound: msg.toolCallRound,
 			}
 		}
 
@@ -488,18 +491,31 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 		}
 
 		results := msg.stream.CallTools()
+		if len(results) == 0 {
+			m.messages = msg.stream.Messages()
+			return completionOutput{errh: msg.errh}
+		}
+
+		// Enforce MaxToolCalls limit (0 = unlimited)
+		nextRound := msg.toolCallRound + 1
+		cfg := m.Config
+		if cfg.MaxToolCalls > 0 && nextRound > cfg.MaxToolCalls {
+			return modsError{
+				err: fmt.Errorf("tool call limit of %d reached", cfg.MaxToolCalls),
+				reason: fmt.Sprintf(
+					"Exceeded max-tool-calls limit of %d. Set max-tool-calls: 0 in mods.yml to disable.",
+					cfg.MaxToolCalls,
+				),
+			}
+		}
+
 		toolMsg := completionOutput{
-			stream: msg.stream,
-			errh:   msg.errh,
+			stream:        msg.stream,
+			errh:          msg.errh,
+			toolCallRound: nextRound,
 		}
 		for _, call := range results {
 			toolMsg.content += call.String()
-		}
-		if len(results) == 0 {
-			m.messages = msg.stream.Messages()
-			return completionOutput{
-				errh: msg.errh,
-			}
 		}
 		return toolMsg
 	}

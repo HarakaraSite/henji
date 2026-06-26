@@ -47,6 +47,7 @@ var help = map[string]string{
 	"help":              "Show help and exit",
 	"version":           "Show version and exit",
 	"max-retries":       "Maximum number of times to retry API calls",
+	"max-tool-calls":    "Maximum number of agentic tool call rounds, 0 = unlimited",
 	"no-limit":          "Turn off the client-side limit on the size of the input into the model",
 	"word-wrap":         "Wrap formatted output at specific width (default is 80)",
 	"max-tokens":        "Maximum number of tokens in response",
@@ -158,6 +159,7 @@ type Config struct {
 	IncludePromptArgs   bool       `yaml:"include-prompt-args" env:"INCLUDE_PROMPT_ARGS"`
 	IncludePrompt       int        `yaml:"include-prompt" env:"INCLUDE_PROMPT"`
 	MaxRetries          int        `yaml:"max-retries" env:"MAX_RETRIES"`
+	MaxToolCalls        int        `yaml:"max-tool-calls" env:"MAX_TOOL_CALLS"`
 	WordWrap            int        `yaml:"word-wrap" env:"WORD_WRAP"`
 	Fanciness           uint       `yaml:"fanciness" env:"FANCINESS"`
 	StatusText          string     `yaml:"status-text" env:"STATUS_TEXT"`
