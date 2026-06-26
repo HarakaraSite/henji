@@ -234,6 +234,9 @@ func (s *Stream) Next() bool {
 
 // Close closes the stream.
 func (s *Stream) Close() error {
+	if s.response == nil {
+		return nil
+	}
 	return s.response.Body.Close() //nolint:wrapcheck
 }
 
@@ -307,7 +310,9 @@ func googleSendRequestStream(client *Client, req *http.Request) (*Stream, error)
 		return new(Stream), err
 	}
 	if isFailureStatusCode(resp) {
-		return new(Stream), client.handleErrorResp(resp)
+		err := client.handleErrorResp(resp)
+		resp.Body.Close() //nolint:errcheck,gosec
+		return new(Stream), err
 	}
 	return &Stream{
 		reader:      bufio.NewReader(resp.Body),
