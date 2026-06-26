@@ -17,6 +17,41 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// mcpClientPool holds per-server MCP clients that persist for the session lifetime.
+type mcpClientPool struct {
+	mu      sync.Mutex
+	clients map[string]*client.Client
+}
+
+func newMCPClientPool() *mcpClientPool {
+	return &mcpClientPool{clients: make(map[string]*client.Client)}
+}
+
+// get returns a cached client for the named server, creating one if necessary.
+func (p *mcpClientPool) get(ctx context.Context, name string, server MCPServerConfig) (*client.Client, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if cli, ok := p.clients[name]; ok {
+		return cli, nil
+	}
+	cli, err := initMcpClient(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	p.clients[name] = cli
+	return cli, nil
+}
+
+// closeAll closes every cached client and empties the pool.
+func (p *mcpClientPool) closeAll() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, cli := range p.clients {
+		cli.Close() //nolint:errcheck,gosec
+	}
+	p.clients = nil
+}
+
 func enabledMCPs() iter.Seq2[string, MCPServerConfig] {
 	return func(yield func(string, MCPServerConfig) bool) {
 		names := slices.Collect(maps.Keys(config.MCPServers))
@@ -61,9 +96,11 @@ func mcpListTools(ctx context.Context) error {
 	return nil
 }
 
+// mcpTools is the package-level version used by mcpListTools (--mcp-list-tools).
+// Creates and closes clients transiently; does not use the session cache.
 func mcpTools(ctx context.Context) (map[string][]mcp.Tool, error) {
 	var mu sync.Mutex
-	var wg errgroup.Group
+	wg, ctx := errgroup.WithContext(ctx) // cancel siblings on first failure
 	result := map[string][]mcp.Tool{}
 	for sname, server := range enabledMCPs() {
 		wg.Go(func() error {
@@ -82,6 +119,43 @@ func mcpTools(ctx context.Context) (map[string][]mcp.Tool, error) {
 			}
 			mu.Lock()
 			result[sname] = append(result[sname], serverTools...)
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := wg.Wait(); err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	return result, nil
+}
+
+// mcpTools is the session-scoped version used during completions.
+// Uses the pool to cache clients across tool call rounds.
+func (m *Mods) mcpTools(ctx context.Context) (map[string][]mcp.Tool, error) {
+	var mu sync.Mutex
+	wg, ctx := errgroup.WithContext(ctx)
+	result := map[string][]mcp.Tool{}
+	for sname, server := range enabledMCPs() {
+		wg.Go(func() error {
+			cli, err := m.mcpPool.get(ctx, sname, server)
+			if errors.Is(err, context.DeadlineExceeded) {
+				return modsError{
+					err:    fmt.Errorf("timeout while listing tools for %q - make sure the configuration is correct. If your server requires a docker container, make sure it's running", sname),
+					reason: "Could not list tools",
+				}
+			}
+			if err != nil {
+				return modsError{err: err, reason: "Could not list tools"}
+			}
+			tools, err := cli.ListTools(ctx, mcp.ListToolsRequest{})
+			if err != nil {
+				return modsError{
+					err:    fmt.Errorf("could not list tools for %s: %w", sname, err),
+					reason: "Could not list tools",
+				}
+			}
+			mu.Lock()
+			result[sname] = append(result[sname], tools.Tools...)
 			mu.Unlock()
 			return nil
 		})
@@ -129,6 +203,7 @@ func initMcpClient(ctx context.Context, server MCPServerConfig) (*client.Client,
 	return cli, nil
 }
 
+// mcpToolsFor is used by the package-level mcpTools (transient, no cache).
 func mcpToolsFor(ctx context.Context, name string, server MCPServerConfig) ([]mcp.Tool, error) {
 	cli, err := initMcpClient(ctx, server)
 	if err != nil {
@@ -143,7 +218,8 @@ func mcpToolsFor(ctx context.Context, name string, server MCPServerConfig) ([]mc
 	return tools.Tools, nil
 }
 
-func toolCall(ctx context.Context, name string, data []byte) (string, error) {
+// toolCall is the session-scoped version: reuses cached clients from the pool.
+func (m *Mods) toolCall(ctx context.Context, name string, data []byte) (string, error) {
 	sname, tool, ok := strings.Cut(name, "_")
 	if !ok {
 		return "", fmt.Errorf("mcp: invalid tool name: %q", name)
@@ -155,11 +231,10 @@ func toolCall(ctx context.Context, name string, data []byte) (string, error) {
 	if !isMCPEnabled(sname) {
 		return "", fmt.Errorf("mcp: server is disabled: %q", sname)
 	}
-	client, err := initMcpClient(ctx, server)
+	cli, err := m.mcpPool.get(ctx, sname, server)
 	if err != nil {
 		return "", fmt.Errorf("mcp: %w", err)
 	}
-	defer client.Close() //nolint:errcheck
 
 	var args map[string]any
 	if len(data) > 0 {
@@ -171,7 +246,7 @@ func toolCall(ctx context.Context, name string, data []byte) (string, error) {
 	request := mcp.CallToolRequest{}
 	request.Params.Name = tool
 	request.Params.Arguments = args
-	result, err := client.CallTool(ctx, request)
+	result, err := cli.CallTool(ctx, request)
 	if err != nil {
 		return "", fmt.Errorf("mcp: %w", err)
 	}

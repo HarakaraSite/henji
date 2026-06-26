@@ -61,6 +61,7 @@ type Mods struct {
 	glamOutput    string
 	glamHeight    int
 	messages []proto.Message
+	mcpPool  *mcpClientPool
 	anim     tea.Model
 	width         int
 	height        int
@@ -99,6 +100,7 @@ func newMods(
 		cache:        cache,
 		Config:       cfg,
 		ctx:          ctx,
+		mcpPool:      newMCPClientPool(),
 	}
 }
 
@@ -253,6 +255,7 @@ func (m *Mods) View() string {
 }
 
 func (m *Mods) quit() tea.Msg {
+	m.mcpPool.closeAll()
 	return tea.Quit()
 }
 
@@ -378,7 +381,7 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		// The LLM stream below uses m.ctx directly (no timeout) so long
 		// responses are not cut off by the MCP deadline.
 		ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
-		tools, err := mcpTools(ctx)
+		tools, err := m.mcpTools(ctx)
 		cancel()
 		if err != nil {
 			return err
@@ -402,7 +405,7 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 				// Per-call timeout: each tool invocation is bounded independently.
 				ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
 				defer cancel()
-				return toolCall(ctx, name, data)
+				return m.toolCall(ctx, name, data)
 			},
 		}
 		if cfg.MaxTokens > 0 {
