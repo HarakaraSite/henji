@@ -1,0 +1,242 @@
+# mods フォーク 修正ロードマップ
+
+作成日: 2026-06-21  
+更新日: 2026-06-26 v4（全 PR 完了 → 次フェーズは README + モジュール名変更）  
+対象ブランチ: main（Codex作業済みコミット `23810ab` 以降）
+
+---
+
+## 0. このフォークの目的と公開方針
+
+### 背景
+
+charmbracelet/mods は 2026-03-09 にアーカイブされた。本家 README はフォークでのメンテ継続を明示的に歓迎している。
+
+### 作者の主目的
+
+**ローカル LLM 中心 + MCP 連携の CLI ツール**
+
+- 軽作業（fish スクリプト組み立て等）をローカル LLM（mlx-lm/MLX = OpenAI 互換エンドポイント、Ollama）に任せる
+- Web 検索・調査・翻訳・要約もローカル LLM + MCP で処理する
+
+### 公開方針
+
+修正後に公開し、他ユーザーの利用を想定する。公開物としての価値は「mods の正しく動く後継」であること。  
+「ローカル LLM 優先」は**着手順の話**であって、完了範囲を狭める話ではない。
+
+### 優先度判断の基準
+
+1. **公開前に必須**: Tier 1（全プロバイダのクラッシュ修正）は作者が使わない google/anthropic も含めて完遂する。他ユーザーが使うため省略不可。
+2. **着手順**: 主経路（ollama, openai互換）を先に、副次（google, anthropic）を後に。
+3. **プロバイダ削除なし**: Cohere は本家由来で削除済み。以降は全プロバイダを維持する。
+
+### 別トラック：role 設定タスク
+
+fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `roles:` 設定だけで実現できる見込み（コード改造不要）。これらはこの roadmap のバグ修正 PR とは独立した「設定・ドキュメント整備タスク」として管理する。設定だけで賄えるかはドッグフーディング後に判断し、使い勝手の問題が出た時点で初めて機能追加 PR を検討する。
+
+### 公開時の必須作業（コード修正とは別）★ **次フェーズ**
+
+- **README 更新**: アーカイブ済み本家からの fork である旨、本家が fork でのメンテを歓迎している事実、このフォークが何を変えたか（Cohere 削除・クラッシュ修正・依存更新・MCP 接続キャッシュ・MaxToolCalls）の要約、LICENSE（MIT）の著作権表示維持と改変部分の表示追加。README に「ローカル MCP 多用時の推奨設定例（`max-tool-calls: 50`）」を記載し、用途に応じてユーザーが設定するよう案内する。
+- **モジュール名変更**: `go install github.com/<user>/<新名称>` の形で配布する方針は確定。ただし module パスの変更は内部 import 全体に波及するため、**公開直前にまとめて実施**（今は触らない）。
+
+---
+
+## 1. Codexで実施済み（参考）
+
+- Cohere provider削除
+- Ollama stream完了バグ修正（`finalized`フラグ追加）
+- Google/Gemini 会話保存が空になる修正
+- cache deleteをidempotentに
+- MCP tool callとloadMsg URLにtimeout付与
+- prompt echo (`-P`フラグ) の修正
+
+---
+
+## 2. 優先順位付き修正リスト ✅ 全件完了
+
+### Tier 1: クラッシュ / データ競合（✅ 全件完了）
+
+**1-D. OpenAI `CallTools()` の空 Choices panic** ✅ `3ef59dc`
+- 箇所: `internal/openai/openai.go:121`
+- 問題: `s.message.Choices[0]` に無条件アクセス。`Next()` が一度も true を返さない場合（空ストリーム）に `CallTools()` が呼ばれると index out of range panic。
+- 対処: `if len(s.message.Choices) == 0 { return nil }` を `CallTools()` 冒頭に追加。1行変更。
+
+**1-B. Ollama `Current()` の busy-loop + `s.err` data race** ✅ `6789fbc`
+- 問題: `default:` で即 `ErrNoContent` を返すノンブロッキング設計のため高速ループが発生。goroutine からの `s.err` 書き込みも無保護で data race。
+- 対処: `Current()` をブロッキング受信に変更。goroutine は errCh 経由でエラーを送信、`s.err` 書き込みは `Current()` のみ。
+
+**1-C. Ollama `Close()` の closed channel panic** ✅ `6789fbc`（1-B と同一 PR）
+- 対処: goroutine が `defer close(respCh)` を所有。`Close()` は `cancelFn()` を呼ぶだけ。
+
+**1-A. `cancelRequest` への並行 append+range — data race** ✅ `61e5b7a`
+- 対処: `cancelRequest` フィールドを完全削除。MCP context は即時 cancel、ToolCaller は `defer cancel()`。
+
+**1-E. Google `Close()` の nil response panic + `resp.Body` リーク** ✅ `24f40b5`
+- 対処: `Close()` に nil ガード追加。エラーレスポンス時に `resp.Body.Close()` を追加。
+
+---
+
+### Tier 2: 正確性・ロジックバグ（✅ 全件完了）
+
+**2-A. tool call ループ上限なし** ✅ `3852672`
+- 対処: `Config.MaxToolCalls int`（デフォルト 0 = 無制限）追加。`toolCallRound` フィールドを `completionOutput` で propagate。YAML テンプレート・flag 追加済み。
+
+**2-B. Google `Current()` エラーで `isFinished` が未設定** ✅ `ea52b5d`
+- 対処: 全エラーパスで `s.isFinished = true` を設定。
+
+**2-C. グローバル `config` への直参照** ✅ `ea52b5d`（2-B と同一 PR）
+- 対処: 3箇所を `cfg.MCPTimeout`、`cfg.FormatAs` に統一。
+
+~~**2-D. `ptrOrNil` の 0 値扱い**~~ → **廃止**  
+~~**2-E. `retry()` の blocking sleep**~~ → **廃止**
+
+---
+
+### Tier 2.5: MCP 接続キャッシュ（✅ 完了）
+
+**3-A. MCP 接続を毎回再生成している** ✅ `5ba3e98`
+- 対処: `mcpClientPool`（mutex + map）を `mcp.go` に追加。`Mods` に `mcpPool *mcpClientPool` フィールド、`quit()` で `closeAll()`。`(m *Mods) mcpTools` / `(m *Mods) toolCall` がセッション内でクライアントを再利用。package-level `mcpTools`（`--mcp-list-tools` 用）は従来通り都度作成・Close。
+
+---
+
+### Tier 3: 設計改善（✅ 全件完了）
+
+**3-B. MCP context と LLM request context の混在** ✅ `d36df0d`
+- 対処: コメントで意図を明示。
+
+**3-C. `cancelRequest` の cancel 蓄積** ✅ `61e5b7a`（1-A と統合済み）
+
+**3-D. `Config.System` フィールド削除** ✅ `d36df0d`
+- 対処: フィールド削除、後方互換コメント追加。
+
+**3-E. `stream` 変数名とパッケージ名のシャドウ** ✅ `ea52b5d`（2-B と同一 PR）
+- 対処: 変数名を `s` に変更。
+
+---
+
+### Tier 4: 依存ライブラリ更新（✅ 全件完了）
+
+| PR | 内容 | コミット | 実績 |
+|---|---|---|---|
+| #5 | x/net + x/crypto CVE 更新 | `49f0731` | コード変更なし |
+| #6 | sqlite v1.46.1 → v1.53.0 | `78ed0f3` | コード変更なし |
+| #9 | anthropic-sdk-go v1.26.0 → v1.50.1 | `a87bf70` | コード変更なし（高リスク予測は外れ） |
+| #10 | mcp-go v0.45.0 → v0.54.1 | `5ba3e98` | API 互換のまま |
+| #11 | ollama v0.17.7 → v0.30.8 | `bd13dac` | コード変更なし（API 互換確認済み） |
+| #13 | glamour v0.10.0→v1.0.0, huh v0.8.0→v1.0.0 | `7c79cb0` | コード変更なし（高リスク予測は外れ） |
+
+---
+
+## 3. 修正のグルーピング（参考）
+
+> **PR番号の正式な定義はセクション4が一次情報。** このセクションは「なぜ同一PRにまとめるか」の理由を補足する参考資料。
+
+### グループ A — Tier 1 クラッシュ系（完了）
+
+| 含む修正 | PR |
+|---|---|
+| 1-D（OpenAI 1行ガード） | #1 |
+| 1-B + 1-C（Ollama channel 設計変更） | #2 |
+| 1-A + 3-C（cancelRequest 削除 + defer cancel） | #3 |
+| 1-E（Google nil panic + body リーク） | #4 |
+
+### グループ B — Tier 2 正確性系（完了）
+
+| 含む修正 | PR |
+|---|---|
+| 2-B + 2-C + 3-E（Google isFinished / global config / stream 変数名） | #7 |
+| 2-A（MaxToolCalls 追加） | #8 |
+
+### グループ C — Tier 2.5〜3 設計改善（完了）
+
+- **3-A + M5 + 4-5（mcp-go）→ PR#10**: 接続キャッシュ設計変更と SDK 更新を同時実施。
+- 3-C は 1-A と統合（PR#3）
+- 3-B、3-D は PR#12 でまとめて完了
+
+### グループ D — 依存更新バッチ（完了）
+
+| 含む更新 | PR |
+|---|---|
+| 4-1（x/net）+ 4-2（x/crypto） | #5 |
+| 4-3（sqlite）| #6 |
+| 4-4（anthropic-sdk-go）| #9 |
+| 3-A + M5 + 4-5（mcp-go）| #10 |
+| 4-6（ollama）| #11 |
+| 4-7（glamour + huh）| #13 |
+
+---
+
+## 4. 推奨実施順（✅ 全 PR 完了）
+
+```
+── 公開前に必須（Tier 1：全プロバイダのクラッシュ修正）──────────────────────
+PR #1  ✅ 3ef59dc  1-D                  OpenAI Choices guard（1行）
+PR #2  ✅ 6789fbc  1-B + 1-C            Ollama channel 設計変更
+PR #3  ✅ 61e5b7a  1-A + 3-C            cancelRequest: 削除 + defer cancel
+PR #4  ✅ 24f40b5  1-E                  Google nil panic + body リーク
+
+── 依存セキュリティ ──────────────────────────────────────────────────────────
+PR #5  ✅ 49f0731  Dep [1]              x/net + x/crypto CVE 更新
+PR #6  ✅ 78ed0f3  Dep [2]              sqlite 更新
+
+── 正確性・ロジック修正 ───────────────────────────────────────────────────────
+PR #7  ✅ ea52b5d  2-B + 2-C + 3-E     Google isFinished / global config / stream 変数名
+PR #8  ✅ 3852672  2-A                  MaxToolCalls 追加（デフォルト 0 = 無制限）
+
+── 依存更新（単独 PR）───────────────────────────────────────────────────────
+PR #9  ✅ a87bf70  Dep [3]              anthropic-sdk-go 更新
+
+── MCP 強化 ──────────────────────────────────────────────────────────────────
+PR #10 ✅ 5ba3e98  3-A + M5 + Dep [4]  MCP 接続キャッシュ + errgroup 改善 + mcp-go 更新
+
+── 残り依存更新 ──────────────────────────────────────────────────────────────
+PR #11 ✅ bd13dac  Dep [5]              ollama 更新
+
+── 後回し設計改善 ────────────────────────────────────────────────────────────
+PR #12 ✅ d36df0d  3-B + 3-D            context コメント整理 / Config.System 削除
+PR #13 ✅ 7c79cb0  Dep [6]              glamour + huh メジャー更新
+
+── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
+       ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
+       ⬜ モジュール名変更     go install 用に module パスを一括変更（import 全体に波及）
+```
+
+---
+
+## 5. 廃止・後回しの根拠
+
+| 項目 | 判断 | 理由 |
+|---|---|---|
+| 2-D（ptrOrNil の 0 値） | **廃止** | `config_template.yml` で `temp:1.0 / topp:1.0 / topk:50` と正の値が設定済み。デフォルト通りに使う限り実害なし |
+| 2-E（retry blocking sleep） | **廃止** | `retry()` は tea.Cmd goroutine 内から呼ばれるため `time.Sleep` は Update ループをブロックしない。race条件も実害なし |
+
+---
+
+## 6. 主要ファイル一覧
+
+| ファイル | 関連修正 | 状態 |
+|---|---|---|
+| `mods.go` | 1-A, 2-A, 2-C, 3-B, 3-C | ✅ |
+| `internal/ollama/ollama.go` | 1-B, 1-C | ✅ |
+| `internal/google/google.go` | 1-E, 2-B, 3-E | ✅ |
+| `internal/openai/openai.go` | 1-D | ✅ |
+| `internal/anthropic/anthropic.go` | 4-4 | ✅（コード変更不要だった） |
+| `mcp.go` | 3-A, M5 | ✅ |
+| `config.go` | 3-D | ✅ |
+| `go.mod` | 4-1 〜 4-7 | ✅ |
+
+---
+
+## 7. 検証メモ（調査で判明した事実）
+
+- `receiveCompletionStreamCmd` は `tea.Cmd`（goroutine）として実行される → `Current()` のブロッキング化は安全
+- `retry()` は tea.Cmd goroutine 内から呼ばれる → `time.Sleep` は Update ループをブロックしない
+- `config_template.yml`: `temp:1.0 / topp:1.0 / topk:50`（すべて正値）→ 2-D は不要
+- `format.go:97` に `// anthropic v1.5 removed this method` コメントあり → 4-4 は「高」リスクと予測したが、実際は v1.26→v1.50 でコード変更不要だった
+- `errgroup.Group`（素）が `mcp.go:66` で確認済み → PR#10 で `errgroup.WithContext` に変更
+- `main.go:748`: `_ = cache.Delete(id)` が L4 の実体（DB保存失敗時の孤立cache削除エラーを無視）
+- ollama v0.17.7 と v0.30.8 の API 構造体は同一 → PR#11 は単純 version bump（コード変更不要）
+- anthropic-sdk-go v1.26→v1.50: コード変更不要（高リスク予測は外れた）
+- glamour v0.10→v1.0 / huh v0.8→v1.0: コード変更不要（高リスク予測は外れた）
+- mcp-go v0.45→v0.54.1: `go.sum` に追加エントリ（jsonschema-go, santhosh-tekuri/jsonschema）が必要。`go get` でサブモジュールも指定すれば解決
+- MCP 接続キャッシュ（PR#10）: `mcpClientPool` を `mcp.go` に定義し、`Mods` に `*mcpClientPool` ポインタを持たせることで `mods.go` への mcp-go import 追加を回避できた
