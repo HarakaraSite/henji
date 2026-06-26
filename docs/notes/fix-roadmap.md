@@ -261,6 +261,18 @@ openai/anthropic/ollama の `Stream` が `done`/`factory`/`Next` での再スト
 
 `config.go:142-201` で YAML タグ付き永続設定値（`Format`・`MaxTokens` 等）とランタイム専用フラグ（`ShowHelp`・`Dirs`・`cacheReadFromID` 等）が1つの構造体に混在し、インデントも乱れている。「永続設定」と「セッション状態」を型で分離すると、グローバル `config` 問題の再発防止にもなる。大規模変更のため次バージョン向け。
 
+### R-E. MCP ツール名のセパレータ問題（`mcp.go:225`）
+
+MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引きしているが、区切り文字が `_` のためサーバ名自体に `_` を含むと誤ルーティングする。
+
+- `strings.Cut(name, "_")` は最初の `_` で分割するため、`my_server` サーバの `list` ツールが `my` サーバの `server_list` として解釈される
+- 逆引き時は `m.Config.MCPServers[sname]` で存在チェックされるため越境は起きないが、`my_server` を使う設定では機能しなくなる
+- セキュリティ実害（権限昇格・越境）はなく純粋な命名バグ
+
+修正方針: 区切り文字を衝突しにくい文字列（例: `__` ダブルアンダースコア、または `-`）に変えるか、広告側でエスケープして逆引き時にアンエスケープする。変更すると既存の会話キャッシュとの後方互換が壊れる可能性があるため、移行処理も含めて設計すること。
+
+出典: セキュリティスキャン（2026-06-26）Medium 指摘を Opus が「機能バグ、セキュリティ実害なし」と再評価。
+
 ---
 
 ## 6. 廃止・後回しの根拠（旧Tier）
@@ -306,3 +318,4 @@ openai/anthropic/ollama の `Stream` が `done`/`factory`/`Next` での再スト
 - `go test ./... -cover` の `covdata` ツール欠落エラー: Go toolchain 側の問題でコード失敗ではない（`go test -race` は全通過）
 - `mcp.go` グローバル `config` 参照（PR#16）: `enabledMCPs`・`isMCPEnabled` はグローバル `config` を読んでいたが、`(m *Mods) toolCall` もメソッドでありながら同様。本番は `m.Config == &config` で同一ポインタのため無害だが、テスト時に別 `Config` を注入すると MCP ロジックが壊れる。`*Config` を引数に変えて解消（`649e925`）
 - Opus リファクタリングレビュー（2026-06-26）: `stream.Stream` インターフェース・並行処理・エラーハンドリングは問題なし。主要な設計問題は `mcp.go` グローバル参照のみ（PR#16 で解消）。残りは次バージョン候補（セクション5）
+- セキュリティスキャン（2026-06-26）: Medium 2件・Low 3件の指摘。Google API key の URL 埋め込み（Medium）は `x-goog-api-key` ヘッダ化で修正（`d2b4c40`）。残り4件は Opus が評価し、セキュリティ実害なしと判定: sha.go regex 非アンカー（URL 注入経路なし）・google.go 行長無制限（自己設定エンドポイントのみ）・MaxToolCalls=0 無制限（意図的仕様）・MCP ツール名衝突（機能バグとして R-E に記録）
