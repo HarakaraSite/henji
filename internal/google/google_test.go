@@ -36,6 +36,14 @@ func TestStreamMessagesIncludesRequestAndAssistantResponse(t *testing.T) {
 	}, s.Messages())
 }
 
+// TestCloseNilResponseNoPanic is the PR#4 regression test.
+// Close must be safe to call when the HTTP response is nil (request failed before
+// the stream was established).
+func TestCloseNilResponseNoPanic(t *testing.T) {
+	s := &Stream{} // response is nil by default
+	require.NoError(t, s.Close())
+}
+
 func TestStreamMessagesReturnsCopy(t *testing.T) {
 	s := &Stream{
 		messages: []proto.Message{

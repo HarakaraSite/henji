@@ -4,8 +4,124 @@ import (
 	"fmt"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/mods/internal/proto"
+	"github.com/charmbracelet/mods/internal/stream"
 	"github.com/stretchr/testify/require"
 )
+
+// fakeToolCallStream is a stream.Stream that is always finished and always
+// returns the provided tool call statuses. Used to drive receiveCompletionStreamCmd.
+type fakeToolCallStream struct {
+	calls []proto.ToolCallStatus
+}
+
+func (f *fakeToolCallStream) Next() bool                           { return false }
+func (f *fakeToolCallStream) Current() (proto.Chunk, error)       { return proto.Chunk{}, nil }
+func (f *fakeToolCallStream) Close() error                         { return nil }
+func (f *fakeToolCallStream) Err() error                           { return nil }
+func (f *fakeToolCallStream) Messages() []proto.Message            { return nil }
+func (f *fakeToolCallStream) CallTools() []proto.ToolCallStatus    { return f.calls }
+
+var _ stream.Stream = (*fakeToolCallStream)(nil)
+
+func TestMaxToolCallsLimit(t *testing.T) {
+	fs := &fakeToolCallStream{
+		calls: []proto.ToolCallStatus{{Name: "search"}},
+	}
+	errh := func(err error) tea.Msg { return modsError{err: err} }
+
+	t.Run("allows rounds up to the limit", func(t *testing.T) {
+		m := &Mods{Config: &Config{MaxToolCalls: 2}}
+
+		// round 1 (toolCallRound 0→1): within limit
+		result := m.receiveCompletionStreamCmd(completionOutput{
+			stream: fs, errh: errh, toolCallRound: 0,
+		})()
+		out, ok := result.(completionOutput)
+		require.True(t, ok, "round 1: expected completionOutput, got %T", result)
+		require.Equal(t, 1, out.toolCallRound)
+
+		// round 2 (toolCallRound 1→2): at the limit, still allowed
+		result = m.receiveCompletionStreamCmd(completionOutput{
+			stream: fs, errh: errh, toolCallRound: 1,
+		})()
+		out, ok = result.(completionOutput)
+		require.True(t, ok, "round 2: expected completionOutput, got %T", result)
+		require.Equal(t, 2, out.toolCallRound)
+	})
+
+	t.Run("stops when exceeding the limit", func(t *testing.T) {
+		m := &Mods{Config: &Config{MaxToolCalls: 2}}
+
+		// round 3 (nextRound=3 > limit=2): must stop
+		result := m.receiveCompletionStreamCmd(completionOutput{
+			stream: fs, errh: errh, toolCallRound: 2,
+		})()
+		err, ok := result.(modsError)
+		require.True(t, ok, "expected modsError, got %T", result)
+		require.Contains(t, err.Error(), "tool call limit of 2 reached")
+	})
+
+	t.Run("zero means unlimited", func(t *testing.T) {
+		m := &Mods{Config: &Config{MaxToolCalls: 0}}
+
+		for i := range 5 {
+			result := m.receiveCompletionStreamCmd(completionOutput{
+				stream: fs, errh: errh, toolCallRound: i,
+			})()
+			out, ok := result.(completionOutput)
+			require.True(t, ok, "round %d: expected completionOutput, got %T", i+1, result)
+			require.Equal(t, i+1, out.toolCallRound)
+		}
+	})
+}
+
+func TestEnsureKeyPriority(t *testing.T) {
+	m := Mods{}
+	const docsURL = "https://example.com"
+
+	t.Run("explicit api-key wins over env and cmd", func(t *testing.T) {
+		t.Setenv("MY_KEY_ENV", "env-val")
+		key, err := m.ensureKey(API{
+			APIKey:    "explicit-key",
+			APIKeyEnv: "MY_KEY_ENV",
+			APIKeyCmd: "echo cmd-val",
+		}, "UNSET_XYZ", docsURL)
+		require.NoError(t, err)
+		require.Equal(t, "explicit-key", key)
+	})
+
+	t.Run("api-key-env wins over api-key-cmd", func(t *testing.T) {
+		t.Setenv("MY_KEY_ENV", "env-val")
+		key, err := m.ensureKey(API{
+			APIKeyEnv: "MY_KEY_ENV",
+			APIKeyCmd: "echo cmd-val",
+		}, "UNSET_XYZ", docsURL)
+		require.NoError(t, err)
+		require.Equal(t, "env-val", key)
+	})
+
+	t.Run("api-key-cmd used when env is absent", func(t *testing.T) {
+		key, err := m.ensureKey(API{
+			APIKeyCmd: "echo cmd-val",
+		}, "UNSET_XYZ", docsURL)
+		require.NoError(t, err)
+		require.Equal(t, "cmd-val", key)
+	})
+
+	t.Run("default env used as last resort", func(t *testing.T) {
+		t.Setenv("FALLBACK_KEY", "fallback-val")
+		key, err := m.ensureKey(API{}, "FALLBACK_KEY", docsURL)
+		require.NoError(t, err)
+		require.Equal(t, "fallback-val", key)
+	})
+
+	t.Run("error when all sources are empty", func(t *testing.T) {
+		_, err := m.ensureKey(API{}, "UNSET_MODS_KEY_XYZ", docsURL)
+		require.Error(t, err)
+	})
+}
 
 func TestFindCacheOpsDetails(t *testing.T) {
 	newMods := func(t *testing.T) *Mods {
