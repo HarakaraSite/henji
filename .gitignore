@@ -3,3 +3,5 @@ mods
 completions/
 manpages/
 dist/
+mods.yml
+*.bak
