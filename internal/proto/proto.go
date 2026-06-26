@@ -73,8 +73,9 @@ type Request struct {
 	TopP           *float64
 	TopK           *int64
 	Stop           []string
-	MaxTokens      *int64
-	ResponseFormat *string
+	MaxTokens           *int64
+	MaxCompletionTokens *int64
+	ResponseFormat      *string
 	ToolCaller     func(name string, data []byte) (string, error)
 }
 

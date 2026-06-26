@@ -368,12 +368,17 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		if mod.MaxChars == 0 {
 			mod.MaxChars = cfg.MaxInputChars
 		}
+		// Model-level max-completion-tokens overrides the global setting when set.
+		if mod.MaxCompletionTokens > 0 {
+			cfg.MaxCompletionTokens = mod.MaxCompletionTokens
+		}
 
-		// Check if the model is an o1 model and unset the max_tokens parameter
-		// accordingly, as it's unsupported by o1.
-		// We do set max_completion_tokens instead, which is supported.
-		// Release won't have a prefix with a dash, so just putting o1 for match.
+		// o1 models do not support max_tokens; use max_completion_tokens instead.
+		// If the user set max-tokens but not max-completion-tokens, promote it.
 		if strings.HasPrefix(mod.Name, "o1") {
+			if cfg.MaxCompletionTokens == 0 && cfg.MaxTokens > 0 {
+				cfg.MaxCompletionTokens = cfg.MaxTokens
+			}
 			cfg.MaxTokens = 0
 		}
 
@@ -411,6 +416,9 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		if cfg.MaxTokens > 0 {
 			request.MaxTokens = &cfg.MaxTokens
 		}
+		if cfg.MaxCompletionTokens > 0 {
+			request.MaxCompletionTokens = &cfg.MaxCompletionTokens
+		}
 
 		var client stream.Client
 		switch mod.API {
@@ -442,7 +450,7 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 
 func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 	key := api.APIKey
-	if key == "" && api.APIKeyEnv != "" && api.APIKeyCmd == "" {
+	if key == "" && api.APIKeyEnv != "" {
 		key = os.Getenv(api.APIKeyEnv)
 	}
 	if key == "" && api.APIKeyCmd != "" {
