@@ -28,6 +28,7 @@ var (
 // Config represents the configuration for the Google API client.
 type Config struct {
 	BaseURL        string
+	APIKey         string
 	HTTPClient     *http.Client
 	ThinkingBudget int
 }
@@ -35,7 +36,8 @@ type Config struct {
 // DefaultConfig returns the default configuration for the Google API client.
 func DefaultConfig(model, authToken string) Config {
 	return Config{
-		BaseURL:    fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?alt=sse&key=%s", model, authToken),
+		BaseURL:    fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:streamGenerateContent?alt=sse", model),
+		APIKey:     authToken,
 		HTTPClient: &http.Client{},
 	}
 }
@@ -312,6 +314,9 @@ func (s *Stream) Current() (proto.Chunk, error) {
 
 func googleSendRequestStream(client *Client, req *http.Request) (*Stream, error) {
 	req.Header.Set("content-type", "application/json")
+	if client.config.APIKey != "" {
+		req.Header.Set("x-goog-api-key", client.config.APIKey)
+	}
 
 	resp, err := client.config.HTTPClient.Do(req) //nolint:bodyclose // body is closed in stream.Close()
 	if err != nil {
