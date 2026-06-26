@@ -413,8 +413,8 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			client, err = ollama.New(occfg)
 		default:
 			client = openai.New(ccfg)
-			if cfg.Format && config.FormatAs == "json" {
-				request.ResponseFormat = &config.FormatAs
+			if cfg.Format && cfg.FormatAs == "json" {
+				request.ResponseFormat = &cfg.FormatAs
 			}
 		}
 		if err != nil {

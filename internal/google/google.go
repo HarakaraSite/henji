@@ -95,7 +95,7 @@ type Client struct {
 
 // Request implements stream.Client.
 func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stream {
-	stream := &Stream{
+	s := &Stream{
 		messages: append([]proto.Message(nil), request.Messages...),
 	}
 	body := MessageCompletionRequest{
@@ -130,16 +130,16 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 
 	req, err := c.newRequest(ctx, http.MethodPost, c.config.BaseURL, withBody(body))
 	if err != nil {
-		stream.err = err
-		return stream
+		s.err = err
+		return s
 	}
 
-	stream, err = googleSendRequestStream(c, req)
+	s, err = googleSendRequestStream(c, req)
 	if err != nil {
-		stream.err = err
+		s.err = err
 	}
-	stream.messages = append([]proto.Message(nil), request.Messages...)
-	return stream
+	s.messages = append([]proto.Message(nil), request.Messages...)
+	return s
 }
 
 // New creates a new Client with the given configuration.
@@ -256,7 +256,9 @@ func (s *Stream) Current() (proto.Chunk, error) {
 				s.isFinished = true
 				return proto.Chunk{}, stream.ErrNoContent // signals end of stream, not a real error
 			}
-			return proto.Chunk{}, fmt.Errorf("googleStreamReader.processLines: %w", readErr)
+			s.isFinished = true
+			s.err = fmt.Errorf("googleStreamReader.processLines: %w", readErr)
+			return proto.Chunk{}, s.err
 		}
 
 		noSpaceLine := bytes.TrimSpace(rawLine)
@@ -270,11 +272,15 @@ func (s *Stream) Current() (proto.Chunk, error) {
 		if !bytes.HasPrefix(noSpaceLine, googleHeaderData) || hasError {
 			if hasError {
 				noSpaceLine = bytes.TrimPrefix(noSpaceLine, googleHeaderData)
-				return proto.Chunk{}, fmt.Errorf("googleStreamReader.processLines: %s", noSpaceLine)
+				s.isFinished = true
+				s.err = fmt.Errorf("googleStreamReader.processLines: %s", noSpaceLine)
+				return proto.Chunk{}, s.err
 			}
 			emptyMessagesCount++
 			if emptyMessagesCount > emptyMessagesLimit {
-				return proto.Chunk{}, ErrTooManyEmptyStreamMessages
+				s.isFinished = true
+				s.err = ErrTooManyEmptyStreamMessages
+				return proto.Chunk{}, s.err
 			}
 			continue
 		}
@@ -284,7 +290,9 @@ func (s *Stream) Current() (proto.Chunk, error) {
 		var chunk CompletionMessageResponse
 		unmarshalErr := s.unmarshaler.Unmarshal(noPrefixLine, &chunk)
 		if unmarshalErr != nil {
-			return proto.Chunk{}, fmt.Errorf("googleStreamReader.processLines: %w", unmarshalErr)
+			s.isFinished = true
+			s.err = fmt.Errorf("googleStreamReader.processLines: %w", unmarshalErr)
+			return proto.Chunk{}, s.err
 		}
 		if len(chunk.Candidates) == 0 {
 			return proto.Chunk{}, stream.ErrNoContent
