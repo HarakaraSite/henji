@@ -51,6 +51,7 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 	b := true
 	s := &Stream{
 		toolCall: request.ToolCaller,
+		messages: request.Messages,
 	}
 	body := api.ChatRequest{
 		Model:    request.Model,
@@ -73,14 +74,26 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 		body.Options["top_p"] = *request.TopP
 	}
 	s.request = body
-	s.messages = request.Messages
 	s.factory = func() {
+		if s.cancelFn != nil {
+			s.cancelFn()
+		}
 		s.done = false
 		s.err = nil
-		s.respCh = make(chan api.ChatResponse)
+		ch := make(chan api.ChatResponse)
+		errCh := make(chan error, 1)
+		s.respCh = ch
+		s.errCh = errCh
+		ctx2, cancel := context.WithCancel(ctx)
+		s.cancelFn = cancel
 		go func() {
-			if err := c.Chat(ctx, &s.request, s.fn); err != nil {
-				s.err = err
+			defer close(ch)
+			fn := func(resp api.ChatResponse) error {
+				ch <- resp
+				return nil
+			}
+			if err := c.Chat(ctx2, &s.request, fn); err != nil {
+				errCh <- err
 			}
 		}()
 	}
@@ -95,15 +108,12 @@ type Stream struct {
 	done      bool
 	finalized bool
 	factory   func()
+	cancelFn  context.CancelFunc
 	respCh    chan api.ChatResponse
+	errCh     chan error
 	message   api.Message
 	toolCall  func(name string, data []byte) (string, error)
 	messages  []proto.Message
-}
-
-func (s *Stream) fn(resp api.ChatResponse) error {
-	s.respCh <- resp
-	return nil
 }
 
 // CallTools implements stream.Stream.
@@ -125,30 +135,37 @@ func (s *Stream) CallTools() []proto.ToolCallStatus {
 
 // Close implements stream.Stream.
 func (s *Stream) Close() error {
-	close(s.respCh)
-	s.done = true
+	s.cancelFn()
 	return nil
 }
 
 // Current implements stream.Stream.
+//
+// Blocks until the next chunk arrives or the stream ends. Safe to call from a
+// goroutine (tea.Cmd) — does not block the Bubble Tea Update loop.
 func (s *Stream) Current() (proto.Chunk, error) {
-	select {
-	case resp := <-s.respCh:
-		chunk := proto.Chunk{
-			Content: resp.Message.Content,
+	resp, ok := <-s.respCh
+	if !ok {
+		// goroutine exited; drain error if any (happens-before guaranteed by channel close)
+		select {
+		case s.err = <-s.errCh:
+		default:
 		}
-		if resp.Message.Role != "" {
-			s.message.Role = resp.Message.Role
-		}
-		s.message.Content += resp.Message.Content
-		s.message.ToolCalls = append(s.message.ToolCalls, resp.Message.ToolCalls...)
-		if resp.Done {
-			s.done = true
-		}
-		return chunk, nil
-	default:
+		s.done = true
 		return proto.Chunk{}, stream.ErrNoContent
 	}
+	chunk := proto.Chunk{
+		Content: resp.Message.Content,
+	}
+	if resp.Message.Role != "" {
+		s.message.Role = resp.Message.Role
+	}
+	s.message.Content += resp.Message.Content
+	s.message.ToolCalls = append(s.message.ToolCalls, resp.Message.ToolCalls...)
+	if resp.Done {
+		s.done = true
+	}
+	return chunk, nil
 }
 
 // Err implements stream.Stream.
@@ -159,10 +176,10 @@ func (s *Stream) Messages() []proto.Message { return s.messages }
 
 // Next implements stream.Stream.
 func (s *Stream) Next() bool {
-	if s.err != nil {
-		return false
-	}
 	if s.done {
+		if s.err != nil {
+			return false
+		}
 		if !s.finalized {
 			s.messages = append(s.messages, toProtoMessage(s.message))
 			s.request.Messages = append(s.request.Messages, s.message)
