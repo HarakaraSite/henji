@@ -118,6 +118,9 @@ type Stream struct {
 
 // CallTools implements stream.Stream.
 func (s *Stream) CallTools() []proto.ToolCallStatus {
+	if len(s.message.Choices) == 0 {
+		return nil
+	}
 	calls := s.message.Choices[0].Message.ToolCalls
 	statuses := make([]proto.ToolCallStatus, 0, len(calls))
 	for _, call := range calls {
