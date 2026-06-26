@@ -1,122 +1,51 @@
-> [!NOTE]
->
-> # Sunsetting Mods
->
-> On March 9, 2026 we sunset Mods and archive this repository to focus our
-> efforts on [Crush](https://charm.land/crush).
->
-> Much of the functionality in Mods can be found in Crush’s non-interactive
-> mode, `crush run`. We plan on continuing to invest into Crush’s
-> non-interactive mode, so if there are features in Mods does that you’d like
-> to see in Crush, [let us know](https://github.com/charmbracelet/crush/discussions).
->
-> Mods will remain be open source and publicly available. If you love this
-> project and would like to maintain a fork, please do.
->
-> Thanks for supporting this project and chat us up in
-> [Slack](https://charm.land/slack) or [Discord](https://charm.sh/chat) if
-> you have any questions.
-
-# Mods
-
-<p>
-    <img src="https://github.com/charmbracelet/mods/assets/25087/5442bf46-b908-47af-bf4e-60f7c38951c4" width="630" alt="Mods product art and type treatment"/>
-    <br>
-    <a href="https://github.com/charmbracelet/mods/releases"><img src="https://img.shields.io/github/release/charmbracelet/mods.svg" alt="Latest Release"></a>
-    <a href="https://github.com/charmbracelet/mods/actions"><img src="https://github.com/charmbracelet/mods/workflows/build/badge.svg" alt="Build Status"></a>
-</p>
+# Mods (fork)
 
 AI for the command line, built for pipelines.
 
-<p><img src="https://vhs.charm.sh/vhs-5Uyj0U6Hlqi1LVIIRyYKM5.gif" width="900" alt="a GIF of mods running"></p>
+This is an actively maintained fork of [charmbracelet/mods](https://github.com/charmbracelet/mods),
+which was archived on March 9, 2026. The fork focuses on local LLM usage and MCP integration.
 
-Large Language Models (LLM) based AI is useful to ingest command output and
-format results in Markdown, JSON, and other text based formats. Mods is a
-tool to add a sprinkle of AI in your command line and make your pipelines
-artificially intelligent.
+## What Changed from Upstream
 
-It works great with LLMs running locally through [LocalAI]. You can also use
-[OpenAI], [Groq], or [Azure OpenAI].
+### Bug fixes
 
-[LocalAI]: https://github.com/go-skynet/LocalAI
-[OpenAI]: https://platform.openai.com/account/api-keys
-[Groq]: https://console.groq.com/keys
-[Azure OpenAI]: https://azure.microsoft.com/en-us/products/cognitive-services/openai-service
+| Area | Fix |
+|---|---|
+| OpenAI | Panic when response has no choices |
+| Ollama | Channel leak / deadlock on stream cancellation |
+| Google | nil panic and response body leak on request failure |
+| All providers | `cancelRequest` goroutine leak replaced with `defer cancel` |
+| All providers | `max-completion-tokens` (o1 models) now correctly wired through to the API |
+| All providers | `api-key-env` priority over `api-key-cmd` restored to match documented order |
+| MCP | Connection caching across tool-call rounds; `errgroup` cancels siblings on first failure |
 
-### Installation
+### Security
 
-Use a package manager:
+- `mods.yml` and `.bak` are created with `0600` permissions (was `0644`)
+- Google API key moved from URL query parameter to `x-goog-api-key` header, preventing key exposure in transport error messages
+- `mods.yml` and `*.bak` added to `.gitignore`
 
-```bash
-# macOS or Linux
-brew install charmbracelet/tap/mods
+### Dependencies
 
-# Windows (with Winget)
-winget install charmbracelet.mods
+All dependencies updated to current versions, including security patches for `x/net` and `x/crypto`.
 
-# Arch Linux (btw)
-yay -S mods
+### Removals
 
-# Nix
-nix-shell -p mods
-```
+- `Config.System` field removed (was unused)
 
-<details>
-<summary>Debian/Ubuntu</summary>
+## Installation
 
-```bash
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
-echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
-sudo apt update && sudo apt install mods
-```
-
-</details>
-
-<details>
-<summary>Fedora/RHEL</summary>
-
-```bash
-echo '[charm]
-name=Charm
-baseurl=https://repo.charm.sh/yum/
-enabled=1
-gpgcheck=1
-gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/yum.repos.d/charm.repo
-sudo yum install mods
-```
-
-</details>
-
-### FreeBSD
-
-Install [from ports](https://www.freshports.org/sysutils/mods/):
+### Build from source
 
 ```sh
-cd /usr/ports/sysutils/mods
-make install
+git clone <this-repo>
+cd mods
+go build -o mods .
 ```
 
-Or, download it:
+> `go install` support will be available once the module is published.
 
-- [Packages][releases] are available in Debian and RPM formats
-- [Binaries][releases] are available for Linux, macOS, and Windows
-
-[releases]: https://github.com/charmbracelet/mods/releases
-
-Or, just install it with `go`:
-
-```sh
-go install github.com/charmbracelet/mods@latest
-```
-
-<details>
-<summary>Shell Completions</summary>
-
-All the packages and archives come with pre-generated completion files for Bash,
-ZSH, Fish, and PowerShell.
-
-If you built it from source, you can generate them with:
+### Shell completions
 
 ```bash
 mods completion bash -h
@@ -125,87 +54,134 @@ mods completion fish -h
 mods completion powershell -h
 ```
 
-If you use a package (like Homebrew, Debs, etc), the completions should be set
-up automatically, given your shell is configured properly.
+## Recommended Setup
 
-</details>
+### Local LLM (Ollama / mlx-lm)
 
-## What Can It Do?
+The simplest setup requires no API key. Point Mods at your local OpenAI-compatible endpoint:
 
-Mods works by reading standard in and prefacing it with a prompt supplied in
-the `mods` arguments. It sends the input text to an LLM and prints out the
-result, optionally asking the LLM to format the response as Markdown. This
-gives you a way to "question" the output of a command. Mods will also work on
-standard in or an argument supplied prompt individually.
+```yaml
+# ~/.config/mods/mods.yml
+apis:
+  local:
+    base-url: http://localhost:11434/v1  # Ollama default
+    models:
+      llama3.2:
+        aliases: ["llama"]
+        max-input-chars: 32000
 
-Be sure to check out the [examples](examples.md) and a list of all the
-[features](features.md).
+default-model: llama3.2
+```
 
-Mods works with OpenAI compatible endpoints. By default, Mods is configured to
-support OpenAI's official API and a LocalAI installation running on port 8080.
-You can configure additional endpoints in your settings file by running
-`mods --settings`.
+```sh
+echo "explain this error" | mods
+ls -la | mods summarize these files
+```
 
-## Saved Conversations
+### MCP tool call limit
 
-Conversations are saved locally by default. Each conversation has a SHA-1
-identifier and a title (like `git`!).
+When using MCP servers, set a tool-call limit to prevent runaway loops. `0` means unlimited (default).
 
-<p>
-  <img src="https://vhs.charm.sh/vhs-6MMscpZwgzohYYMfTrHErF.gif" width="900" alt="a GIF listing and showing saved conversations.">
-</p>
+```yaml
+# ~/.config/mods/mods.yml
+max-tool-calls: 10
+```
 
-Check the [`./features.md`](./features.md) for more details.
+### API key management
+
+Preferred order (most secure first):
+
+1. **`api-key-cmd`** — shell command whose stdout is the key; keys never touch disk
+
+   ```yaml
+   api-key-cmd: op read "op://vault/openai/key"
+   # or:
+   api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
+   ```
+
+   The command must write only the key to stdout.
+
+2. **`api-key-env`** — read from a named environment variable
+
+   ```yaml
+   api-key-env: OPENAI_API_KEY
+   ```
+
+3. **`api-key`** — plaintext in `mods.yml` (stored at `0600`; avoid committing to version control)
+
+4. **Default env** — provider-specific fallback (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
 
 ## Usage
 
-- `-m`, `--model`: Specify Large Language Model to use
-- `-M`, `--ask-model`: Ask which model to use via interactive prompt
-- `-f`, `--format`: Ask the LLM to format the response in a given format
-- `--format-as`: Specify the format for the output (used with `--format`)
-- `-P`, `--prompt` Include the prompt from the arguments and stdin, truncate stdin to specified number of lines
-- `-p`, `--prompt-args`: Include the prompt from the arguments in the response
-- `-q`, `--quiet`: Only output errors to standard err
-- `-r`, `--raw`: Print raw response without syntax highlighting
-- `--settings`: Open settings
-- `-x`, `--http-proxy`: Use HTTP proxy to connect to the API endpoints
-- `--max-retries`: Maximum number of retries
-- `--max-tokens`: Specify maximum tokens with which to respond
-- `--no-limit`: Do not limit the response tokens
-- `--role`: Specify the role to use (See [custom roles](#custom-roles))
-- `--word-wrap`: Wrap output at width (defaults to 80)
-- `--reset-settings`: Restore settings to default
-- `--theme`: Theme to use in the forms; valid choices are: `charm`, `catppuccin`, `dracula`, and `base16`
-- `--status-text`: Text to show while generating
+```sh
+# Pipe command output to an LLM
+ls -la | mods "explain these files"
+cat error.log | mods "what went wrong?"
+
+# Prompt only
+mods "write a haiku about Go"
+
+# Continue a conversation
+mods -C "now make it funnier"
+```
+
+### Flags
+
+| Flag | Description |
+|---|---|
+| `-m`, `--model` | Specify the model to use |
+| `-M`, `--ask-model` | Choose model interactively |
+| `-f`, `--format` | Ask the LLM to format the response (e.g. markdown, json) |
+| `--format-as` | Specify output format (used with `--format`) |
+| `-P`, `--prompt` | Include prompt from args and stdin; truncate stdin to N lines |
+| `-p`, `--prompt-args` | Include prompt from args in the response |
+| `-q`, `--quiet` | Only output errors to stderr |
+| `-r`, `--raw` | Print raw response without syntax highlighting |
+| `--settings` | Open settings file |
+| `-x`, `--http-proxy` | Use HTTP proxy for API connections |
+| `--max-retries` | Maximum number of retries |
+| `--max-tokens` | Maximum tokens in response |
+| `--no-limit` | Do not limit response tokens |
+| `--role` | Specify a custom role (system prompt) |
+| `--word-wrap` | Wrap output at width (default 80) |
+| `--reset-settings` | Restore settings to default |
+| `--theme` | UI theme: `charm`, `catppuccin`, `dracula`, `base16` |
+| `--status-text` | Text shown while generating |
 
 #### Conversations
 
-- `-t`, `--title`: Set the title for the conversation.
-- `-l`, `--list`: List saved conversations.
-- `-c`, `--continue`: Continue from last response or specific title or SHA-1.
-- `-C`, `--continue-last`: Continue the last conversation.
-- `-s`, `--show`: Show saved conversation for the given title or SHA-1
-- `-S`, `--show-last`: Show previous conversation
-- `--delete-older-than=<duration>`: Deletes conversations older than given duration (`10d`, `1mo`).
-- `--delete`: Deletes the saved conversations for the given titles or SHA-1s
-- `--no-cache`: Do not save conversations
+| Flag | Description |
+|---|---|
+| `-t`, `--title` | Set conversation title |
+| `-l`, `--list` | List saved conversations |
+| `-c`, `--continue` | Continue a conversation by title or SHA-1 |
+| `-C`, `--continue-last` | Continue the last conversation |
+| `-s`, `--show` | Show a saved conversation |
+| `-S`, `--show-last` | Show the previous conversation |
+| `--delete-older-than` | Delete conversations older than duration (`10d`, `1mo`) |
+| `--delete` | Delete conversations by title or SHA-1 |
+| `--no-cache` | Do not save this conversation |
 
 #### MCP
 
-- `--mcp-list`: List all available MCP servers
-- `--mcp-list-tools`: List all available tools from enabled MCP servers
-- `--mcp-disable`: Disable specific MCP servers
+| Flag | Description |
+|---|---|
+| `--mcp-list` | List configured MCP servers |
+| `--mcp-list-tools` | List available tools from enabled MCP servers |
+| `--mcp-disable` | Disable specific MCP servers for this run |
 
 #### Advanced
 
-- `--fanciness`: Level of fanciness
-- `--temp`: Sampling temperature
-- `--topp`: Top P value
-- `--topk`: Top K value
+| Flag | Description |
+|---|---|
+| `--fanciness` | Level of fanciness |
+| `--temp` | Sampling temperature |
+| `--topp` | Top-P value |
+| `--topk` | Top-K value |
 
 ## Custom Roles
 
-Roles allow you to set system prompts. Here is an example of a `shell` role:
+Roles set a system prompt for a session. Define them in `mods.yml`:
 
 ```yaml
 roles:
@@ -216,66 +192,64 @@ roles:
     - you do not provide any explanation whatsoever, ONLY the command
 ```
 
-Then, use the custom role in `mods`:
-
 ```sh
-mods --role shell list files in the current directory
+mods --role shell list files sorted by size
 ```
 
-## Setup
+## Cloud Providers
 
-### Open AI
+### OpenAI
 
-Mods uses GPT-4 by default. It will fall back to GPT-3.5 Turbo.
+```sh
+export OPENAI_API_KEY=sk-...
+```
 
-Set the `OPENAI_API_KEY` environment variable. If you don't have one yet, you
-can grab it the [OpenAI website](https://platform.openai.com/account/api-keys).
+### Anthropic
 
-Alternatively, set the [`AZURE_OPENAI_KEY`] environment variable to use Azure
-OpenAI. Grab a key from [Azure](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service).
+```sh
+export ANTHROPIC_API_KEY=sk-ant-...
+```
 
-### Local AI
+### Google Gemini
 
-Local AI allows you to run models locally. Mods works with the GPT4ALL-J model
-as setup in [this tutorial](https://github.com/go-skynet/LocalAI#example-use-gpt4all-j-model).
+```sh
+export GOOGLE_API_KEY=...
+```
 
 ### Groq
 
-Groq provides models powered by their LPU inference engine.
+```sh
+export GROQ_API_KEY=...
+```
 
-Set the `GROQ_API_KEY` environment variable. If you don't have one yet, you can
-get it from the [Groq console](https://console.groq.com/keys).
+### Azure OpenAI
 
-### Gemini
+```sh
+export AZURE_OPENAI_KEY=...
+```
 
-Mods supports using Gemini models from Google.
+Configure the `base-url` and `azure-deployment` in `mods.yml` as well.
 
-Set the `GOOGLE_API_KEY` enviroment variable. If you don't have one yet,
-you can get it from the [Google AI Studio](https://aistudio.google.com/apikey).
+## MCP Integration
 
-## Contributing
+MCP (Model Context Protocol) allows the LLM to call external tools defined by MCP servers.
 
-See [contributing][contribute].
+```yaml
+# ~/.config/mods/mods.yml
+mcp-servers:
+  filesystem:
+    type: stdio
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 
-[contribute]: https://github.com/charmbracelet/mods/contribute
+max-tool-calls: 10  # recommended; 0 = unlimited
+```
 
-## Whatcha Think?
-
-We’d love to hear your thoughts on this project. Feel free to drop us a note.
-
-- [Twitter](https://twitter.com/charmcli)
-- [The Fediverse](https://mastodon.social/@charmcli)
-- [Discord](https://charm.sh/chat)
+```sh
+mods --mcp-list-tools          # inspect available tools
+mods --mcp-disable filesystem  # disable a server for this run
+```
 
 ## License
 
-[MIT](https://github.com/charmbracelet/mods/raw/main/LICENSE)
-
----
-
-Part of [Charm](https://charm.sh).
-
-<a href="https://charm.sh/"><img alt="The Charm logo" width="400" src="https://stuff.charm.sh/charm-badge.jpg" /></a>
-
-<!--prettier-ignore-->
-Charm热爱开源 • Charm loves open source
+[MIT](LICENSE) — original work by [Charmbracelet, Inc.](https://charm.sh)
