@@ -374,6 +374,9 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			cfg.MaxTokens = 0
 		}
 
+		// MCPTimeout context: only for tool listing / individual tool calls.
+		// The LLM stream below uses m.ctx directly (no timeout) so long
+		// responses are not cut off by the MCP deadline.
 		ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
 		tools, err := mcpTools(ctx)
 		cancel()
@@ -396,6 +399,7 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			Stop:        cfg.Stop,
 			Tools:       tools,
 			ToolCaller: func(name string, data []byte) (string, error) {
+				// Per-call timeout: each tool invocation is bounded independently.
 				ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
 				defer cancel()
 				return toolCall(ctx, name, data)

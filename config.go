@@ -164,11 +164,10 @@ type Config struct {
 	Fanciness           uint       `yaml:"fanciness" env:"FANCINESS"`
 	StatusText          string     `yaml:"status-text" env:"STATUS_TEXT"`
 	HTTPProxy           string     `yaml:"http-proxy" env:"HTTP_PROXY"`
-	APIs                APIs       `yaml:"apis"`
-	System              string     `yaml:"system"`
-	Role                string     `yaml:"role" env:"ROLE"`
-	AskModel            bool
-	Roles               map[string][]string
+	APIs     APIs   `yaml:"apis"`
+	Role     string `yaml:"role" env:"ROLE"`
+	AskModel bool
+	Roles    map[string][]string
 	ShowHelp            bool
 	ResetSettings       bool
 	Prefix              string
@@ -193,6 +192,8 @@ type Config struct {
 	MCPListTools bool
 	MCPDisable   []string
 	MCPTimeout   time.Duration `yaml:"mcp-timeout" env:"MCP_TIMEOUT"`
+	// Note: the former top-level "system:" YAML key (Config.System) has been
+	// removed. Use the "roles:" section to define system prompts instead.
 
 	openEditor                                         bool
 	cacheReadFromID, cacheWriteToID, cacheWriteToTitle string
