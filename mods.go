@@ -60,9 +60,8 @@ type Mods struct {
 	glamViewport  viewport.Model
 	glamOutput    string
 	glamHeight    int
-	messages      []proto.Message
-	cancelRequest []context.CancelFunc
-	anim          tea.Model
+	messages []proto.Message
+	anim     tea.Model
 	width         int
 	height        int
 
@@ -252,9 +251,6 @@ func (m *Mods) View() string {
 }
 
 func (m *Mods) quit() tea.Msg {
-	for _, cancel := range m.cancelRequest {
-		cancel()
-	}
 	return tea.Quit()
 }
 
@@ -376,10 +372,9 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			cfg.MaxTokens = 0
 		}
 
-		ctx, cancel := context.WithTimeout(m.ctx, config.MCPTimeout)
-		m.cancelRequest = append(m.cancelRequest, cancel)
-
+		ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
 		tools, err := mcpTools(ctx)
+		cancel()
 		if err != nil {
 			return err
 		}
@@ -399,8 +394,8 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			Stop:        cfg.Stop,
 			Tools:       tools,
 			ToolCaller: func(name string, data []byte) (string, error) {
-				ctx, cancel := context.WithTimeout(m.ctx, config.MCPTimeout)
-				m.cancelRequest = append(m.cancelRequest, cancel)
+				ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
+				defer cancel()
 				return toolCall(ctx, name, data)
 			},
 		}
