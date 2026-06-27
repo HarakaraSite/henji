@@ -111,6 +111,16 @@ Preferred order (most secure first):
 
 4. **Default env** — provider-specific fallback (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
 
+### Environment variable overrides
+
+Any `henji.yml` setting can be overridden with a `HENJI_` prefixed environment variable:
+
+```sh
+export HENJI_DEFAULT_MODEL=llama3.2
+export HENJI_MAX_TOKENS=2000
+export HENJI_FORMAT=true
+```
+
 ## Usage
 
 ```sh

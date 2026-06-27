@@ -233,7 +233,7 @@ func ensureConfig() (Config, error) {
 		return c, modsError{err, "Could not parse settings file."}
 	}
 
-	if err := env.ParseWithOptions(&c, env.Options{Prefix: "MODS_"}); err != nil {
+	if err := env.ParseWithOptions(&c, env.Options{Prefix: "HENJI_"}); err != nil {
 		return c, modsError{err, "Could not parse environment into settings file."}
 	}
 
