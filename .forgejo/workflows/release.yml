@@ -6,66 +6,33 @@ on:
       - "v*"
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-            ext: ""
-          - goos: linux
-            goarch: arm64
-            ext: ""
-          - goos: darwin
-            goarch: amd64
-            ext: ""
-          - goos: darwin
-            goarch: arm64
-            ext: ""
-          - goos: windows
-            goarch: amd64
-            ext: ".exe"
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Go
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
 
-      - name: Build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "0"
+      - name: Build binaries
         run: |
-          go build -trimpath -ldflags="-s -w" \
-            -o dist/henji-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
-            .
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/henji-linux-amd64   .
+          CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/henji-linux-arm64   .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/henji-darwin-amd64  .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/henji-darwin-arm64  .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/henji-windows-amd64.exe .
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload release
+        uses: actions/forgejo-release@v2
         with:
-          name: henji-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: dist/
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*/*
-          generate_release_notes: true
+          direction: upload
+          url: ${{ vars.FORGE_URL }}
+          repo: ${{ github.repository }}
+          token: ${{ secrets.RELEASE_TOKEN }}
+          tag: ${{ github.ref_name }}
+          release-dir: dist
+          release-notes: "Release ${{ github.ref_name }}"
