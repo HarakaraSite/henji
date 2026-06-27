@@ -474,8 +474,8 @@ func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 		reason: fmt.Sprintf(
 			"%[1]s required; set the environment variable %[1]s or update %[2]s through %[3]s.",
 			m.Styles.InlineCode.Render(defaultEnv),
-			m.Styles.InlineCode.Render("mods.yaml"),
-			m.Styles.InlineCode.Render("mods --settings"),
+			m.Styles.InlineCode.Render("henji.yml"),
+			m.Styles.InlineCode.Render("henji --settings"),
 		),
 		err: newUserErrorf(
 			"You can grab one at %s",
@@ -765,7 +765,7 @@ func (m *Mods) resolveModel(cfg *Config) (API, Model, error) {
 		err: newUserErrorf(
 			"Please specify an API endpoint with %s or configure the model in the settings: %s",
 			m.Styles.InlineCode.Render("--api"),
-			m.Styles.InlineCode.Render("mods --settings"),
+			m.Styles.InlineCode.Render("henji --settings"),
 		),
 	}
 }
