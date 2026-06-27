@@ -13,15 +13,19 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+            ext: ""
           - goos: linux
             goarch: arm64
+            ext: ""
           - goos: darwin
             goarch: amd64
+            ext: ""
           - goos: darwin
             goarch: arm64
+            ext: ""
           - goos: windows
             goarch: amd64
-            ext: .exe
+            ext: ".exe"
 
     steps:
       - name: Checkout code
@@ -40,7 +44,7 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           go build -trimpath -ldflags="-s -w" \
-            -o dist/henji-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext || '' }} \
+            -o dist/henji-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
             .
 
       - name: Upload artifact

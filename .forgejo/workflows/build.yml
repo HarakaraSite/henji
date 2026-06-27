@@ -15,11 +15,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Download modules
-        run: go mod download
-
       - name: Build
+        env:
+          CGO_ENABLED: "0"
         run: go build -v ./...
 
       - name: Test
+        env:
+          CGO_ENABLED: "0"
         run: go test -timeout=60s ./...
