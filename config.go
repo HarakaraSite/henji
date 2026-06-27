@@ -211,7 +211,7 @@ type MCPServerConfig struct {
 
 func ensureConfig() (Config, error) {
 	var c Config
-	sp, err := xdg.ConfigFile(filepath.Join("mods", "mods.yml"))
+	sp, err := xdg.ConfigFile(filepath.Join("henji", "henji.yml"))
 	if err != nil {
 		return c, modsError{err, "Could not find settings path."}
 	}
@@ -238,7 +238,7 @@ func ensureConfig() (Config, error) {
 	}
 
 	if c.CachePath == "" {
-		c.CachePath = filepath.Join(xdg.DataHome, "mods")
+		c.CachePath = filepath.Join(xdg.DataHome, "henji")
 	}
 
 	if err := os.MkdirAll(

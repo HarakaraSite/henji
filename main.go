@@ -72,7 +72,7 @@ var (
 	db     *convoDB
 
 	rootCmd = &cobra.Command{
-		Use:           "mods",
+		Use:           "henji",
 		Short:         "GPT on the command line. Built for pipelines.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -150,7 +150,7 @@ var (
 			}
 
 			if config.Settings {
-				c, err := editor.Cmd("mods", config.SettingsPath)
+				c, err := editor.Cmd("henji", config.SettingsPath)
 				if err != nil {
 					return modsError{
 						err:    err,
@@ -182,7 +182,7 @@ var (
 					reason: "You haven't provided any prompt input.",
 					err: newUserErrorf(
 						"You can give your prompt as arguments and/or pipe it from STDIN.\nExample: %s",
-						stdoutStyles().InlineCode.Render("mods [prompt]"),
+						stdoutStyles().InlineCode.Render("henji [prompt]"),
 					),
 				}
 			}
@@ -351,7 +351,7 @@ func main() {
 	initFlags()
 
 	if !isCompletionCmd(os.Args) && !isManCmd(os.Args) && !isVersionOrHelpCmd(os.Args) {
-		db, err = openDB(filepath.Join(config.CachePath, "conversations", "mods.db"))
+		db, err = openDB(filepath.Join(config.CachePath, "conversations", "henji.db"))
 		if err != nil {
 			handleError(modsError{err, "Could not open database."})
 			os.Exit(1)
@@ -419,12 +419,12 @@ func maybeWriteMemProfile() {
 		os.Exit(1)
 	}
 
-	heap, err := os.Create("mods_heap.profile")
+	heap, err := os.Create("henji_heap.profile")
 	if err != nil {
 		handle(err)
 	}
 	closers = append(closers, heap.Close)
-	allocs, err := os.Create("mods_allocs.profile")
+	allocs, err := os.Create("henji_allocs.profile")
 	if err != nil {
 		handle(err)
 	}
@@ -455,7 +455,7 @@ func handleError(err error) {
 		args = []any{
 			fmt.Sprintf(
 				"Check out %s %s",
-				stderrStyles().InlineCode.Render("mods -h"),
+				stderrStyles().InlineCode.Render("henji -h"),
 				stderrStyles().Comment.Render("for help."),
 			),
 			fmt.Sprintf(
@@ -926,7 +926,7 @@ func prefixFromEditor() (string, error) {
 	_ = f.Close()
 	defer func() { _ = os.Remove(f.Name()) }()
 	cmd, err := editor.Cmd(
-		"mods",
+		"henji",
 		f.Name(),
 	)
 	if err != nil {

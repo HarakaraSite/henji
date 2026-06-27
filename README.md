@@ -21,9 +21,9 @@ which was archived on March 9, 2026. The fork focuses on local LLM usage and MCP
 
 ### Security
 
-- `mods.yml` and `.bak` are created with `0600` permissions (was `0644`)
+- `henji.yml` and `.bak` are created with `0600` permissions (was `0644`)
 - Google API key moved from URL query parameter to `x-goog-api-key` header, preventing key exposure in transport error messages
-- `mods.yml` and `*.bak` added to `.gitignore`
+- `henji.yml` and `*.bak` added to `.gitignore`
 
 ### Dependencies
 
@@ -39,8 +39,8 @@ All dependencies updated to current versions, including security patches for `x/
 
 ```sh
 git clone <this-repo>
-cd mods
-go build -o mods .
+cd henji
+go build -o henji .
 ```
 
 > `go install` support will be available once the module is published.
@@ -48,10 +48,10 @@ go build -o mods .
 ### Shell completions
 
 ```bash
-mods completion bash -h
-mods completion zsh -h
-mods completion fish -h
-mods completion powershell -h
+henji completion bash -h
+henji completion zsh -h
+henji completion fish -h
+henji completion powershell -h
 ```
 
 ## Recommended Setup
@@ -61,7 +61,7 @@ mods completion powershell -h
 The simplest setup requires no API key. Point Mods at your local OpenAI-compatible endpoint:
 
 ```yaml
-# ~/.config/mods/mods.yml
+# ~/.config/henji/henji.yml
 apis:
   local:
     base-url: http://localhost:11434/v1  # Ollama default
@@ -74,8 +74,8 @@ default-model: llama3.2
 ```
 
 ```sh
-echo "explain this error" | mods
-ls -la | mods summarize these files
+echo "explain this error" | henji
+ls -la | henji summarize these files
 ```
 
 ### MCP tool call limit
@@ -83,7 +83,7 @@ ls -la | mods summarize these files
 When using MCP servers, set a tool-call limit to prevent runaway loops. `0` means unlimited (default).
 
 ```yaml
-# ~/.config/mods/mods.yml
+# ~/.config/henji/henji.yml
 max-tool-calls: 10
 ```
 
@@ -107,7 +107,7 @@ Preferred order (most secure first):
    api-key-env: OPENAI_API_KEY
    ```
 
-3. **`api-key`** — plaintext in `mods.yml` (stored at `0600`; avoid committing to version control)
+3. **`api-key`** — plaintext in `henji.yml` (stored at `0600`; avoid committing to version control)
 
 4. **Default env** — provider-specific fallback (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
 
@@ -115,14 +115,14 @@ Preferred order (most secure first):
 
 ```sh
 # Pipe command output to an LLM
-ls -la | mods "explain these files"
-cat error.log | mods "what went wrong?"
+ls -la | henji "explain these files"
+cat error.log | henji "what went wrong?"
 
 # Prompt only
-mods "write a haiku about Go"
+henji "write a haiku about Go"
 
 # Continue a conversation
-mods -C "now make it funnier"
+henji -C "now make it funnier"
 ```
 
 ### Flags
@@ -151,7 +151,7 @@ mods -C "now make it funnier"
 | `--status-text` | Text shown while generating |
 | `--settings` | Open settings file in `$EDITOR` |
 | `--reset-settings` | Restore settings to default |
-| `--dirs` | Print the directories where mods stores its data |
+| `--dirs` | Print the directories where henji stores its data |
 | `--theme` | UI theme: `charm`, `catppuccin`, `dracula`, `base16` |
 | `-h`, `--help` | Show help and exit |
 | `-v`, `--version` | Show version and exit |
@@ -189,7 +189,7 @@ mods -C "now make it funnier"
 
 ## Custom Roles
 
-Roles set a system prompt for a session. Define them in `mods.yml`:
+Roles set a system prompt for a session. Define them in `henji.yml`:
 
 ```yaml
 roles:
@@ -201,7 +201,7 @@ roles:
 ```
 
 ```sh
-mods --role shell list files sorted by size
+henji --role shell list files sorted by size
 ```
 
 ## Cloud Providers
@@ -236,14 +236,14 @@ export GROQ_API_KEY=...
 export AZURE_OPENAI_KEY=...
 ```
 
-Configure the `base-url` and `azure-deployment` in `mods.yml` as well.
+Configure the `base-url` and `azure-deployment` in `henji.yml` as well.
 
 ## MCP Integration
 
 MCP (Model Context Protocol) allows the LLM to call external tools defined by MCP servers.
 
 ```yaml
-# ~/.config/mods/mods.yml
+# ~/.config/henji/henji.yml
 mcp-servers:
   filesystem:
     type: stdio
@@ -254,8 +254,8 @@ max-tool-calls: 10  # recommended; 0 = unlimited
 ```
 
 ```sh
-mods --mcp-list-tools          # inspect available tools
-mods --mcp-disable filesystem  # disable a server for this run
+henji --mcp-list-tools          # inspect available tools
+henji --mcp-disable filesystem  # disable a server for this run
 ```
 
 ## License

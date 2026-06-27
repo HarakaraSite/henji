@@ -518,7 +518,7 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 			return modsError{
 				err: fmt.Errorf("tool call limit of %d reached", cfg.MaxToolCalls),
 				reason: fmt.Sprintf(
-					"Exceeded max-tool-calls limit of %d. Set max-tool-calls: 0 in mods.yml to disable.",
+					"Exceeded max-tool-calls limit of %d. Set max-tool-calls: 0 in henji.yml to disable.",
 					cfg.MaxToolCalls,
 				),
 			}
