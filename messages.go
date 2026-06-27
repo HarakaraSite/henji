@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/charmbracelet/mods/internal/proto"
+	"forge.harakara.site/littleisland/henji/internal/proto"
 )
 
 const defaultConversationTitle = "Untitled conversation"

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/mods/internal/proto"
-	"github.com/charmbracelet/mods/internal/stream"
+	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/internal/stream"
 	"github.com/stretchr/testify/require"
 )
 

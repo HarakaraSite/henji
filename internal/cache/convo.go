@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/charmbracelet/mods/internal/proto"
+	"forge.harakara.site/littleisland/henji/internal/proto"
 )
 
 // Conversations is the conversation cache.

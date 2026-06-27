@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/charmbracelet/mods/internal/cache"
-	"github.com/charmbracelet/mods/internal/proto"
+	"forge.harakara.site/littleisland/henji/internal/cache"
+	"forge.harakara.site/littleisland/henji/internal/proto"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,4 +1,4 @@
-module github.com/charmbracelet/mods
+module forge.harakara.site/littleisland/henji
 
 go 1.26.0
 
