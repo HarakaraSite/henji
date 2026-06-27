@@ -1,4 +1,4 @@
-# Mods (fork)
+# henji (mods fork)
 
 AI for the command line, built for pipelines.
 
@@ -58,7 +58,7 @@ henji completion powershell -h
 
 ### Local LLM (Ollama / mlx-lm)
 
-The simplest setup requires no API key. Point Mods at your local OpenAI-compatible endpoint:
+The simplest setup requires no API key. Point henji at your local OpenAI-compatible endpoint:
 
 ```yaml
 # ~/.config/henji/henji.yml
