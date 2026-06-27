@@ -131,22 +131,30 @@ mods -C "now make it funnier"
 |---|---|
 | `-m`, `--model` | Specify the model to use |
 | `-M`, `--ask-model` | Choose model interactively |
+| `-a`, `--api` | OpenAI compatible REST API to use (openai, localai, anthropic, ...) |
 | `-f`, `--format` | Ask the LLM to format the response (e.g. markdown, json) |
 | `--format-as` | Specify output format (used with `--format`) |
 | `-P`, `--prompt` | Include prompt from args and stdin; truncate stdin to N lines |
 | `-p`, `--prompt-args` | Include prompt from args in the response |
+| `-e`, `--editor` | Edit the prompt in `$EDITOR` (only when no other args and stdin is a TTY) |
 | `-q`, `--quiet` | Only output errors to stderr |
 | `-r`, `--raw` | Print raw response without syntax highlighting |
-| `--settings` | Open settings file |
+| `-R`, `--role` | Specify a custom role (system prompt) |
+| `--list-roles` | List roles defined in your configuration file |
 | `-x`, `--http-proxy` | Use HTTP proxy for API connections |
 | `--max-retries` | Maximum number of retries |
 | `--max-tokens` | Maximum tokens in response |
+| `--max-tool-calls` | Maximum agentic tool call rounds; `0` = unlimited |
 | `--no-limit` | Do not limit response tokens |
-| `--role` | Specify a custom role (system prompt) |
+| `--stop` | Up to 4 sequences where the API stops generating |
 | `--word-wrap` | Wrap output at width (default 80) |
-| `--reset-settings` | Restore settings to default |
-| `--theme` | UI theme: `charm`, `catppuccin`, `dracula`, `base16` |
 | `--status-text` | Text shown while generating |
+| `--settings` | Open settings file in `$EDITOR` |
+| `--reset-settings` | Restore settings to default |
+| `--dirs` | Print the directories where mods stores its data |
+| `--theme` | UI theme: `charm`, `catppuccin`, `dracula`, `base16` |
+| `-h`, `--help` | Show help and exit |
+| `-v`, `--version` | Show version and exit |
 
 #### Conversations
 
@@ -158,8 +166,8 @@ mods -C "now make it funnier"
 | `-C`, `--continue-last` | Continue the last conversation |
 | `-s`, `--show` | Show a saved conversation |
 | `-S`, `--show-last` | Show the previous conversation |
-| `--delete-older-than` | Delete conversations older than duration (`10d`, `1mo`) |
-| `--delete` | Delete conversations by title or SHA-1 |
+| `-d`, `--delete` | Delete conversations by title or SHA-1 |
+| `--delete-older-than` | Delete conversations older than duration (`10d`, `1mo`, `1y`) |
 | `--no-cache` | Do not save this conversation |
 
 #### MCP
@@ -174,10 +182,10 @@ mods -C "now make it funnier"
 
 | Flag | Description |
 |---|---|
+| `--temp` | Sampling temperature (0.0–2.0, -1.0 to disable) |
+| `--topp` | Top-P (0.0–1.0, -1.0 to disable) |
+| `--topk` | Top-K (-1 to disable) |
 | `--fanciness` | Level of fanciness |
-| `--temp` | Sampling temperature |
-| `--topp` | Top-P value |
-| `--topk` | Top-K value |
 
 ## Custom Roles
 
