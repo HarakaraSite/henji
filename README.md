@@ -56,6 +56,10 @@ henji completion powershell -h
 
 ## Recommended Setup
 
+> For more setup patterns and copy-pasteable examples (adding new providers,
+> keychain-based API keys, `--output json` for scripting/agents, reasoning
+> model quirks), see the [cookbook](docs/cookbook.md).
+
 ### Local LLM (Ollama / mlx-lm)
 
 Point henji at your local OpenAI-compatible endpoint. Local servers don't check the key, but henji's OpenAI-compatible request path always sends one, so set `api-key` to any placeholder value:
