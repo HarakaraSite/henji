@@ -83,7 +83,9 @@ var (
 			switch config.Output {
 			case "text", "json":
 			case "jsonl":
-				return newUserErrorf("--output jsonl is not implemented yet")
+				err := modsError{err: errors.New("not implemented"), reason: "--output jsonl is not implemented yet."}
+				printJSONError(&Mods{Config: &config}, err)
+				return err
 			default:
 				return newUserErrorf("invalid --output value %q, must be one of: text, json", config.Output)
 			}
@@ -138,7 +140,7 @@ var (
 			mods = m.(*Mods)
 			if mods.Error != nil {
 				if config.Output == "json" {
-					printJSONError(*mods.Error)
+					printJSONError(mods, *mods.Error)
 				}
 				return *mods.Error
 			}

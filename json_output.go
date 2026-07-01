@@ -58,17 +58,16 @@ func printJSONOutput(mods *Mods) {
 	fmt.Println(string(out))
 }
 
-func printJSONError(err modsError) {
-	out, marshalErr := json.Marshal(JSONOutput{
-		Version: jsonSchemaVersion,
-		Error: &ErrorInfo{
-			Code:    "error",
-			Message: err.Reason(),
-		},
-	})
+func printJSONError(mods *Mods, err modsError) {
+	out := buildJSONOutput(mods)
+	out.Error = &ErrorInfo{
+		Code:    "error",
+		Message: fmt.Sprintf("%s: %s", err.Reason(), err.Error()),
+	}
+	marshaled, marshalErr := json.Marshal(out)
 	if marshalErr != nil {
 		fmt.Fprintln(os.Stderr, "could not marshal --output json error:", marshalErr)
 		return
 	}
-	fmt.Println(string(out))
+	fmt.Println(string(marshaled))
 }
