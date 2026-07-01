@@ -26,8 +26,8 @@
   - provider 非依存の request/message/tool call 型。
 - `internal/stream/*`
   - provider 共通の streaming client / stream interface。
-- `internal/{openai,anthropic,google,ollama}/*`
-  - 各 provider 実装と proto 変換処理。
+- `internal/{openai,anthropic,google}/*`
+  - 各 provider 実装と proto 変換処理。Ollama は専用実装を持たず `openai` 経由（PR#23）。
 
 ## エントリポイント
 
@@ -146,17 +146,13 @@ provider 非依存の message/request 型は `internal/proto/proto.go`。
   - `ThinkingBudget` は Google provider の generation config に入る。
   - `CallTools()` は未対応（Google API は tool call 非対応のため）。
   - `Messages()` は PR#7 で修正済み。assistant content を `s.content` に蓄積し、会話履歴として返す。
-- `internal/ollama/`
-  - Ollama local API 用。
-  - SDK は `github.com/ollama/ollama/api`。
-  - MCP tool calls に対応。
-
 provider 選択は `mods.go` の `startCompletionCmd()` にある `switch mod.API`。
 
 - `anthropic` -> `anthropic.New(accfg)`
 - `google` -> `google.New(gccfg)`
-- `ollama` -> `ollama.New(occfg)`
 - その他 -> `openai.New(ccfg)`
+
+`internal/ollama/`（`github.com/ollama/ollama/api` SDK 使用の専用実装）はPR#23で削除。Ollama もOpenAI互換の`/v1`エンドポイント経由で `default` ケースに統合された。動的な`num_ctx`指定という唯一の専用機能は失われたが、手書きgoroutine/channel実装（過去2回クラッシュ: PR#1-B/1-C）を丸ごと除去できた。詳細は `fix-roadmap.md` PR#23 参照。
 
 `azure` と `azure-ad` は OpenAI client 用の config を変えて default path に流す。`perplexity` など OpenAI 互換 endpoint も、設定上の API 名は保持しつつ OpenAI client 実装を使う。
 
@@ -241,11 +237,9 @@ MCP 設定は `Config.MCPServers` / `MCPServerConfig` に入る。設定 YAML �
 ### LLM provider SDK / API client
 
 - `github.com/openai/openai-go`
-  - OpenAI 互換 API、Azure、Perplexity などの request/streaming に使う。
+  - OpenAI 互換 API、Azure、Perplexity、Ollama（`/v1`互換エンドポイント、PR#23）などの request/streaming に使う。
 - `github.com/anthropics/anthropic-sdk-go`
   - Anthropic Messages API に使う。
-- `github.com/ollama/ollama`
-  - Ollama local API に使う。
 
 Google/Gemini は専用 SDK ではなく、`internal/google` で `net/http` による REST SSE を直接扱っている。
 
@@ -310,7 +304,7 @@ MCP support を残すなら中心依存。MCP 機能を optional にする設計
 3. DB helper
    - `sqlx` を `database/sql` に置き換える
 4. provider SDK
-   - OpenAI/Anthropic/Ollama SDK を HTTP 直実装へ寄せる
+   - OpenAI/Anthropic SDK を HTTP 直実装へ寄せる（Ollama 専用実装は PR#23 で削除済み。OpenAI互換パスに統合）
 5. CLI/TUI の中核
    - Cobra や Bubble Tea 系。影響が大きいため最後に検討する
 

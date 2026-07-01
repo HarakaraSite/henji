@@ -210,7 +210,12 @@ apis:
         max-input-chars: 4194304
 
   ollama:
-    base-url: http://localhost:11434
+    # Served through Ollama's OpenAI-compatible endpoint (note the /v1
+    # suffix) rather than a dedicated Ollama client. No real API key is
+    # required, but the OpenAI-compatible request path always sends one, so
+    # api-key is set to a placeholder value here.
+    base-url: http://localhost:11434/v1
+    api-key: ollama
     models: # https://ollama.com/library
       "llama3.2:3b":
         aliases: ["llama3.2"]
