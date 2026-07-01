@@ -2,6 +2,8 @@ package google
 
 import (
 	"bufio"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -42,6 +44,30 @@ func TestStreamMessagesIncludesRequestAndAssistantResponse(t *testing.T) {
 func TestCloseNilResponseNoPanic(t *testing.T) {
 	s := &Stream{} // response is nil by default
 	require.NoError(t, s.Close())
+}
+
+// TestSendRequestStreamAPIErrorNoPanic is a regression test: when the Google
+// API returns a non-2xx response, the returned Stream must have isFinished
+// set so callers stop after Next() instead of calling Current() on a Stream
+// with a nil reader (which panicked with a nil pointer dereference).
+func TestSendRequestStreamAPIErrorNoPanic(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"code":401,"message":"invalid API key","status":"UNAUTHENTICATED"}}`))
+	}))
+	defer server.Close()
+
+	client := New(Config{BaseURL: server.URL, HTTPClient: server.Client()})
+	req, err := http.NewRequest(http.MethodPost, server.URL, nil)
+	require.NoError(t, err)
+
+	s, sendErr := googleSendRequestStream(client, req)
+	require.Error(t, sendErr)
+	require.False(t, s.Next(), "Next() must return false so Current() (nil reader) is never called")
+
+	// The wrapped error must be safe to render: (*openai.Error).Error() panics
+	// if its Request/Response fields are nil, which handleErrorResp used to leave unset.
+	require.NotPanics(t, func() { _ = sendErr.Error() })
 }
 
 func TestStreamMessagesReturnsCopy(t *testing.T) {

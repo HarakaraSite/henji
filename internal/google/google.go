@@ -133,6 +133,7 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 	req, err := c.newRequest(ctx, http.MethodPost, c.config.BaseURL, withBody(body))
 	if err != nil {
 		s.err = err
+		s.isFinished = true
 		return s
 	}
 
@@ -175,9 +176,15 @@ func (c *Client) handleErrorResp(resp *http.Response) error {
 		return &openai.Error{
 			StatusCode: resp.StatusCode,
 			Message:    err.Error(),
+			Request:    resp.Request,
+			Response:   resp,
 		}
 	}
 	errRes.StatusCode = resp.StatusCode
+	// Request/Response are required by (*openai.Error).Error(); without them
+	// it panics on a nil pointer dereference when the error is rendered.
+	errRes.Request = resp.Request
+	errRes.Response = resp
 	return &errRes
 }
 
@@ -320,12 +327,12 @@ func googleSendRequestStream(client *Client, req *http.Request) (*Stream, error)
 
 	resp, err := client.config.HTTPClient.Do(req) //nolint:bodyclose // body is closed in stream.Close()
 	if err != nil {
-		return new(Stream), err
+		return &Stream{isFinished: true}, err
 	}
 	if isFailureStatusCode(resp) {
 		err := client.handleErrorResp(resp)
 		resp.Body.Close() //nolint:errcheck,gosec
-		return new(Stream), err
+		return &Stream{isFinished: true}, err
 	}
 	return &Stream{
 		reader:      bufio.NewReader(resp.Body),

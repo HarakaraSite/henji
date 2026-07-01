@@ -82,6 +82,14 @@ fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `
 **1-E. Google `Close()` の nil response panic + `resp.Body` リーク** ✅ `24f40b5`
 - 対処: `Close()` に nil ガード追加。エラーレスポンス時に `resp.Body.Close()` を追加。
 
+**1-F. Google API エラー時の二重nilパニック**（2026-07-01発見、PR#19）
+- 箇所: `internal/google/google.go` の `googleSendRequestStream`（315-336行目）と `Request`（133-137行目）と `handleErrorResp`（172-183行目）
+- 問題1: `googleSendRequestStream` がAPIエラー時（HTTPリクエスト失敗・非2xxレスポンス）に `new(Stream)`（ゼロ値、`reader`が`nil`）を返すが、`isFinished`もゼロ値`false`のまま。呼び出し元 `receiveCompletionStreamCmd`（mods.go:491）は `Next()`（`!isFinished`）が`true`を返すため `Current()` を呼び、`nil`の`reader`への `ReadBytes` 呼び出しでpanic（goroutine crash）。`Request()` 内のリクエスト構築失敗パス（133-137行目）も同型のバグを持つ。PR#4（1-E）はClose()のnilガードのみ対処しており、この`Current()`側のクラッシュは見逃されていた
+- 問題2（問題1修正で新たに露見）: `handleErrorResp` がGoogleのエラーレスポンスをOpenAI SDKの `openai.Error` 型に無理やり詰めているが、`Request`/`Response`フィールドを設定していない。`(*openai.Error).Error()` はこれらのフィールドを前提としており（`r.Request.Method`等）、エラーメッセージを描画しようとした瞬間に別のnilパニックが発生する。問題1の修正で初めて到達可能になり顕在化した
+- 実害: Google/Gemini APIのエラー（認証失敗・不正モデル名・レート制限等）が**すべて**、適切なエラーメッセージではなくクラッシュになっていた。実際のGemini APIキーで動作確認中に発見
+- 対処: (1) `googleSendRequestStream`のエラーパスと`Request`のリクエスト構築失敗パスで `isFinished: true` を設定 (2) `handleErrorResp` で `errRes.Request = resp.Request` / `errRes.Response = resp` を設定
+- 回帰テスト: `internal/google/google_test.go` に `TestSendRequestStreamAPIErrorNoPanic` を追加（修正前は失敗することを確認済み）
+
 ---
 
 ### Tier 2: 正確性・ロジックバグ（✅ 全件完了）
@@ -236,7 +244,10 @@ PR #16 ✅ 649e925  refactor             mcp.go グローバル config 参照を
 PR #17 ✅ 7749ccc+bdc20b9  feature   --output json 追加（AI→AI連携向けJSON出力モード、Phase 1）
 
 ── コードレビュー指摘修正（実ゲートウェイ検証で発見）────────────────────────
-PR #18 ✅ (未コミット)  fix          MaxChars=0（未設定）時に入力プロンプトが空文字列へ切り詰められるバグ修正
+PR #18 ✅ 53a95ad  fix              MaxChars=0（未設定）時に入力プロンプトが空文字列へ切り詰められるバグ修正
+
+── Google/Geminiプロバイダのクラッシュ修正（実APIキーでの検証で発見）───────
+PR #19 ✅ (未コミット)  fix          Google API エラー応答時の二重のnilパニックを修正
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
