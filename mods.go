@@ -240,13 +240,15 @@ func (m *Mods) View() string {
 		}
 
 		m.contentMutex.Lock()
-		for _, c := range m.content {
-			fmt.Print(c)
+		if m.Config.Output != "json" {
+			for _, c := range m.content {
+				fmt.Print(c)
+			}
 		}
 		m.content = []string{}
 		m.contentMutex.Unlock()
 	case doneState:
-		if !isOutputTTY() {
+		if !isOutputTTY() && m.Config.Output != "json" {
 			fmt.Printf("\n")
 		}
 		return ""
@@ -643,7 +645,7 @@ const tabWidth = 4
 
 func (m *Mods) appendToOutput(s string) {
 	m.Output += s
-	if !isOutputTTY() || m.Config.Raw {
+	if !isOutputTTY() || m.Config.Raw || m.Config.Output == "json" {
 		m.contentMutex.Lock()
 		m.content = append(m.content, s)
 		m.contentMutex.Unlock()

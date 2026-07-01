@@ -80,12 +80,20 @@ var (
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config.Prefix = removeWhitespace(strings.Join(args, " "))
 
+			switch config.Output {
+			case "text", "json":
+			case "jsonl":
+				return newUserErrorf("--output jsonl is not implemented yet")
+			default:
+				return newUserErrorf("invalid --output value %q, must be one of: text, json", config.Output)
+			}
+
 			opts := []tea.ProgramOption{}
 
-			if !isInputTTY() || config.Raw {
+			if !isInputTTY() || config.Raw || config.Output == "json" {
 				opts = append(opts, tea.WithInput(nil))
 			}
-			if isOutputTTY() && !config.Raw {
+			if isOutputTTY() && !config.Raw && config.Output != "json" {
 				opts = append(opts, tea.WithOutput(os.Stderr))
 			} else {
 				opts = append(opts, tea.WithoutRenderer())
@@ -129,6 +137,9 @@ var (
 
 			mods = m.(*Mods)
 			if mods.Error != nil {
+				if config.Output == "json" {
+					printJSONError(*mods.Error)
+				}
 				return *mods.Error
 			}
 
@@ -218,8 +229,11 @@ var (
 				return deleteConversationOlderThan()
 			}
 
+			switch {
+			case config.Output == "json":
+				printJSONOutput(mods)
 			// raw mode already prints the output, no need to print it again
-			if isOutputTTY() && !config.Raw {
+			case isOutputTTY() && !config.Raw:
 				switch {
 				case mods.glamOutput != "":
 					fmt.Print(mods.glamOutput)
@@ -244,6 +258,10 @@ var (
 var memprofile bool
 
 func initFlags() {
+	if config.Output == "" {
+		config.Output = defaultConfig().Output
+	}
+
 	flags := rootCmd.Flags()
 	flags.StringVarP(&config.Model, "model", "m", config.Model, stdoutStyles().FlagDesc.Render(help["model"]))
 	flags.BoolVarP(&config.AskModel, "ask-model", "M", config.AskModel, stdoutStyles().FlagDesc.Render(help["ask-model"]))
@@ -252,6 +270,7 @@ func initFlags() {
 	flags.BoolVarP(&config.Format, "format", "f", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
 	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, stdoutStyles().FlagDesc.Render(help["format-as"]))
 	flags.BoolVarP(&config.Raw, "raw", "r", config.Raw, stdoutStyles().FlagDesc.Render(help["raw"]))
+	flags.StringVar(&config.Output, "output", config.Output, stdoutStyles().FlagDesc.Render(help["output"]))
 	flags.IntVarP(&config.IncludePrompt, "prompt", "P", config.IncludePrompt, stdoutStyles().FlagDesc.Render(help["prompt"]))
 	flags.BoolVarP(&config.IncludePromptArgs, "prompt-args", "p", config.IncludePromptArgs, stdoutStyles().FlagDesc.Render(help["prompt-args"]))
 	flags.StringVarP(&config.Continue, "continue", "c", "", stdoutStyles().FlagDesc.Render(help["continue"]))

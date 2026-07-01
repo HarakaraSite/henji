@@ -76,6 +76,7 @@ var help = map[string]string{
 	"mcp-list":          "List all available MCP servers",
 	"mcp-list-tools":    "List all available tools from enabled MCP servers",
 	"mcp-timeout":       "Timeout for MCP server calls, defaults to 15 seconds",
+	"output":            "Output format: text or json",
 }
 
 // Model represents the LLM model used in the API call.
@@ -146,6 +147,7 @@ type Config struct {
 	FormatText          FormatText `yaml:"format-text"`
 	FormatAs            string     `yaml:"format-as" env:"FORMAT_AS"`
 	Raw                 bool       `yaml:"raw" env:"RAW"`
+	Output              string     `yaml:"output" env:"OUTPUT"`
 	Quiet               bool       `yaml:"quiet" env:"QUIET"`
 	MaxTokens           int64      `yaml:"max-tokens" env:"MAX_TOKENS"`
 	MaxCompletionTokens int64      `yaml:"max-completion-tokens" env:"MAX_COMPLETION_TOKENS"`
@@ -288,6 +290,7 @@ func createConfigFile(path string) error {
 
 func defaultConfig() Config {
 	return Config{
+		Output:   "text",
 		FormatAs: "markdown",
 		FormatText: FormatText{
 			"markdown": defaultMarkdownFormatText,

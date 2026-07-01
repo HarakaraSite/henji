@@ -224,6 +224,9 @@ PR #14 ✅ 73284c0  R-1 + R-2            max-completion-tokens 配線 + api-key 
 PR #15 ✅ 9839de9  doc                  overview.md の陳腐化修正
 PR #16 ✅ 649e925  refactor             mcp.go グローバル config 参照を *Config 引数渡しに統一
 
+── 新機能 ────────────────────────────────────────────────────────────────────
+PR #17 ✅ (未コミット)  feature         --output json 追加（AI→AI連携向けJSON出力モード、Phase 1）
+
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
        ⬜ モジュール名変更     go install 用に module パスを一括変更（import 全体に波及）
