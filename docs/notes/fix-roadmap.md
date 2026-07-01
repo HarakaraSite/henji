@@ -247,7 +247,10 @@ PR #17 ✅ 7749ccc+bdc20b9  feature   --output json 追加（AI→AI連携向け
 PR #18 ✅ 53a95ad  fix              MaxChars=0（未設定）時に入力プロンプトが空文字列へ切り詰められるバグ修正
 
 ── Google/Geminiプロバイダのクラッシュ修正（実APIキーでの検証で発見）───────
-PR #19 ✅ (未コミット)  fix          Google API エラー応答時の二重のnilパニックを修正
+PR #19 ✅ 24eaca8  fix              Google API エラー応答時の二重のnilパニックを修正
+
+── config_template.yml メンテナンス ──────────────────────────────────────────
+PR #20 ✅ (未コミット)  doc          Gemini モデル一覧を "-latest" 追従エイリアス3つに更新（旧 gemini-1.5-*-latest は404で廃止済み）
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
