@@ -316,7 +316,7 @@ MCP support を残すなら中心依存。MCP 機能を optional にする設計
 - `github.com/charmbracelet/mods/internal/anthropic`
 - `github.com/charmbracelet/mods/internal/cache`
 - `github.com/charmbracelet/mods/internal/google`
-- `github.com/charmbracelet/mods/internal/ollama`
+- `github.com/charmbracelet/mods/internal/ollama`（当時の記録。PR#23で削除済み）
 - `github.com/charmbracelet/mods/internal/openai`
 - `github.com/charmbracelet/mods/internal/proto`
 - `github.com/charmbracelet/mods/internal/stream`

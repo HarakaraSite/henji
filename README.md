@@ -58,13 +58,14 @@ henji completion powershell -h
 
 ### Local LLM (Ollama / mlx-lm)
 
-The simplest setup requires no API key. Point henji at your local OpenAI-compatible endpoint:
+Point henji at your local OpenAI-compatible endpoint. Local servers don't check the key, but henji's OpenAI-compatible request path always sends one, so set `api-key` to any placeholder value:
 
 ```yaml
 # ~/.config/henji/henji.yml
 apis:
   local:
     base-url: http://localhost:11434/v1  # Ollama default
+    api-key: local
     models:
       llama3.2:
         aliases: ["llama"]
