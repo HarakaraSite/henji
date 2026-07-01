@@ -260,7 +260,10 @@ PR #19 ✅ 24eaca8  fix              Google API エラー応答時の二重のni
 PR #20 ✅ dc1eafe  doc              Gemini モデル一覧を "-latest" 追従エイリアス3つに更新（旧 gemini-1.5-*-latest は404で廃止済み）
 
 ── Anthropicプロバイダの400エラー修正（実APIキーでの検証で発見）───────────
-PR #21 ✅ (未コミット)  fix          temperature と top_p 同時指定で常に400エラーになるバグ修正
+PR #21 ✅ 9fe9070  fix              temperature と top_p 同時指定で常に400エラーになるバグ修正
+
+── config_template.yml メンテナンス（続き）───────────────────────────────────
+PR #22 ✅ (未コミット)  doc          Anthropic モデル一覧を最新世代のみに更新（sonnet-5, opus-4.8, fable-5, haiku-4.5）
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載

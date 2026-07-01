@@ -167,20 +167,28 @@ apis:
     api-key:
     api-key-env: ANTHROPIC_API_KEY
     models: # https://docs.anthropic.com/en/docs/about-claude/models
-      claude-sonnet-4-20250514:
-        aliases: ["claude-sonnet-4", "sonnet-4"]
-        max-input-chars: 680000
-      claude-opus-4-1-20250805:
-        aliases: ["claude-opus-4.1", "opus-4.1", "opus-4-1", "opus"]
-        max-input-chars: 680000
-      claude-3-7-sonnet-latest:
-        aliases: ["claude3.7-sonnet", "claude-3-7-sonnet", "sonnet-3.7"]
-        max-input-chars: 680000
-      claude-3-7-sonnet-20250219:
-        max-input-chars: 680000
-      claude-3-5-haiku-20241022:
-        aliases: ["claude3.5-haiku", "haiku"]
-        max-input-chars: 680000
+      # Latest generation only, verified against /v1/models on 2026-07-01.
+      # max-input-chars = max_input_tokens * 4 (same ratio as the google
+      # section). Older pinned snapshots (claude-sonnet-4-20250514,
+      # claude-3-7-sonnet-*, claude-3-5-haiku-20241022) are no longer in
+      # the API's model list and were removed.
+      claude-sonnet-5:
+        aliases: ["sonnet-5", "sonnet"]
+        max-input-chars: 4000000
+      claude-opus-4-8:
+        aliases: ["opus-4.8", "opus"]
+        max-input-chars: 4000000
+      claude-fable-5:
+        # Not generally available yet (API currently 404s with "Claude Fable
+        # 5 is not available. Please use Opus 4.8."). Kept here so it's ready
+        # to use once access opens up.
+        aliases: ["fable-5", "fable"]
+        max-input-chars: 4000000
+      claude-haiku-4-5-20251001:
+        # No unversioned "haiku-latest" id yet; update this snapshot id when
+        # Anthropic ships the next Haiku generation.
+        aliases: ["haiku-4.5", "haiku"]
+        max-input-chars: 800000
   google:
     models: # https://ai.google.dev/gemini-api/docs/models/gemini
       # These "-latest" names are floating aliases Google repoints to newer
