@@ -39,9 +39,9 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 
 	if request.Temperature != nil {
 		body.Temperature = anthropic.Float(*request.Temperature)
-	}
-
-	if request.TopP != nil {
+	} else if request.TopP != nil {
+		// Anthropic's API rejects requests that set both temperature and
+		// top_p; only send top_p when temperature wasn't set.
 		body.TopP = anthropic.Float(*request.TopP)
 	}
 

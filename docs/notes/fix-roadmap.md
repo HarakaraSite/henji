@@ -90,6 +90,13 @@ fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `
 - 対処: (1) `googleSendRequestStream`のエラーパスと`Request`のリクエスト構築失敗パスで `isFinished: true` を設定 (2) `handleErrorResp` で `errRes.Request = resp.Request` / `errRes.Response = resp` を設定
 - 回帰テスト: `internal/google/google_test.go` に `TestSendRequestStreamAPIErrorNoPanic` を追加（修正前は失敗することを確認済み）
 
+**1-G. Anthropic `temperature`/`top_p` 同時指定で常に400エラー**（2026-07-01発見、PR#21）
+- 箇所: `internal/anthropic/anthropic.go` の `Request`（40-46行目）
+- 問題: `Config.Temperature`と`Config.TopP`が両方非ゼロのとき、両方を無条件でAnthropicリクエストボディに設定していた。Anthropic APIは`temperature`と`top_p`の同時指定を拒否する（`400 Bad Request: temperature and top_p cannot both be specified for this model`）。同梱の`config_template.yml`はグローバルに`temp: 1.0`・`topp: 1.0`の両方を設定しているため、**デフォルト設定のまま使うと全てのAnthropicリクエストが必ず失敗する**
+- 実害: OpenAI/Google/Ollamaでは温度・top_pの同時指定が許容されるため今まで見逃されていた。実際のAnthropic APIキーで動作確認中に発見
+- 対処: `Temperature`が設定されている場合は`TopP`を送らないよう`else if`に変更
+- 回帰テスト: `internal/anthropic/anthropic_test.go`（新規）に`TestRequestOmitsTopPWhenTemperatureSet`を追加（修正前は失敗することを確認済み）
+
 ---
 
 ### Tier 2: 正確性・ロジックバグ（✅ 全件完了）
@@ -250,7 +257,10 @@ PR #18 ✅ 53a95ad  fix              MaxChars=0（未設定）時に入力プロ
 PR #19 ✅ 24eaca8  fix              Google API エラー応答時の二重のnilパニックを修正
 
 ── config_template.yml メンテナンス ──────────────────────────────────────────
-PR #20 ✅ (未コミット)  doc          Gemini モデル一覧を "-latest" 追従エイリアス3つに更新（旧 gemini-1.5-*-latest は404で廃止済み）
+PR #20 ✅ dc1eafe  doc              Gemini モデル一覧を "-latest" 追従エイリアス3つに更新（旧 gemini-1.5-*-latest は404で廃止済み）
+
+── Anthropicプロバイダの400エラー修正（実APIキーでの検証で発見）───────────
+PR #21 ✅ (未コミット)  fix          temperature と top_p 同時指定で常に400エラーになるバグ修正
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
