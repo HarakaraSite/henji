@@ -13,7 +13,7 @@ By default:
 The most basic usage is:
 
 ```bash
-mods 'first 2 primes'
+henji 'first 2 primes'
 ```
 
 ### Pipe from
@@ -21,10 +21,10 @@ mods 'first 2 primes'
 You can also pipe to it, in which case `STDIN` will not be a TTY:
 
 ```bash
-echo 'as json' | mods 'first 2 primes'
+echo 'as json' | henji 'first 2 primes'
 ```
 
-In this case, `mods` should read `STDIN` and append it to the prompt.
+In this case, `henji` should read `STDIN` and append it to the prompt.
 
 ### Pipe to
 
@@ -32,7 +32,7 @@ You may also pipe the output to another program, in which case `STDOUT` will not
 be a TTY:
 
 ```bash
-echo 'as json' | mods 'first 2 primes' | jq .
+echo 'as json' | henji 'first 2 primes' | jq .
 ```
 
 In this case, the "Generating" animation will go to `STDERR`, but the response
@@ -43,7 +43,7 @@ will be streamed to `STDOUT`.
 You can set a custom title:
 
 ```bash
-mods --title='title' 'first 2 primes'
+henji --title='title' 'first 2 primes'
 ```
 
 ### Continue latest
@@ -52,22 +52,22 @@ You can continue the latest conversation and save it with a new title using
 `--continue=title`:
 
 ```bash
-mods 'first 2 primes'
-mods --continue='primes as json' 'format as json'
+henji 'first 2 primes'
+henji --continue='primes as json' 'format as json'
 ```
 
 ### Untitled continue latest
 
 ```bash
-mods 'first 2 primes'
-mods --continue-last 'format as json'
+henji 'first 2 primes'
+henji --continue-last 'format as json'
 ```
 
 ### Continue from specific conversation, save with a new title
 
 ```bash
-mods --title='naturals' 'first 5 natural numbers'
-mods --continue='naturals' --title='naturals.json' 'format as json'
+henji --title='naturals' 'first 5 natural numbers'
+henji --continue='naturals' --title='naturals.json' 'format as json'
 ```
 
 ### Conversation branching
@@ -76,9 +76,9 @@ You can use the `--continue` and `--title` to branch out conversations, for
 instance:
 
 ```bash
-mods --title='naturals' 'first 5 natural numbers'
-mods --continue='naturals' --title='naturals.json' 'format as json'
-mods --continue='naturals' --title='naturals.yaml' 'format as yaml'
+henji --title='naturals' 'first 5 natural numbers'
+henji --continue='naturals' --title='naturals.json' 'format as json'
+henji --continue='naturals' --title='naturals.yaml' 'format as yaml'
 ```
 
 With this you'll end up with 3 conversations: `naturals`, `naturals.json`, and
@@ -89,9 +89,9 @@ With this you'll end up with 3 conversations: `naturals`, `naturals.json`, and
 You can list your previous conversations with:
 
 ```bash
-mods --list
+henji --list
 # or
-mods -l
+henji -l
 ```
 
 ## Show a previous conversation
@@ -99,8 +99,8 @@ mods -l
 You can also show a previous conversation by ID or title, e.g.:
 
 ```bash
-mods --show='naturals'
-mods -s='a2e2'
+henji --show='naturals'
+henji -s='a2e2'
 ```
 
 For titles, the match should be exact.
@@ -113,7 +113,7 @@ You can also delete conversations by title or ID, same as `--show`, different
 flag:
 
 ```bash
-mods --delete='naturals' --delete='a2e2'
+henji --delete='naturals' --delete='a2e2'
 ```
 
 Keep in mind that these operations are not reversible.
