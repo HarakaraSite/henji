@@ -35,3 +35,49 @@ func TestBuildJSONOutputEmpty(t *testing.T) {
 		t.Errorf("ConversationID = %q, want empty", out.ConversationID)
 	}
 }
+
+func TestBuildModelsListOutput(t *testing.T) {
+	cfg := &Config{
+		API:   "openai",
+		Model: "gpt-4o",
+		APIs: APIs{
+			{
+				Name: "anthropic",
+				Models: map[string]Model{
+					"claude-sonnet-5": {Aliases: []string{"sonnet"}},
+				},
+			},
+			{
+				Name: "openai",
+				Models: map[string]Model{
+					"gpt-4o":      {Aliases: []string{"4o"}},
+					"gpt-4o-mini": {},
+				},
+			},
+		},
+	}
+
+	out := buildModelsListOutput(cfg)
+
+	if out.Version != jsonSchemaVersion {
+		t.Errorf("Version = %d, want %d", out.Version, jsonSchemaVersion)
+	}
+	if len(out.APIs) != 2 {
+		t.Fatalf("len(APIs) = %d, want 2", len(out.APIs))
+	}
+	// sorted alphabetically: anthropic, openai
+	if out.APIs[0].Name != "anthropic" || out.APIs[0].Default {
+		t.Errorf("APIs[0] = %+v, want anthropic/non-default", out.APIs[0])
+	}
+	if out.APIs[1].Name != "openai" || !out.APIs[1].Default {
+		t.Errorf("APIs[1] = %+v, want openai/default", out.APIs[1])
+	}
+	// sorted alphabetically: gpt-4o, gpt-4o-mini
+	models := out.APIs[1].Models
+	if len(models) != 2 || models[0].ID != "gpt-4o" || !models[0].Default {
+		t.Errorf("Models[0] = %+v, want gpt-4o/default", models[0])
+	}
+	if models[1].ID != "gpt-4o-mini" || models[1].Default {
+		t.Errorf("Models[1] = %+v, want gpt-4o-mini/non-default", models[1])
+	}
+}

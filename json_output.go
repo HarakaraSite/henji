@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 )
 
 // jsonSchemaVersion is the version of the --output json envelope. Bump this
@@ -70,4 +71,54 @@ func printJSONError(mods *Mods, err modsError) {
 		return
 	}
 	fmt.Println(string(marshaled))
+}
+
+// ModelsListOutput is the envelope printed by --list-models --output json.
+type ModelsListOutput struct {
+	Version int              `json:"version"`
+	APIs    []APIModelsEntry `json:"apis"`
+}
+
+// APIModelsEntry describes one configured API endpoint and its models.
+type APIModelsEntry struct {
+	Name    string       `json:"name"`
+	Default bool         `json:"default,omitempty"`
+	Models  []ModelEntry `json:"models"`
+}
+
+// ModelEntry describes one model available under an API endpoint.
+type ModelEntry struct {
+	ID      string   `json:"id"`
+	Aliases []string `json:"aliases,omitempty"`
+	Default bool     `json:"default,omitempty"`
+}
+
+func buildModelsListOutput(cfg *Config) ModelsListOutput {
+	out := ModelsListOutput{Version: jsonSchemaVersion}
+	for _, api := range cfg.APIs {
+		entry := APIModelsEntry{
+			Name:    api.Name,
+			Default: api.Name == cfg.API,
+		}
+		for name, mod := range api.Models {
+			entry.Models = append(entry.Models, ModelEntry{
+				ID:      name,
+				Aliases: mod.Aliases,
+				Default: entry.Default && name == cfg.Model,
+			})
+		}
+		sort.Slice(entry.Models, func(i, j int) bool { return entry.Models[i].ID < entry.Models[j].ID })
+		out.APIs = append(out.APIs, entry)
+	}
+	sort.Slice(out.APIs, func(i, j int) bool { return out.APIs[i].Name < out.APIs[j].Name })
+	return out
+}
+
+func printModelsListJSON(cfg *Config) {
+	out, err := json.Marshal(buildModelsListOutput(cfg))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "could not marshal --list-models json:", err)
+		return
+	}
+	fmt.Println(string(out))
 }

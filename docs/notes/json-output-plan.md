@@ -281,3 +281,19 @@ Step 7: テスト追加（main_test.go に --output json のスモークテス�
 ## 7. ロードマップへの位置づけ
 
 `docs/notes/fix-roadmap.md` の PR#17 として追記予定（PR#16 `649e925` 完了後のフェーズ）。
+
+---
+
+## 8. AI自律利用に向けた discovery（PR#24）
+
+`--output json` だけでは、AIエージェントが henji を自律的に使うには不十分だった。`-h`/`--help` から読み取れる情報には2つの穴があった:
+
+1. **設定済みのAPI/モデルを発見する手段がない**: `--api`/`--model` に何を渡せるかは `henji.yml` を直接読むしかなかった
+2. **`--output json` の応答スキーマがどこにも書かれていない**: `--output` の説明が一文だけで、成功時/エラー時のJSON構造が `-h` から読み取れなかった
+
+対処:
+- `--list-models` フラグを追加（`--output json` にも対応）。設定済み API 一覧とモデル一覧・エイリアス・デフォルト値を machine-readable に取得できる
+- `--output` のヘルプ文にJSONスキーマの実例を追記（成功時/エラー時それぞれの構造を一文で提示）
+- ついでに `--format-as` のヘルプ文が空欄だった既存の見落としも修正
+
+これで `henji --list-models --output json` → 使えるAPI/モデルを把握 → `henji --api X --model Y --output json "prompt"` → 構造化された応答を得る、という一連の流れを、AIが `-h` の出力だけから組み立てられるようになった。

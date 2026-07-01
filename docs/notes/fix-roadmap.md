@@ -266,7 +266,10 @@ PR #21 ✅ 9fe9070  fix              temperature と top_p 同時指定で常に
 PR #22 ✅ 7fe4d8e  doc              Anthropic モデル一覧を最新世代のみに更新（sonnet-5, opus-4.8, fable-5, haiku-4.5）
 
 ── Ollama専用実装の削除（設計相談・Opusレビュー経由）─────────────────────────
-PR #23 ✅ (未コミット)  refactor     internal/ollama 削除、OpenAI互換パス（default ケース）に統合
+PR #23 ✅ 1c4be2a+13c1bfd  refactor  internal/ollama 削除、OpenAI互換パス（default ケース）に統合
+
+── AI自律利用の土台強化 ───────────────────────────────────────────────────────
+PR #24 ✅ (未コミット)  feature      --list-models 追加（--output json 対応）、--output/--format-as のヘルプ文改善
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載

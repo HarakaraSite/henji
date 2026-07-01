@@ -208,6 +208,10 @@ var (
 				listRoles()
 				return nil
 			}
+			if config.ListModels {
+				listModels()
+				return nil
+			}
 			if config.List {
 				return listConversations(config.Raw)
 			}
@@ -303,6 +307,7 @@ func initFlags() {
 	flags.BoolVar(&config.Dirs, "dirs", false, stdoutStyles().FlagDesc.Render(help["dirs"]))
 	flags.StringVarP(&config.Role, "role", "R", config.Role, stdoutStyles().FlagDesc.Render(help["role"]))
 	flags.BoolVar(&config.ListRoles, "list-roles", config.ListRoles, stdoutStyles().FlagDesc.Render(help["list-roles"]))
+	flags.BoolVar(&config.ListModels, "list-models", config.ListModels, stdoutStyles().FlagDesc.Render(help["list-models"]))
 	flags.StringVar(&config.Theme, "theme", "charm", stdoutStyles().FlagDesc.Render(help["theme"]))
 	flags.BoolVarP(&config.openEditor, "editor", "e", false, stdoutStyles().FlagDesc.Render(help["editor"]))
 	flags.BoolVar(&config.MCPList, "mcp-list", false, stdoutStyles().FlagDesc.Render(help["mcp-list"]))
@@ -347,6 +352,7 @@ func initFlags() {
 		"delete",
 		"delete-older-than",
 		"list",
+		"list-models",
 		"continue",
 		"continue-last",
 		"reset-settings",
@@ -674,6 +680,31 @@ func listRoles() {
 	}
 }
 
+func listModels() {
+	if config.Output == "json" {
+		printModelsListJSON(&config)
+		return
+	}
+	out := buildModelsListOutput(&config)
+	for _, api := range out.APIs {
+		name := api.Name
+		if api.Default {
+			name += stdoutStyles().Timeago.Render(" (default)")
+		}
+		fmt.Println(name)
+		for _, mod := range api.Models {
+			line := "  " + mod.ID
+			if mod.Default {
+				line += stdoutStyles().Timeago.Render(" (default)")
+			}
+			if len(mod.Aliases) > 0 {
+				line += stdoutStyles().Comment.Render(" [" + strings.Join(mod.Aliases, ", ") + "]")
+			}
+			fmt.Println(line)
+		}
+	}
+}
+
 func makeOptions(conversations []Conversation) []huh.Option[string] {
 	opts := make([]huh.Option[string], 0, len(conversations))
 	for _, c := range conversations {
@@ -791,6 +822,7 @@ func isNoArgs() bool {
 		!config.ShowHelp &&
 		!config.List &&
 		!config.ListRoles &&
+		!config.ListModels &&
 		!config.MCPList &&
 		!config.MCPListTools &&
 		!config.Dirs &&

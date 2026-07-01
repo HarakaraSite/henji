@@ -36,10 +36,12 @@ var help = map[string]string{
 	"ask-model":         "Ask which model to use via interactive prompt",
 	"max-input-chars":   "Default character limit on input to model",
 	"format":            "Ask for the response to be formatted as markdown unless otherwise set",
+	"format-as":         "Format to request from the model when -f/--format is set; valid values are keys in format-text (default: markdown, json)",
 	"format-text":       "Text to append when using the -f flag",
 	"role":              "System role to use",
 	"roles":             "List of predefined system messages that can be used as roles",
 	"list-roles":        "List the roles defined in your configuration file",
+	"list-models":       "List configured APIs and their models (respects --output json)",
 	"prompt":            "Include the prompt from the arguments and stdin, truncate stdin to specified number of lines",
 	"prompt-args":       "Include the prompt from the arguments in the response",
 	"raw":               "Render output as raw text when connected to a TTY",
@@ -76,7 +78,7 @@ var help = map[string]string{
 	"mcp-list":          "List all available MCP servers",
 	"mcp-list-tools":    "List all available tools from enabled MCP servers",
 	"mcp-timeout":       "Timeout for MCP server calls, defaults to 15 seconds",
-	"output":            "Output format: text or json",
+	"output":            `Output format: text or json. json prints one line: {"version":1,"content":[{"type":"text","text":"..."}],"model":"...","conversation_id":"..."} on success, {"version":1,"error":{"code":"...","message":"..."}} on failure (exit 1)`,
 }
 
 // Model represents the LLM model used in the API call.
@@ -186,6 +188,7 @@ type Config struct {
 	Show                string
 	List                bool
 	ListRoles           bool
+	ListModels          bool
 	Delete              []string
 	DeleteOlderThan     time.Duration
 	User                string
