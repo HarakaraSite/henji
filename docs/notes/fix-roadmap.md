@@ -269,7 +269,10 @@ PR #22 ✅ 7fe4d8e  doc              Anthropic モデル一覧を最新世代の
 PR #23 ✅ 1c4be2a+13c1bfd  refactor  internal/ollama 削除、OpenAI互換パス（default ケース）に統合
 
 ── AI自律利用の土台強化 ───────────────────────────────────────────────────────
-PR #24 ✅ (未コミット)  feature      --list-models 追加（--output json 対応）、--output/--format-as のヘルプ文改善
+PR #24 ✅ af58cdd  feature          --list-models 追加（--output json 対応）、--output/--format-as のヘルプ文改善
+
+── 設定/データディレクトリの簡素化 ────────────────────────────────────────────
+PR #25 ✅ (未コミット)  refactor     xdg ライブラリ削除、設定/データディレクトリを mac/Linux で ~/.config・~/.local/share に統一
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
@@ -374,3 +377,4 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
   - 過去のクラッシュバグ（1-B/1-C: busy-loop、closed channel panic）はまさにこの専用実装の手書きgoroutine/channel設計に起因しており、削除すれば保守負債ごと除去できる
   - ユーザー確認: `num_ctx`動的指定は未使用、`api: ollama`設定も未使用（後方互換の実害なし）と確認の上で削除を決定
   - 対処: `internal/ollama`削除、`mods.go`の`case "ollama"`を除去（`default`ケースに自然統合）、`go.mod`から`github.com/ollama/ollama`依存除去（`go mod tidy`）、`config_template.yml`の`ollama:`セクションを`base-url: http://localhost:11434/v1` + `api-key: ollama`（ダミー）に更新
+- 設定/データディレクトリの簡素化（PR#25、2026-07-01）: `github.com/adrg/xdg`は設定ファイル探索時に最大5段階のフォールバック（`XDG_CONFIG_HOME` → `~/Library/Application Support` → `~/Library/Preferences` → `/Library/Application Support` → `/Library/Preferences` → `~/.config`、macOS実装）を持ち、既存ディレクトリの有無で挙動が変わり分かりにくかった。依存自体は軽量（yaml.v3/x/sys/testifyのみ、Ollama SDKのような巨大依存ツリーはない）だが、Windowsの「Known Folders」API呼び出しロジックは代替が必要だった。対処: `config.go`に`configHomeDir()`/`dataHomeDir()`を自前実装（標準ライブラリのみ）。優先順位を「env var（`XDG_CONFIG_HOME`/`XDG_DATA_HOME`） → OS単一デフォルト」の2段階に単純化。macOS/Linuxは`~/.config`・`~/.local/share`に統一（fishシェル等のXDG準拠ツールと同じ配置）、Windowsは`%LOCALAPPDATA%`のまま変更なし（既存ライブラリと同一デフォルトを維持）。ユーザーの既存設定ファイル（`~/Library/Application Support/henji/henji.yml`）は`~/.config/henji/henji.yml`に手動コピーして移行済み

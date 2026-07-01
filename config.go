@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"text/template"
 	"time"
 
 	_ "embed"
 
-	"github.com/adrg/xdg"
 	"github.com/caarlos0/duration"
 	"github.com/caarlos0/env/v9"
 	"github.com/charmbracelet/x/exp/strings"
@@ -19,6 +19,50 @@ import (
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
+
+// configHomeDir returns the base directory henji's settings file lives
+// under: $XDG_CONFIG_HOME if set, otherwise a single OS-specific default
+// (no multi-location fallback search).
+func configHomeDir() (string, error) {
+	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
+		return v, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	if runtime.GOOS == "windows" {
+		if v := os.Getenv("LOCALAPPDATA"); v != "" {
+			return v, nil
+		}
+		return filepath.Join(home, "AppData", "Local"), nil
+	}
+	// macOS and Linux share the same default: ~/.config, matching how
+	// most XDG-aware CLI tools (fish included) lay out their config.
+	return filepath.Join(home, ".config"), nil
+}
+
+// dataHomeDir returns the base directory henji's cache (conversation
+// history) lives under: $XDG_DATA_HOME if set, otherwise a single
+// OS-specific default.
+func dataHomeDir() (string, error) {
+	if v := os.Getenv("XDG_DATA_HOME"); v != "" {
+		return v, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	if runtime.GOOS == "windows" {
+		if v := os.Getenv("LOCALAPPDATA"); v != "" {
+			return v, nil
+		}
+		return filepath.Join(home, "AppData", "Local"), nil
+	}
+	// macOS and Linux share the same default: ~/.local/share, matching
+	// how most XDG-aware CLI tools (fish included) lay out their data.
+	return filepath.Join(home, ".local", "share"), nil
+}
 
 //go:embed config_template.yml
 var configTemplate string
@@ -169,10 +213,10 @@ type Config struct {
 	Fanciness           uint       `yaml:"fanciness" env:"FANCINESS"`
 	StatusText          string     `yaml:"status-text" env:"STATUS_TEXT"`
 	HTTPProxy           string     `yaml:"http-proxy" env:"HTTP_PROXY"`
-	APIs     APIs   `yaml:"apis"`
-	Role     string `yaml:"role" env:"ROLE"`
-	AskModel bool
-	Roles    map[string][]string
+	APIs                APIs       `yaml:"apis"`
+	Role                string     `yaml:"role" env:"ROLE"`
+	AskModel            bool
+	Roles               map[string][]string
 	ShowHelp            bool
 	ResetSettings       bool
 	Prefix              string
@@ -216,10 +260,11 @@ type MCPServerConfig struct {
 
 func ensureConfig() (Config, error) {
 	var c Config
-	sp, err := xdg.ConfigFile(filepath.Join("henji", "henji.yml"))
+	configHome, err := configHomeDir()
 	if err != nil {
 		return c, modsError{err, "Could not find settings path."}
 	}
+	sp := filepath.Join(configHome, "henji", "henji.yml")
 	c.SettingsPath = sp
 
 	dir := filepath.Dir(sp)
@@ -243,7 +288,11 @@ func ensureConfig() (Config, error) {
 	}
 
 	if c.CachePath == "" {
-		c.CachePath = filepath.Join(xdg.DataHome, "henji")
+		dataHome, err := dataHomeDir()
+		if err != nil {
+			return c, modsError{err, "Could not find cache path."}
+		}
+		c.CachePath = filepath.Join(dataHome, "henji")
 	}
 
 	if err := os.MkdirAll(

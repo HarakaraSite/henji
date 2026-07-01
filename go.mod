@@ -3,7 +3,6 @@ module forge.harakara.site/littleisland/henji
 go 1.26.0
 
 require (
-	github.com/adrg/xdg v0.5.3
 	github.com/anthropics/anthropic-sdk-go v1.50.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/caarlos0/duration v0.0.0-20240108180406-5d492514f3c7
