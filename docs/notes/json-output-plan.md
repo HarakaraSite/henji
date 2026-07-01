@@ -18,8 +18,27 @@
 - `json_output_test.go`（新規）: `buildJSONOutput` の単体テスト
 - 動作確認: モック SSE ストリーミングサーバーで実際に `--output json` の成功パス（`content`/`conversation_id`/`model` を含む単一 JSON 行）とエラーパス（`error` フィールド + exit 1）を確認済み。既存の `--output` 未指定（text）モードの挙動に変化がないことも確認済み
 - `usage` フィールドはプロバイダ側に使用量取得の配線が一切ないため Phase 1 では実装せず（Phase 2 に据え置き）
+- PR#18（2026-07-01）: 実ゲートウェイ検証中に `max-input-chars` 未設定時のプロンプト全消失バグを発見・修正（本家由来、フォーク非起因）。詳細は `fix-roadmap.md` 参照
 
 ---
+
+## E2E テスト（ローカルゲートウェイ必須、CI対象外）
+
+`scripts/e2e-gateway-test.sh` に、実ローカルゲートウェイ（mlx-lm/Ollama/LM Studio 等のOpenAI互換エンドポイント）に対する動作確認を自動化したスクリプトを用意している。CIのForgejoランナーにはゲートウェイが無いため自動実行はできず、**手動実行が前提**。
+
+`--output json` / リクエスト組み立て（`stream.go`）/ プロバイダのリクエストコードに触れた際は、コミット前に手動で実行する:
+
+```bash
+GATEWAY_URL=http://localhost:8080/v1 MODEL=mlx-community/gemma-4-E2B-it-qat-4bit ./scripts/e2e-gateway-test.sh
+```
+
+チェック内容:
+1. `--output json` 成功パス（短いプロンプト、jqでenvelope形状を検証）
+2. `--output json` 成功パス（長い応答）
+3. `--output json` エラーパス（存在しないモデル名、`error.message`検証）
+4. `max-input-chars` 未設定時に入力が切り詰められない（PR#18 の回帰チェック）
+
+デフォルトは作者のローカル mlx-lm ゲートウェイ設定に合わせているが、`GATEWAY_URL`/`MODEL` 環境変数で任意のOpenAI互換エンドポイントに向けられる。
 
 ## 1. 概要
 
