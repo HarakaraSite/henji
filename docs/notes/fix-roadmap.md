@@ -36,7 +36,7 @@ fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `
 
 ### 公開時の必須作業（コード修正とは別）★ **次フェーズ**
 
-- **README 更新**: アーカイブ済み本家からの fork である旨、本家が fork でのメンテを歓迎している事実、このフォークが何を変えたか（Cohere 削除・クラッシュ修正・依存更新・MCP 接続キャッシュ・MaxToolCalls）の要約、LICENSE（MIT）の著作権表示維持と改変部分の表示追加。README に「ローカル MCP 多用時の推奨設定例（`max-tool-calls: 50`）」を記載し、用途に応じてユーザーが設定するよう案内する。
+- **README 更新**: アーカイブ済み本家からの fork である旨、本家が fork でのメンテを歓迎している事実、このフォークが何を変えたか（Cohere 削除・クラッシュ修正・依存更新・MCP 接続キャッシュ・MaxToolCalls・Ollama専用実装削除）の要約、LICENSE（MIT）の著作権表示維持と改変部分の表示追加。README に「ローカル MCP 多用時の推奨設定例（`max-tool-calls: 50`）」を記載し、用途に応じてユーザーが設定するよう案内する。**移行注記（PR#23）**: 旧バージョンで `api: ollama` を `base-url: http://localhost:11434`（`/v1`なし）で設定していたユーザー向けに、`/v1` の追記とダミー `api-key` 設定が必要になった旨を明記する。
 - **モジュール名変更**: `go install github.com/<user>/<新名称>` の形で配布する方針は確定。ただし module パスの変更は内部 import 全体に波及するため、**公開直前にまとめて実施**（今は触らない）。
 
 ### バージョニング方針
@@ -263,7 +263,13 @@ PR #20 ✅ dc1eafe  doc              Gemini モデル一覧を "-latest" 追従�
 PR #21 ✅ 9fe9070  fix              temperature と top_p 同時指定で常に400エラーになるバグ修正
 
 ── config_template.yml メンテナンス（続き）───────────────────────────────────
-PR #22 ✅ (未コミット)  doc          Anthropic モデル一覧を最新世代のみに更新（sonnet-5, opus-4.8, fable-5, haiku-4.5）
+PR #22 ✅ 7fe4d8e  doc              Anthropic モデル一覧を最新世代のみに更新（sonnet-5, opus-4.8, fable-5, haiku-4.5）
+
+── Ollama専用実装の削除（設計相談・Opusレビュー経由）─────────────────────────
+PR #23 ✅ 1c4be2a+13c1bfd  refactor  internal/ollama 削除、OpenAI互換パス（default ケース）に統合
+
+── AI自律利用の土台強化 ───────────────────────────────────────────────────────
+PR #24 ✅ (未コミット)  feature      --list-models 追加（--output json 対応）、--output/--format-as のヘルプ文改善
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
@@ -291,7 +297,7 @@ Opus によるコードレビュー（2026-06-26）で「今は触らなくて�
 
 ### R-B. Stream ステートマシンの重複
 
-openai/anthropic/ollama の `Stream` が `done`/`factory`/`Next` での再ストリーム生成という同型パターンを各自実装している。tool call ラウンドの state 遷移が3箇所に分散しており、1箇所修正して他を直し忘れるリスクがある。ただし各 SDK の型が異なるため安易な統一は逆効果になりうる。実害が出た段階で検討。
+openai/anthropic の `Stream` が `done`/`factory`/`Next` での再ストリーム生成という同型パターンを各自実装している（PR#23でOllama専用実装を削除したため、重複箇所は2つに減った）。tool call ラウンドの state 遷移が分散しており、1箇所修正して他を直し忘れるリスクがある。ただし各 SDK の型が異なるため安易な統一は逆効果になりうる。実害が出た段階で検討。
 
 ### R-C. 命名の小さな不整合
 
@@ -331,10 +337,10 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 | ファイル | 関連修正 | 状態 |
 |---|---|---|
 | `mods.go` | 1-A, 2-A, 2-C, 3-B, 3-C | ✅ |
-| `internal/ollama/ollama.go` | 1-B, 1-C | ✅ |
-| `internal/google/google.go` | 1-E, 2-B, 3-E | ✅ |
+| `internal/ollama/ollama.go` | 1-B, 1-C | PR#23でファイルごと削除（OpenAI互換パスに統合） |
+| `internal/google/google.go` | 1-E, 2-B, 3-E, 1-F | ✅ |
 | `internal/openai/openai.go` | 1-D | ✅ |
-| `internal/anthropic/anthropic.go` | 4-4 | ✅（コード変更不要だった） |
+| `internal/anthropic/anthropic.go` | 4-4, 1-G | ✅ |
 | `mcp.go` | 3-A, M5 | ✅ |
 | `config.go` | 3-D | ✅ |
 | `go.mod` | 4-1 〜 4-7 | ✅ |
@@ -361,3 +367,10 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 - Opus リファクタリングレビュー（2026-06-26）: `stream.Stream` インターフェース・並行処理・エラーハンドリングは問題なし。主要な設計問題は `mcp.go` グローバル参照のみ（PR#16 で解消）。残りは次バージョン候補（セクション5）
 - セキュリティスキャン（2026-06-26）: Medium 2件・Low 3件の指摘。Google API key の URL 埋め込み（Medium）は `x-goog-api-key` ヘッダ化で修正（`d2b4c40`）。残り4件は Opus が評価し、セキュリティ実害なしと判定: sha.go regex 非アンカー（URL 注入経路なし）・google.go 行長無制限（自己設定エンドポイントのみ）・MaxToolCalls=0 無制限（意図的仕様）・MCP ツール名衝突（機能バグとして R-E に記録）
 - `MaxChars` サイレント切り詰めバグ（PR#18、2026-07-01発見）: `stream.go:47` の `content[:mod.MaxChars]` は、モデル個別 `max-input-chars` もグローバル `max-input-chars` も未指定（共に0）のとき `content[:0]` で入力プロンプトを完全に切り詰める。エラーは出ず空メッセージがそのままAPIに送信される。実ローカルゲートウェイ（mlx-community/gemma-4-E2B-it-qat-4bit）に対し `--output json` を検証中、テンプレートに無い新規APIを最小構成で追加したところ実際に踏んだ。Opus によるレビューで、本家コミット `ff9a598`（"fix: use default max input settings"）由来の古いロジック欠陥でありフォークでの新規発生ではないと判定。同梱の `config_template.yml` がグローバル・モデル個別ともに `max-input-chars` を設定しているため通常利用では顕在化しない。修正: `mod.MaxChars > 0` を条件に追加し、未設定(0)を無制限として扱う（`--no-limit`/`NoLimit` の意味論と整合）
+- Ollama専用実装の削除（PR#23、2026-07-01、Opusレビュー経由の設計相談）: OllamaはOpenAI互換の`/v1/chat/completions`エンドポイントも提供しており、`internal/ollama`（`github.com/ollama/ollama/api` SDK使用の専用実装）を維持する価値があるか検討した。Opusの調査結果:
+  - 削除範囲は狭い（`mods.go`の5箇所の参照 + `internal/ollama`パッケージ丸ごと + `go.mod`の依存）。`stream.Client`インターフェースの変更は不要
+  - 専用実装だけが提供する機能は実質`num_ctx`（コンテキスト窓の動的指定）のみ。tool calling・ストリーミング形式はOllamaの`/v1`エンドポイントがOpenAI形式で返すため機能損失なし
+  - 透過フォールバックは不可: 既存ユーザーの`base-url`に`/v1`が付いていないと404になり、OpenAI互換パスは`ensureKey`でAPIキー必須のためダミーキー設定が必要
+  - 過去のクラッシュバグ（1-B/1-C: busy-loop、closed channel panic）はまさにこの専用実装の手書きgoroutine/channel設計に起因しており、削除すれば保守負債ごと除去できる
+  - ユーザー確認: `num_ctx`動的指定は未使用、`api: ollama`設定も未使用（後方互換の実害なし）と確認の上で削除を決定
+  - 対処: `internal/ollama`削除、`mods.go`の`case "ollama"`を除去（`default`ケースに自然統合）、`go.mod`から`github.com/ollama/ollama`依存除去（`go mod tidy`）、`config_template.yml`の`ollama:`セクションを`base-url: http://localhost:11434/v1` + `api-key: ollama`（ダミー）に更新

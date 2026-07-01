@@ -28,7 +28,6 @@ import (
 	"forge.harakara.site/littleisland/henji/internal/anthropic"
 	"forge.harakara.site/littleisland/henji/internal/cache"
 	"forge.harakara.site/littleisland/henji/internal/google"
-	"forge.harakara.site/littleisland/henji/internal/ollama"
 	"forge.harakara.site/littleisland/henji/internal/openai"
 	"forge.harakara.site/littleisland/henji/internal/proto"
 	"forge.harakara.site/littleisland/henji/internal/stream"
@@ -281,7 +280,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		var api API
 		var ccfg openai.Config
 		var accfg anthropic.Config
-		var occfg ollama.Config
 		var gccfg google.Config
 
 		cfg := m.Config
@@ -308,11 +306,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		}
 
 		switch mod.API {
-		case "ollama":
-			occfg = ollama.DefaultConfig()
-			if api.BaseURL != "" {
-				occfg.BaseURL = api.BaseURL
-			}
 		case "anthropic":
 			key, err := m.ensureKey(api, "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys")
 			if err != nil {
@@ -363,7 +356,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 			ccfg.HTTPClient = httpClient
 			accfg.HTTPClient = httpClient
-			occfg.HTTPClient = httpClient
 			gccfg.HTTPClient = httpClient
 		}
 
@@ -428,16 +420,11 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			client = anthropic.New(accfg)
 		case "google":
 			client = google.New(gccfg)
-		case "ollama":
-			client, err = ollama.New(occfg)
 		default:
 			client = openai.New(ccfg)
 			if cfg.Format && cfg.FormatAs == "json" {
 				request.ResponseFormat = &cfg.FormatAs
 			}
-		}
-		if err != nil {
-			return modsError{err, "Could not setup client"}
 		}
 
 		stream := client.Request(m.ctx, request)
