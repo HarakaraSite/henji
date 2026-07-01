@@ -74,6 +74,19 @@ func TestSetupStreamContext(t *testing.T) {
 		}, mods.messages)
 	})
 
+	t.Run("keeps long user content when model max chars is unset", func(t *testing.T) {
+		mods := &Mods{
+			Config: &Config{},
+		}
+
+		err := mods.setupStreamContext("1234567890", Model{})
+
+		require.NoError(t, err)
+		require.Equal(t, []proto.Message{
+			{Role: proto.RoleUser, Content: "1234567890"},
+		}, mods.messages)
+	})
+
 	t.Run("loads cached conversation before new user message", func(t *testing.T) {
 		convos, err := cache.NewConversations(t.TempDir())
 		require.NoError(t, err)

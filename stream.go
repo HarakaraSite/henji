@@ -44,7 +44,7 @@ func (m *Mods) setupStreamContext(content string, mod Model) error {
 		content = strings.TrimSpace(prefix + "\n\n" + content)
 	}
 
-	if !cfg.NoLimit && int64(len(content)) > mod.MaxChars {
+	if !cfg.NoLimit && mod.MaxChars > 0 && int64(len(content)) > mod.MaxChars {
 		content = content[:mod.MaxChars]
 	}
 

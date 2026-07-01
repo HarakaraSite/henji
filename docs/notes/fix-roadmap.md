@@ -225,7 +225,10 @@ PR #15 ✅ 9839de9  doc                  overview.md の陳腐化修正
 PR #16 ✅ 649e925  refactor             mcp.go グローバル config 参照を *Config 引数渡しに統一
 
 ── 新機能 ────────────────────────────────────────────────────────────────────
-PR #17 ✅ (未コミット)  feature         --output json 追加（AI→AI連携向けJSON出力モード、Phase 1）
+PR #17 ✅ 7749ccc+bdc20b9  feature   --output json 追加（AI→AI連携向けJSON出力モード、Phase 1）
+
+── コードレビュー指摘修正（実ゲートウェイ検証で発見）────────────────────────
+PR #18 ✅ (未コミット)  fix          MaxChars=0（未設定）時に入力プロンプトが空文字列へ切り詰められるバグ修正
 
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
@@ -322,3 +325,4 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 - `mcp.go` グローバル `config` 参照（PR#16）: `enabledMCPs`・`isMCPEnabled` はグローバル `config` を読んでいたが、`(m *Mods) toolCall` もメソッドでありながら同様。本番は `m.Config == &config` で同一ポインタのため無害だが、テスト時に別 `Config` を注入すると MCP ロジックが壊れる。`*Config` を引数に変えて解消（`649e925`）
 - Opus リファクタリングレビュー（2026-06-26）: `stream.Stream` インターフェース・並行処理・エラーハンドリングは問題なし。主要な設計問題は `mcp.go` グローバル参照のみ（PR#16 で解消）。残りは次バージョン候補（セクション5）
 - セキュリティスキャン（2026-06-26）: Medium 2件・Low 3件の指摘。Google API key の URL 埋め込み（Medium）は `x-goog-api-key` ヘッダ化で修正（`d2b4c40`）。残り4件は Opus が評価し、セキュリティ実害なしと判定: sha.go regex 非アンカー（URL 注入経路なし）・google.go 行長無制限（自己設定エンドポイントのみ）・MaxToolCalls=0 無制限（意図的仕様）・MCP ツール名衝突（機能バグとして R-E に記録）
+- `MaxChars` サイレント切り詰めバグ（PR#18、2026-07-01発見）: `stream.go:47` の `content[:mod.MaxChars]` は、モデル個別 `max-input-chars` もグローバル `max-input-chars` も未指定（共に0）のとき `content[:0]` で入力プロンプトを完全に切り詰める。エラーは出ず空メッセージがそのままAPIに送信される。実ローカルゲートウェイ（mlx-community/gemma-4-E2B-it-qat-4bit）に対し `--output json` を検証中、テンプレートに無い新規APIを最小構成で追加したところ実際に踏んだ。Opus によるレビューで、本家コミット `ff9a598`（"fix: use default max input settings"）由来の古いロジック欠陥でありフォークでの新規発生ではないと判定。同梱の `config_template.yml` がグローバル・モデル個別ともに `max-input-chars` を設定しているため通常利用では顕在化しない。修正: `mod.MaxChars > 0` を条件に追加し、未設定(0)を無制限として扱う（`--no-limit`/`NoLimit` の意味論と整合）
