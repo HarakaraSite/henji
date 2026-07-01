@@ -140,6 +140,11 @@ henji "write a haiku about Go"
 henji -C "now make it funnier"
 ```
 
+For more worked examples, see [`examples.md`](examples.md)
+([日本語](examples.ja.md)) and [`features.md`](features.md)
+([日本語](features.ja.md)). See also the [cookbook](docs/cookbook.md) above
+for provider setup and scripting/agent patterns.
+
 ### Flags
 
 | Flag | Description |
