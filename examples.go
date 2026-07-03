@@ -7,7 +7,7 @@ import (
 
 var examples = map[string]string{
 	"Write new sections for a readme": `cat README.md | henji "write a new section to this README documenting a pdf sharing feature"`,
-	"Editorialize your video files":   `ls ~/vids | henji -f "summarize each of these titles, group them by decade" | glow`,
+	"Editorialize your video files":   `ls ~/vids | henji -f "summarize each of these titles, group them by decade"`,
 	"Let GPT pick something to watch": `ls ~/vids | henji "Pick 5 action packed shows from the 80s from this list" | gum choose | xargs vlc`,
 }
 
