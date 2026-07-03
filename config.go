@@ -74,7 +74,7 @@ const (
 )
 
 var help = map[string]string{
-	"api":                   "OpenAI compatible REST API (openai, localai, anthropic, ...)",
+	"api":                   "OpenAI compatible REST API (openai, localai, anthropic, ...). default-model belongs to one API, so pair this with -m/--model or it will likely fail to find the model",
 	"apis":                  "Aliases and endpoints for OpenAI compatible REST API",
 	"http-proxy":            "HTTP proxy to use for API requests",
 	"model":                 "Default model (gpt-3.5-turbo, gpt-4, ggml-gpt4all-j...)",
