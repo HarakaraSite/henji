@@ -60,14 +60,18 @@ type ThinkingConfig struct {
 
 // GenerationConfig are the options for model generation and outputs. Not all parameters are configurable for every model.
 type GenerationConfig struct {
-	StopSequences    []string        `json:"stopSequences,omitempty"`
-	ResponseMimeType string          `json:"responseMimeType,omitempty"`
-	CandidateCount   uint            `json:"candidateCount,omitempty"`
-	MaxOutputTokens  uint            `json:"maxOutputTokens,omitempty"`
-	Temperature      float64         `json:"temperature,omitempty"`
-	TopP             float64         `json:"topP,omitempty"`
-	TopK             int64           `json:"topK,omitempty"`
-	ThinkingConfig   *ThinkingConfig `json:"thinkingConfig,omitempty"`
+	StopSequences    []string `json:"stopSequences,omitempty"`
+	ResponseMimeType string   `json:"responseMimeType,omitempty"`
+	// ResponseSchema constrains output to a JSON Schema (an OpenAPI 3.0
+	// subset; see https://ai.google.dev/gemini-api/docs/structured-output).
+	// Requires ResponseMimeType to be "application/json".
+	ResponseSchema  any             `json:"responseSchema,omitempty"`
+	CandidateCount  uint            `json:"candidateCount,omitempty"`
+	MaxOutputTokens uint            `json:"maxOutputTokens,omitempty"`
+	Temperature     float64         `json:"temperature,omitempty"`
+	TopP            float64         `json:"topP,omitempty"`
+	TopK            int64           `json:"topK,omitempty"`
+	ThinkingConfig  *ThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 
 // MessageCompletionRequest represents the valid parameters and value options for the request.
@@ -128,6 +132,11 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 		body.GenerationConfig.ThinkingConfig = &ThinkingConfig{
 			ThinkingBudget: c.config.ThinkingBudget,
 		}
+	}
+
+	if request.JSONSchema != nil {
+		body.GenerationConfig.ResponseMimeType = "application/json"
+		body.GenerationConfig.ResponseSchema = request.JSONSchema
 	}
 
 	req, err := c.newRequest(ctx, http.MethodPost, c.config.BaseURL, withBody(body))

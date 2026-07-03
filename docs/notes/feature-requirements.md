@@ -97,16 +97,15 @@ mods は「CLI の引数 prompt」と「stdin から渡された入力」を LLM
 - Azure OpenAI / Azure AD
 - Anthropic
 - Google/Gemini
-- Ollama
 
-OpenAI compatible endpoint は default branch で `internal/openai` を使う。設定上は Groq, Perplexity, LocalAI, DeepSeek, GitHub Models などを `apis` に定義できる。
+OpenAI compatible endpoint は default branch で `internal/openai` を使う。設定上は Groq, Perplexity, LocalAI, DeepSeek, GitHub Models, Ollama などを `apis` に定義できる。
 
 Cohere provider は使わない方針のため削除済み。
 
 方針:
 
 - OpenAI compatible endpoint と専用 provider の境界は現状維持。
-- Ollama は将来的に OpenAI compatible に寄せる可能性があるが、現時点では専用 provider を維持する。
+- Ollama は PR#23（2026-07-01）で専用実装(`internal/ollama`)を削除し、OpenAI compatible endpoint（`base-url`に`/v1`を指定）に統合済み。専用 provider は存在しない。
 
 ### model 解決
 

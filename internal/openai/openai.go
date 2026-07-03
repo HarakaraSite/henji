@@ -11,6 +11,7 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/azure"
 	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/packages/ssestream"
 	"github.com/openai/openai-go/shared"
 )
@@ -64,6 +65,19 @@ func New(config Config) *Client {
 	}
 }
 
+// strictParam returns the response_format.json_schema.strict default for
+// the given dialect. Real OpenAI enforces strict-mode constraints (e.g.
+// additionalProperties:false, all fields required) reliably; other
+// OpenAI-compatible dialects (Groq's non gpt-oss-* models, local gateways,
+// Azure, ...) may reject or ignore strict mode, so leave it unset there and
+// let the server fall back to its own default/best-effort behavior.
+func strictParam(api string) param.Opt[bool] {
+	if api == "openai" {
+		return openai.Bool(true)
+	}
+	return param.Opt[bool]{}
+}
+
 // Request makes a new request and returns a stream.
 func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stream {
 	body := openai.ChatCompletionNewParams{
@@ -93,6 +107,25 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 			body.ResponseFormat = openai.ChatCompletionNewParamsResponseFormatUnion{
 				OfJSONObject: &shared.ResponseFormatJSONObjectParam{},
 			}
+		}
+	}
+
+	// JSONSchema takes precedence over the loose ResponseFormat above and is
+	// set unconditionally (outside the perplexity-online guard above): this
+	// covers every OpenAI-compatible dialect, including perplexity's online
+	// models. If a dialect rejects response_format outright, that surfaces
+	// as a clear 400 from the API instead of silently never sending the
+	// schema and leaving client-side validation to retry against a model
+	// that was never actually asked to follow it.
+	if request.JSONSchema != nil {
+		body.ResponseFormat = openai.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &shared.ResponseFormatJSONSchemaParam{
+				JSONSchema: shared.ResponseFormatJSONSchemaJSONSchemaParam{
+					Name:   "response",
+					Schema: request.JSONSchema,
+					Strict: strictParam(request.API),
+				},
+			},
 		}
 	}
 

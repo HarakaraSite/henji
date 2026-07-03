@@ -15,6 +15,7 @@ import (
 	"github.com/caarlos0/env/v9"
 	"github.com/charmbracelet/x/exp/strings"
 	"github.com/muesli/termenv"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -73,56 +74,58 @@ const (
 )
 
 var help = map[string]string{
-	"api":               "OpenAI compatible REST API (openai, localai, anthropic, ...)",
-	"apis":              "Aliases and endpoints for OpenAI compatible REST API",
-	"http-proxy":        "HTTP proxy to use for API requests",
-	"model":             "Default model (gpt-3.5-turbo, gpt-4, ggml-gpt4all-j...)",
-	"ask-model":         "Ask which model to use via interactive prompt",
-	"max-input-chars":   "Default character limit on input to model",
-	"format":            "Ask for the response to be formatted as markdown unless otherwise set",
-	"format-as":         "Format to request from the model when -f/--format is set; valid values are keys in format-text (default: markdown, json)",
-	"format-text":       "Text to append when using the -f flag",
-	"role":              "System role to use",
-	"roles":             "List of predefined system messages that can be used as roles",
-	"list-roles":        "List the roles defined in your configuration file",
-	"list-models":       "List configured APIs and their models (respects --output json)",
-	"prompt":            "Include the prompt from the arguments and stdin, truncate stdin to specified number of lines",
-	"prompt-args":       "Include the prompt from the arguments in the response",
-	"raw":               "Render output as raw text when connected to a TTY",
-	"quiet":             "Quiet mode (hide the spinner while loading and stderr messages for success)",
-	"help":              "Show help and exit",
-	"version":           "Show version and exit",
-	"max-retries":       "Maximum number of times to retry API calls",
-	"max-tool-calls":    "Maximum number of agentic tool call rounds, 0 = unlimited",
-	"no-limit":          "Turn off the client-side limit on the size of the input into the model",
-	"word-wrap":         "Wrap formatted output at specific width (default is 80)",
-	"max-tokens":        "Maximum number of tokens in response",
-	"temp":              "Temperature (randomness) of results, from 0.0 to 2.0, -1.0 to disable",
-	"stop":              "Up to 4 sequences where the API will stop generating further tokens",
-	"topp":              "TopP, an alternative to temperature that narrows response, from 0.0 to 1.0, -1.0 to disable",
-	"topk":              "TopK, only sample from the top K options for each subsequent token, -1 to disable",
-	"fanciness":         "Your desired level of fanciness",
-	"status-text":       "Text to show while generating",
-	"settings":          "Open settings in your $EDITOR",
-	"dirs":              "Print the directories in which henji stores its data",
-	"reset-settings":    "Backup your old settings file and reset everything to the defaults",
-	"continue":          "Continue from the last response or a given save title",
-	"continue-last":     "Continue from the last response",
-	"no-cache":          "Disables caching of the prompt/response",
-	"title":             "Saves the current conversation with the given title",
-	"list":              "Lists saved conversations",
-	"delete":            "Deletes one or more saved conversations with the given titles or IDs",
-	"delete-older-than": "Deletes all saved conversations older than the specified duration; valid values are " + strings.EnglishJoin(duration.ValidUnits(), true),
-	"show":              "Show a saved conversation with the given title or ID",
-	"theme":             "Theme to use in the forms; valid choices are charm, catppuccin, dracula, and base16",
-	"show-last":         "Show the last saved conversation",
-	"editor":            "Edit the prompt in your $EDITOR; only taken into account if no other args and if STDIN is a TTY",
-	"mcp-servers":       "MCP Servers configurations",
-	"mcp-disable":       "Disable specific MCP servers",
-	"mcp-list":          "List all available MCP servers",
-	"mcp-list-tools":    "List all available tools from enabled MCP servers",
-	"mcp-timeout":       "Timeout for MCP server calls, defaults to 15 seconds",
-	"output":            `Output format: text or json. json prints one line: {"version":1,"content":[{"type":"text","text":"..."}],"model":"...","conversation_id":"..."} on success, {"version":1,"error":{"code":"...","message":"..."}} on failure (exit 1)`,
+	"api":                 "OpenAI compatible REST API (openai, localai, anthropic, ...)",
+	"apis":                "Aliases and endpoints for OpenAI compatible REST API",
+	"http-proxy":          "HTTP proxy to use for API requests",
+	"model":               "Default model (gpt-3.5-turbo, gpt-4, ggml-gpt4all-j...)",
+	"ask-model":           "Ask which model to use via interactive prompt",
+	"max-input-chars":     "Default character limit on input to model",
+	"format":              "Ask for the response to be formatted as markdown unless otherwise set",
+	"format-as":           "Format to request from the model when -f/--format is set; valid values are keys in format-text (default: markdown, json)",
+	"format-text":         "Text to append when using the -f flag",
+	"json-schema":         "Path to a JSON Schema file; the response is constrained to it (Anthropic/OpenAI-compatible/Google) and validated against it client-side",
+	"json-schema-retries": "Maximum number of times to ask the model to correct a response that failed JSON Schema validation",
+	"role":                "System role to use",
+	"roles":               "List of predefined system messages that can be used as roles",
+	"list-roles":          "List the roles defined in your configuration file",
+	"list-models":         "List configured APIs and their models (respects --output json)",
+	"prompt":              "Include the prompt from the arguments and stdin, truncate stdin to specified number of lines",
+	"prompt-args":         "Include the prompt from the arguments in the response",
+	"raw":                 "Render output as raw text when connected to a TTY",
+	"quiet":               "Quiet mode (hide the spinner while loading and stderr messages for success)",
+	"help":                "Show help and exit",
+	"version":             "Show version and exit",
+	"max-retries":         "Maximum number of times to retry API calls",
+	"max-tool-calls":      "Maximum number of agentic tool call rounds, 0 = unlimited",
+	"no-limit":            "Turn off the client-side limit on the size of the input into the model",
+	"word-wrap":           "Wrap formatted output at specific width (default is 80)",
+	"max-tokens":          "Maximum number of tokens in response",
+	"temp":                "Temperature (randomness) of results, from 0.0 to 2.0, -1.0 to disable",
+	"stop":                "Up to 4 sequences where the API will stop generating further tokens",
+	"topp":                "TopP, an alternative to temperature that narrows response, from 0.0 to 1.0, -1.0 to disable",
+	"topk":                "TopK, only sample from the top K options for each subsequent token, -1 to disable",
+	"fanciness":           "Your desired level of fanciness",
+	"status-text":         "Text to show while generating",
+	"settings":            "Open settings in your $EDITOR",
+	"dirs":                "Print the directories in which henji stores its data",
+	"reset-settings":      "Backup your old settings file and reset everything to the defaults",
+	"continue":            "Continue from the last response or a given save title",
+	"continue-last":       "Continue from the last response",
+	"no-cache":            "Disables caching of the prompt/response",
+	"title":               "Saves the current conversation with the given title",
+	"list":                "Lists saved conversations",
+	"delete":              "Deletes one or more saved conversations with the given titles or IDs",
+	"delete-older-than":   "Deletes all saved conversations older than the specified duration; valid values are " + strings.EnglishJoin(duration.ValidUnits(), true),
+	"show":                "Show a saved conversation with the given title or ID",
+	"theme":               "Theme to use in the forms; valid choices are charm, catppuccin, dracula, and base16",
+	"show-last":           "Show the last saved conversation",
+	"editor":              "Edit the prompt in your $EDITOR; only taken into account if no other args and if STDIN is a TTY",
+	"mcp-servers":         "MCP Servers configurations",
+	"mcp-disable":         "Disable specific MCP servers",
+	"mcp-list":            "List all available MCP servers",
+	"mcp-list-tools":      "List all available tools from enabled MCP servers",
+	"mcp-timeout":         "Timeout for MCP server calls, defaults to 15 seconds",
+	"output":              `Output format: text or json. json prints one line: {"version":1,"content":[{"type":"text","text":"..."}],"model":"...","conversation_id":"..."} on success, {"version":1,"error":{"code":"...","message":"..."}} on failure (exit 1)`,
 }
 
 // Model represents the LLM model used in the API call.
@@ -192,6 +195,8 @@ type Config struct {
 	Format              bool       `yaml:"format" env:"FORMAT"`
 	FormatText          FormatText `yaml:"format-text"`
 	FormatAs            string     `yaml:"format-as" env:"FORMAT_AS"`
+	JSONSchemaPath      string     `yaml:"json-schema" env:"JSON_SCHEMA"`
+	JSONSchemaRetries   int        `yaml:"json-schema-retries" env:"JSON_SCHEMA_RETRIES"`
 	Raw                 bool       `yaml:"raw" env:"RAW"`
 	Output              string     `yaml:"output" env:"OUTPUT"`
 	Quiet               bool       `yaml:"quiet" env:"QUIET"`
@@ -247,6 +252,12 @@ type Config struct {
 
 	openEditor                                         bool
 	cacheReadFromID, cacheWriteToID, cacheWriteToTitle string
+
+	// jsonSchemaDoc is the parsed --json-schema file, sent to providers as-is.
+	// jsonSchemaValidator compiles the same file for client-side validation.
+	// Both are populated once in RunE if JSONSchemaPath is set.
+	jsonSchemaDoc       map[string]any
+	jsonSchemaValidator *jsonschema.Schema
 }
 
 // MCPServerConfig holds configuration for an MCP server.
@@ -348,7 +359,8 @@ func defaultConfig() Config {
 			"markdown": defaultMarkdownFormatText,
 			"json":     defaultJSONFormatText,
 		},
-		MCPTimeout: 15 * time.Second,
+		MCPTimeout:        15 * time.Second,
+		JSONSchemaRetries: 2,
 	}
 }
 

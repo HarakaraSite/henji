@@ -154,6 +154,8 @@ for provider setup and scripting/agent patterns.
 | `-a`, `--api` | OpenAI compatible REST API to use (openai, localai, anthropic, ...) |
 | `-f`, `--format` | Ask the LLM to format the response (e.g. markdown, json) |
 | `--format-as` | Specify output format (used with `--format`) |
+| `--json-schema` | Path to a JSON Schema file; constrains and validates the response (see [Structured Output](#structured-output)) |
+| `--json-schema-retries` | Times to ask the model to correct a response that fails schema validation (default 2) |
 | `-P`, `--prompt` | Include prompt from args and stdin; truncate stdin to N lines |
 | `-p`, `--prompt-args` | Include prompt from args in the response |
 | `-e`, `--editor` | Edit the prompt in `$EDITOR` (only when no other args and stdin is a TTY) |
@@ -257,6 +259,38 @@ export AZURE_OPENAI_KEY=...
 ```
 
 Configure the `base-url` and `azure-deployment` in `henji.yml` as well.
+
+## Structured Output
+
+`--format json` only asks the model to *try* to respond as JSON; it doesn't
+guarantee the response actually matches any particular shape. `--json-schema`
+is stricter: it passes your schema to the provider's native structured-output
+feature (Anthropic's `output_config.format`, the OpenAI-compatible
+`response_format.json_schema` used by OpenAI/Groq/local gateways, or
+Google's `generationConfig.responseSchema`) and additionally validates the
+response against the schema client-side before printing it.
+
+```sh
+henji --json-schema review-schema.json "review this diff for security issues" < diff.patch
+```
+
+If the response fails validation, henji tells the model what was wrong and
+asks it to try again (up to `--json-schema-retries` times, default 2) instead
+of silently resending the same prompt.
+
+Notes:
+
+- Real OpenAI enforces `strict: true` reliably; other OpenAI-compatible
+  dialects (Groq models outside the `gpt-oss-*` family, local gateways like
+  Ollama/mlx-lm, Azure) get the schema without `strict`, since they may
+  reject or ignore it — the client-side validation step still catches
+  anything that slips through.
+- Google's schema support is an OpenAPI 3.0 subset and doesn't accept every
+  JSON Schema keyword (e.g. `$ref`/`oneOf`-heavy schemas may be rejected);
+  keep schemas simple when targeting the Google dialect.
+- `--json-schema` suppresses live streaming output — since a failed response
+  gets discarded and retried, henji only prints once the answer has actually
+  passed validation.
 
 ## MCP Integration
 

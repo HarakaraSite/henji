@@ -90,12 +90,21 @@ var (
 				return newUserErrorf("invalid --output value %q, must be one of: text, json", config.Output)
 			}
 
+			if config.JSONSchemaPath != "" {
+				doc, validator, err := loadJSONSchema(config.JSONSchemaPath)
+				if err != nil {
+					return err
+				}
+				config.jsonSchemaDoc = doc
+				config.jsonSchemaValidator = validator
+			}
+
 			opts := []tea.ProgramOption{}
 
 			if !isInputTTY() || config.Raw || config.Output == "json" {
 				opts = append(opts, tea.WithInput(nil))
 			}
-			if isOutputTTY() && !config.Raw && config.Output != "json" {
+			if isOutputTTY() && !config.Raw && config.Output != "json" && config.jsonSchemaValidator == nil {
 				opts = append(opts, tea.WithOutput(os.Stderr))
 			} else {
 				opts = append(opts, tea.WithoutRenderer())
@@ -238,6 +247,12 @@ var (
 			switch {
 			case config.Output == "json":
 				printJSONOutput(mods)
+			// --json-schema suppresses all live/streamed output (see
+			// appendToOutput) so a validated response is only ever shown
+			// here, once, after the model has produced something that
+			// actually matches the schema.
+			case config.jsonSchemaValidator != nil:
+				fmt.Print(mods.Output)
 			// raw mode already prints the output, no need to print it again
 			case isOutputTTY() && !config.Raw:
 				switch {
@@ -275,6 +290,8 @@ func initFlags() {
 	flags.StringVarP(&config.HTTPProxy, "http-proxy", "x", config.HTTPProxy, stdoutStyles().FlagDesc.Render(help["http-proxy"]))
 	flags.BoolVarP(&config.Format, "format", "f", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
 	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, stdoutStyles().FlagDesc.Render(help["format-as"]))
+	flags.StringVar(&config.JSONSchemaPath, "json-schema", config.JSONSchemaPath, stdoutStyles().FlagDesc.Render(help["json-schema"]))
+	flags.IntVar(&config.JSONSchemaRetries, "json-schema-retries", config.JSONSchemaRetries, stdoutStyles().FlagDesc.Render(help["json-schema-retries"]))
 	flags.BoolVarP(&config.Raw, "raw", "r", config.Raw, stdoutStyles().FlagDesc.Render(help["raw"]))
 	flags.StringVar(&config.Output, "output", config.Output, stdoutStyles().FlagDesc.Render(help["output"]))
 	flags.IntVarP(&config.IncludePrompt, "prompt", "P", config.IncludePrompt, stdoutStyles().FlagDesc.Render(help["prompt"]))
@@ -343,6 +360,10 @@ func initFlags() {
 
 	if config.MCPTimeout == 0 {
 		config.MCPTimeout = defaultConfig().MCPTimeout
+	}
+
+	if config.JSONSchemaRetries == 0 {
+		config.JSONSchemaRetries = defaultConfig().JSONSchemaRetries
 	}
 
 	rootCmd.MarkFlagsMutuallyExclusive(

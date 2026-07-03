@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strings"
 
+	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/internal/stream"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
-	"forge.harakara.site/littleisland/henji/internal/proto"
-	"forge.harakara.site/littleisland/henji/internal/stream"
 )
 
 var _ stream.Client = &Client{}
@@ -43,6 +43,14 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 		// Anthropic's API rejects requests that set both temperature and
 		// top_p; only send top_p when temperature wasn't set.
 		body.TopP = anthropic.Float(*request.TopP)
+	}
+
+	if request.JSONSchema != nil {
+		body.OutputConfig = anthropic.OutputConfigParam{
+			Format: anthropic.JSONOutputFormatParam{
+				Schema: request.JSONSchema,
+			},
+		}
 	}
 
 	s := &Stream{

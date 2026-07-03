@@ -64,19 +64,22 @@ type Function struct {
 
 // Request is a chat request.
 type Request struct {
-	Messages       []Message
-	API            string
-	Model          string
-	User           string
-	Tools          map[string][]mcp.Tool
-	Temperature    *float64
-	TopP           *float64
-	TopK           *int64
-	Stop           []string
+	Messages            []Message
+	API                 string
+	Model               string
+	User                string
+	Tools               map[string][]mcp.Tool
+	Temperature         *float64
+	TopP                *float64
+	TopK                *int64
+	Stop                []string
 	MaxTokens           *int64
 	MaxCompletionTokens *int64
 	ResponseFormat      *string
-	ToolCaller     func(name string, data []byte) (string, error)
+	// JSONSchema, when set, asks the provider to constrain its output to
+	// this JSON Schema. It takes precedence over ResponseFormat.
+	JSONSchema map[string]any
+	ToolCaller func(name string, data []byte) (string, error)
 }
 
 // Conversation is a conversation.

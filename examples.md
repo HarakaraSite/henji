@@ -79,6 +79,9 @@ agent's own context) first.
 Ask a local gateway first, and only escalate to a paid cloud model if you're
 not satisfied with the answer.
 
+`ollama` here is just the name given to the API in `henji.yml`; henji talks
+to it over Ollama's OpenAI-compatible `/v1` endpoint, not a dedicated client.
+
 `echo "explain this regex: ^(?:[a-z0-9]+_)+[a-z0-9]+$" | henji --api ollama --model llama3.2 -f`
 
 ### Have henji Investigate Your Project's Bloat

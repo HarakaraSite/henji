@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,6 +25,21 @@ func (f *fakeToolCallStream) Messages() []proto.Message            { return nil 
 func (f *fakeToolCallStream) CallTools() []proto.ToolCallStatus    { return f.calls }
 
 var _ stream.Stream = (*fakeToolCallStream)(nil)
+
+// fakeMessagesStream is a finished stream.Stream with no pending tool calls,
+// used to drive the --json-schema validation path in receiveCompletionStreamCmd.
+type fakeMessagesStream struct {
+	messages []proto.Message
+}
+
+func (f *fakeMessagesStream) Next() bool                       { return false }
+func (f *fakeMessagesStream) Current() (proto.Chunk, error)    { return proto.Chunk{}, nil }
+func (f *fakeMessagesStream) Close() error                     { return nil }
+func (f *fakeMessagesStream) Err() error                       { return nil }
+func (f *fakeMessagesStream) Messages() []proto.Message        { return f.messages }
+func (f *fakeMessagesStream) CallTools() []proto.ToolCallStatus { return nil }
+
+var _ stream.Stream = (*fakeMessagesStream)(nil)
 
 func TestMaxToolCallsLimit(t *testing.T) {
 	fs := &fakeToolCallStream{
@@ -75,6 +91,107 @@ func TestMaxToolCallsLimit(t *testing.T) {
 			require.Equal(t, i+1, out.toolCallRound)
 		}
 	})
+}
+
+func TestCheckJSONSchemaValidResponsePassesThrough(t *testing.T) {
+	_, schema, err := loadJSONSchema(writeTempSchema(t, `{"type":"object","required":["ok"],"properties":{"ok":{"type":"boolean"}}}`))
+	require.NoError(t, err)
+
+	fs := &fakeMessagesStream{messages: []proto.Message{
+		{Role: proto.RoleUser, Content: "hi"},
+		{Role: proto.RoleAssistant, Content: `{"ok":true}`},
+	}}
+	m := &Mods{Config: &Config{jsonSchemaValidator: schema, JSONSchemaRetries: 2}, contentMutex: &sync.Mutex{}}
+	errh := func(err error) tea.Msg { return modsError{err: err} }
+
+	result := m.receiveCompletionStreamCmd(completionOutput{stream: fs, errh: errh})()
+	_, ok := result.(completionOutput)
+	require.True(t, ok, "expected completionOutput, got %T", result)
+	require.Equal(t, 0, m.schemaRetries)
+}
+
+// TestCheckJSONSchemaInvalidResponseTriggersRetryWithCorrection is a
+// regression test: unlike m.retry (which resets the whole conversation via
+// setupStreamContext), a schema validation failure must keep the failed
+// assistant turn in m.messages and hand a correction message to retryFn.
+func TestCheckJSONSchemaInvalidResponseTriggersRetryWithCorrection(t *testing.T) {
+	_, schema, err := loadJSONSchema(writeTempSchema(t, `{"type":"object","required":["ok"],"properties":{"ok":{"type":"boolean"}}}`))
+	require.NoError(t, err)
+
+	fs := &fakeMessagesStream{messages: []proto.Message{
+		{Role: proto.RoleUser, Content: "hi"},
+		{Role: proto.RoleAssistant, Content: `not json`},
+	}}
+	m := &Mods{Config: &Config{jsonSchemaValidator: schema, JSONSchemaRetries: 2}, contentMutex: &sync.Mutex{}}
+
+	var gotCorrection string
+	retryFn := func(correction string) tea.Msg {
+		gotCorrection = correction
+		return completionOutput{content: "retried"}
+	}
+	errh := func(err error) tea.Msg { return modsError{err: err} }
+
+	result := m.receiveCompletionStreamCmd(completionOutput{stream: fs, errh: errh, retryFn: retryFn})()
+
+	require.Equal(t, 1, m.schemaRetries)
+	require.Contains(t, gotCorrection, "did not conform")
+	out, ok := result.(completionOutput)
+	require.True(t, ok, "expected completionOutput from retryFn, got %T", result)
+	require.Equal(t, "retried", out.content)
+	require.Len(t, m.messages, 2, "the failed assistant turn must not be wiped from context")
+}
+
+// TestCheckJSONSchemaRetryDiscardsFailedOutput is a regression test:
+// appendToOutput accumulates into m.Output unconditionally (it only guards
+// whether chunks are also live-printed), so a failed attempt's text was
+// being concatenated with the retried response instead of being replaced by
+// it. checkJSONSchema must clear m.Output/m.content before handing off to
+// retryFn.
+func TestCheckJSONSchemaRetryDiscardsFailedOutput(t *testing.T) {
+	_, schema, err := loadJSONSchema(writeTempSchema(t, `{"type":"object","required":["ok"]}`))
+	require.NoError(t, err)
+
+	m := &Mods{
+		Config:       &Config{jsonSchemaValidator: schema, JSONSchemaRetries: 2},
+		contentMutex: &sync.Mutex{},
+	}
+	// Simulate the failed stream's chunks having already been rendered, the
+	// same way Update() calls appendToOutput as each chunk arrives.
+	m.appendToOutput("not json")
+	require.NotEmpty(t, m.Output, "test setup: appendToOutput should have populated m.Output")
+
+	fs := &fakeMessagesStream{messages: []proto.Message{
+		{Role: proto.RoleUser, Content: "hi"},
+		{Role: proto.RoleAssistant, Content: "not json"},
+	}}
+	retryFn := func(string) tea.Msg { return completionOutput{content: "retried"} }
+	errh := func(err error) tea.Msg { return modsError{err: err} }
+
+	m.receiveCompletionStreamCmd(completionOutput{stream: fs, errh: errh, retryFn: retryFn})()
+
+	require.Empty(t, m.Output, "the discarded attempt's output must not survive into the retry")
+	require.Empty(t, m.content)
+}
+
+func TestCheckJSONSchemaFailsFastAfterRetriesExhausted(t *testing.T) {
+	_, schema, err := loadJSONSchema(writeTempSchema(t, `{"type":"object","required":["ok"]}`))
+	require.NoError(t, err)
+
+	fs := &fakeMessagesStream{messages: []proto.Message{
+		{Role: proto.RoleAssistant, Content: `not json`},
+	}}
+	m := &Mods{Config: &Config{jsonSchemaValidator: schema, JSONSchemaRetries: 1}, schemaRetries: 1, contentMutex: &sync.Mutex{}}
+	retryFn := func(string) tea.Msg {
+		t.Fatal("retryFn must not be called once retries are exhausted")
+		return nil
+	}
+	errh := func(err error) tea.Msg { return modsError{err: err} }
+
+	result := m.receiveCompletionStreamCmd(completionOutput{stream: fs, errh: errh, retryFn: retryFn})()
+
+	msgErr, ok := result.(modsError)
+	require.True(t, ok, "expected modsError, got %T", result)
+	require.Contains(t, msgErr.Reason(), "did not match --json-schema")
 }
 
 func TestEnsureKeyPriority(t *testing.T) {

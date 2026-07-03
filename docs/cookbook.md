@@ -158,3 +158,52 @@ Failure (exit code 1):
 henji --output json "..." | jq -r '.content[0].text'   # extract just the text
 henji --output json "..." | jq -e '.error == null'      # assert success
 ```
+
+## Structured output with `--json-schema`
+
+`--format json` only asks nicely; `--json-schema` uses the provider's native
+structured-output feature and validates the response client-side, so
+downstream tooling can trust the shape without defensive parsing.
+
+Say you want a security review of a diff, reduced to a fixed shape a script
+can consume:
+
+```json
+// review-schema.json
+{
+  "type": "object",
+  "properties": {
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "file": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["severity", "file", "description"]
+      }
+    }
+  },
+  "required": ["summary", "findings"]
+}
+```
+
+```sh
+git diff main | henji --json-schema review-schema.json \
+  "review this diff for security issues" | jq '.findings[] | select(.severity == "critical")'
+```
+
+If the model's first answer doesn't validate, henji shows it the validation
+error and asks it to correct itself, up to `--json-schema-retries` times
+(default 2), before giving up with a clear error instead of handing your
+script malformed JSON.
+
+Combine it with `--output json` to get the structured answer inside the
+usual scripting envelope:
+
+```sh
+henji --output json --json-schema review-schema.json "..." | jq -r '.content[0].text | fromjson'
+```

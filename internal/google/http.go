@@ -32,7 +32,7 @@ func (jm *JSONMarshaller) Marshal(value any) ([]byte, error) {
 	return result, nil
 }
 
-// HTTPRequestBuilder is an implementation of OllamaRequestBuilder that builds HTTP requests.
+// HTTPRequestBuilder is an implementation of RequestBuilder that builds HTTP requests.
 type HTTPRequestBuilder struct {
 	marshaller Marshaller
 }

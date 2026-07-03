@@ -2,6 +2,9 @@ package google
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,6 +71,32 @@ func TestSendRequestStreamAPIErrorNoPanic(t *testing.T) {
 	// The wrapped error must be safe to render: (*openai.Error).Error() panics
 	// if its Request/Response fields are nil, which handleErrorResp used to leave unset.
 	require.NotPanics(t, func() { _ = sendErr.Error() })
+}
+
+// TestRequestJSONSchema verifies that proto.Request.JSONSchema is sent as
+// generationConfig.responseSchema, alongside responseMimeType:"application/json".
+func TestRequestJSONSchema(t *testing.T) {
+	var gotBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := New(Config{BaseURL: server.URL, HTTPClient: server.Client()})
+	schema := map[string]any{"type": "object", "properties": map[string]any{"ok": map[string]any{"type": "boolean"}}}
+	s := client.Request(context.Background(), proto.Request{
+		Messages:   []proto.Message{{Role: proto.RoleUser, Content: "hi"}},
+		JSONSchema: schema,
+	})
+	defer s.Close() //nolint:errcheck
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(gotBody, &body))
+	genConfig, ok := body["generationConfig"].(map[string]any)
+	require.True(t, ok, "generationConfig must be set")
+	require.Equal(t, "application/json", genConfig["responseMimeType"])
+	require.EqualValues(t, schema, genConfig["responseSchema"])
 }
 
 func TestStreamMessagesReturnsCopy(t *testing.T) {

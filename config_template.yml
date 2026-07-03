@@ -36,6 +36,10 @@ roles:
   #   - you do not provide any explanation whatsoever, ONLY the command
 # {{ index .Help "format" }}
 format: false
+# {{ index .Help "json-schema" }}
+# json-schema: /path/to/schema.json
+# {{ index .Help "json-schema-retries" }}
+json-schema-retries: 2
 # {{ index .Help "role" }}
 role: "default"
 # {{ index .Help "raw" }}

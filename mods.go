@@ -54,6 +54,7 @@ type Mods struct {
 	Error         *modsError
 	state         state
 	retries       int
+	schemaRetries int
 	renderer      *lipgloss.Renderer
 	glam          *glamour.TermRenderer
 	glamViewport  viewport.Model
@@ -114,6 +115,9 @@ type completionOutput struct {
 	stream        stream.Stream
 	errh          func(error) tea.Msg
 	toolCallRound int // counts completed tool call rounds for MaxToolCalls enforcement
+	// retryFn re-issues the request with a correction message appended,
+	// used when the response fails --json-schema validation.
+	retryFn func(correction string) tea.Msg
 }
 
 // Init implements tea.Model.
@@ -179,6 +183,7 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			stream:        msg.stream,
 			errh:          msg.errh,
 			toolCallRound: msg.toolCallRound,
+			retryFn:       msg.retryFn,
 		}))
 	case modsError:
 		m.Error = &msg
@@ -239,7 +244,7 @@ func (m *Mods) View() string {
 		}
 
 		m.contentMutex.Lock()
-		if m.Config.Output != "json" {
+		if m.Config.Output != "json" && m.Config.jsonSchemaValidator == nil {
 			for _, c := range m.content {
 				fmt.Print(c)
 			}
@@ -413,6 +418,7 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 		if cfg.MaxCompletionTokens > 0 {
 			request.MaxCompletionTokens = &cfg.MaxCompletionTokens
 		}
+		request.JSONSchema = cfg.jsonSchemaDoc
 
 		var client stream.Client
 		switch mod.API {
@@ -427,12 +433,34 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			}
 		}
 
+		errh := func(err error) tea.Msg {
+			return m.handleRequestError(err, mod, m.Input)
+		}
+
+		// retryFn re-issues the request with the failed assistant response
+		// still in context plus a correction message, so the model sees
+		// what it got wrong instead of blindly regenerating from scratch
+		// (unlike m.retry, which resets the whole conversation via
+		// setupStreamContext).
+		var retryFn func(correction string) tea.Msg
+		retryFn = func(correction string) tea.Msg {
+			retryReq := request
+			retryReq.Messages = append(append([]proto.Message{}, m.messages...), proto.Message{
+				Role:    proto.RoleUser,
+				Content: correction,
+			})
+			return m.receiveCompletionStreamCmd(completionOutput{
+				stream:  client.Request(m.ctx, retryReq),
+				errh:    errh,
+				retryFn: retryFn,
+			})()
+		}
+
 		stream := client.Request(m.ctx, request)
 		return m.receiveCompletionStreamCmd(completionOutput{
-			stream: stream,
-			errh: func(err error) tea.Msg {
-				return m.handleRequestError(err, mod, m.Input)
-			},
+			stream:  stream,
+			errh:    errh,
+			retryFn: retryFn,
 		})()
 	}
 }
@@ -473,6 +501,51 @@ func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 	}
 }
 
+// checkJSONSchema validates the last assistant message against
+// --json-schema. On failure it either asks the model to correct itself
+// (via msg.retryFn, which keeps the failed response in context) or, once
+// --json-schema-retries is exhausted, returns a terminal error.
+func (m *Mods) checkJSONSchema(msg completionOutput) tea.Msg {
+	var content string
+	if len(m.messages) > 0 {
+		content = m.messages[len(m.messages)-1].Content
+	}
+
+	err := validateAgainstSchema(m.Config.jsonSchemaValidator, content)
+	if err == nil {
+		return nil
+	}
+
+	m.schemaRetries++
+	if m.schemaRetries > m.Config.JSONSchemaRetries {
+		return modsError{
+			err: err,
+			reason: fmt.Sprintf(
+				"Response did not match --json-schema after %d attempt(s).",
+				m.schemaRetries,
+			),
+		}
+	}
+
+	correction := fmt.Sprintf(
+		"Your previous response did not conform to the required JSON Schema: %s\n"+
+			"Respond again with ONLY JSON that strictly matches the schema, and nothing else.",
+		err,
+	)
+
+	// Discard the failed attempt's accumulated display/save output. m.Output
+	// is appended to unconditionally in appendToOutput, so without this a
+	// retry's chunks would be concatenated onto the rejected response
+	// instead of replacing it (m.messages, used to build the corrected
+	// request below, is unaffected and correctly keeps the failed turn).
+	m.Output = ""
+	m.contentMutex.Lock()
+	m.content = nil
+	m.contentMutex.Unlock()
+
+	return msg.retryFn(correction)
+}
+
 func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 	return func() tea.Msg {
 		if msg.stream.Next() {
@@ -486,6 +559,7 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 				stream:        msg.stream,
 				errh:          msg.errh,
 				toolCallRound: msg.toolCallRound,
+				retryFn:       msg.retryFn,
 			}
 		}
 
@@ -497,6 +571,11 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 		results := msg.stream.CallTools()
 		if len(results) == 0 {
 			m.messages = msg.stream.Messages()
+			if m.Config.jsonSchemaValidator != nil {
+				if errMsg := m.checkJSONSchema(msg); errMsg != nil {
+					return errMsg
+				}
+			}
 			return completionOutput{errh: msg.errh}
 		}
 
@@ -517,6 +596,7 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 			stream:        msg.stream,
 			errh:          msg.errh,
 			toolCallRound: nextRound,
+			retryFn:       msg.retryFn,
 		}
 		for _, call := range results {
 			toolMsg.content += call.String()
@@ -632,7 +712,7 @@ const tabWidth = 4
 
 func (m *Mods) appendToOutput(s string) {
 	m.Output += s
-	if !isOutputTTY() || m.Config.Raw || m.Config.Output == "json" {
+	if !isOutputTTY() || m.Config.Raw || m.Config.Output == "json" || m.Config.jsonSchemaValidator != nil {
 		m.contentMutex.Lock()
 		m.content = append(m.content, s)
 		m.contentMutex.Unlock()
