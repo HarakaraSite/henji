@@ -13,6 +13,15 @@ type example struct {
 // text envelope, --json-schema for a strictly-typed answer, and MCP for
 // agentic tool calls) since those are the features an agent invoking henji
 // as a tool is least likely to discover from flag descriptions alone.
+//
+// Re-verified by having opencode and codex independently write commands for
+// two tasks using only `henji --help` as input (no README/source access).
+// Both correctly picked --json-schema over the loose --format-as json, but
+// both also assumed --max-tool-calls implies filesystem/tool access is
+// available -- --help said nothing about tools being MCP-server-dependent,
+// so an agent could write a plausible command against an unconfigured MCP
+// setup and get back nothing useful with no indication why. Fixed via the
+// max-tool-calls help text and this example's title.
 var helpExamples = []example{
 	{
 		title:   "Editorialize your video files",
@@ -27,7 +36,7 @@ var helpExamples = []example{
 		command: `git diff main | henji --json-schema review-schema.json "review this diff for security issues" | jq '.findings[]'`,
 	},
 	{
-		title:   "Have henji investigate your project's bloat via MCP",
+		title:   "Have henji investigate your project's bloat via MCP (needs mcp-servers configured; check with --mcp-list-tools)",
 		command: `henji --max-tool-calls 5 "list the largest files in my current project and explain what each is for"`,
 	},
 }

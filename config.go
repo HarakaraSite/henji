@@ -96,7 +96,7 @@ var help = map[string]string{
 	"help":                  "Show help and exit",
 	"version":               "Show version and exit",
 	"max-retries":           "Maximum number of times to retry API calls",
-	"max-tool-calls":        "Maximum number of agentic tool call rounds, 0 = unlimited",
+	"max-tool-calls":        "Maximum number of agentic tool call rounds (default: 0, unlimited). Tools only exist if mcp-servers are configured; check what's available with --mcp-list-tools before relying on this",
 	"no-limit":              "Turn off the client-side limit on the size of the input into the model",
 	"word-wrap":             "Wrap formatted output at specific width (default is 80)",
 	"max-tokens":            "Maximum number of tokens in response",
