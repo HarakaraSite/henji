@@ -76,7 +76,6 @@ var (
 		Short:         "GPT on the command line. Built for pipelines.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Example:       randomExample(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config.Prefix = removeWhitespace(strings.Join(args, " "))
 

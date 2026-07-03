@@ -1,23 +1,35 @@
 package main
 
-import (
-	"math/rand"
-	"regexp"
-)
+import "regexp"
 
-var examples = map[string]string{
-	"Write new sections for a readme": `cat README.md | henji "write a new section to this README documenting a pdf sharing feature"`,
-	"Editorialize your video files":   `ls ~/vids | henji -f "summarize each of these titles, group them by decade"`,
-	"Let GPT pick something to watch": `ls ~/vids | henji "Pick 5 action packed shows from the 80s from this list" | gum choose | xargs vlc`,
+// example is one entry shown in the --help footer.
+type example struct {
+	title, command string
 }
 
-func randomExample() string {
-	keys := make([]string, 0, len(examples))
-	for k := range examples {
-		keys = append(keys, k)
-	}
-	desc := keys[rand.Intn(len(keys))] //nolint:gosec
-	return desc
+// helpExamples are shown in --help, in this order, every time (not a random
+// pick): one familiar pipe-and-summarize example for orientation, then three
+// that cover the AI/scripted-consumption surface (--output json for a safe
+// text envelope, --json-schema for a strictly-typed answer, and MCP for
+// agentic tool calls) since those are the features an agent invoking henji
+// as a tool is least likely to discover from flag descriptions alone.
+var helpExamples = []example{
+	{
+		title:   "Editorialize your video files",
+		command: `ls ~/vids | henji -f "summarize each of these titles, group them by decade"`,
+	},
+	{
+		title:   "Draft your commit message for you",
+		command: `git diff --staged | henji --output json "suggest 3 commit messages for this diff" | jq -r '.content[0].text'`,
+	},
+	{
+		title:   "Get a strictly-typed answer you can trust without parsing",
+		command: `git diff main | henji --json-schema review-schema.json "review this diff for security issues" | jq '.findings[]'`,
+	},
+	{
+		title:   "Have henji investigate your project's bloat via MCP",
+		command: `henji --max-tool-calls 5 "list the largest files in my current project and explain what each is for"`,
+	},
 }
 
 func cheapHighlighting(s styles, code string) string {

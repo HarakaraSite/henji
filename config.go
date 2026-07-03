@@ -405,12 +405,15 @@ func usageFunc(cmd *cobra.Command) error {
 			)
 		}
 	})
-	if cmd.HasExample() {
-		fmt.Printf(
-			"\nExample:\n  %s\n  %s\n",
-			stdoutStyles().Comment.Render("# "+cmd.Example),
-			cheapHighlighting(stdoutStyles(), examples[cmd.Example]),
-		)
+	if len(helpExamples) > 0 {
+		fmt.Println("\nExamples:")
+		for _, ex := range helpExamples {
+			fmt.Printf(
+				"  %s\n  %s\n\n",
+				stdoutStyles().Comment.Render("# "+ex.title),
+				cheapHighlighting(stdoutStyles(), ex.command),
+			)
+		}
 	}
 
 	return nil
