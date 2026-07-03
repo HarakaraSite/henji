@@ -198,7 +198,7 @@ func TestEnsureKeyPriority(t *testing.T) {
 	m := Mods{}
 	const docsURL = "https://example.com"
 
-	t.Run("explicit api-key wins over env and cmd", func(t *testing.T) {
+	t.Run("api-key-cmd wins over env and explicit api-key", func(t *testing.T) {
 		t.Setenv("MY_KEY_ENV", "env-val")
 		key, err := m.ensureKey(API{
 			APIKey:    "explicit-key",
@@ -206,25 +206,25 @@ func TestEnsureKeyPriority(t *testing.T) {
 			APIKeyCmd: "echo cmd-val",
 		}, "UNSET_XYZ", docsURL)
 		require.NoError(t, err)
-		require.Equal(t, "explicit-key", key)
+		require.Equal(t, "cmd-val", key)
 	})
 
-	t.Run("api-key-env wins over api-key-cmd", func(t *testing.T) {
+	t.Run("api-key-env wins over explicit api-key when cmd is absent", func(t *testing.T) {
 		t.Setenv("MY_KEY_ENV", "env-val")
 		key, err := m.ensureKey(API{
+			APIKey:    "explicit-key",
 			APIKeyEnv: "MY_KEY_ENV",
-			APIKeyCmd: "echo cmd-val",
 		}, "UNSET_XYZ", docsURL)
 		require.NoError(t, err)
 		require.Equal(t, "env-val", key)
 	})
 
-	t.Run("api-key-cmd used when env is absent", func(t *testing.T) {
+	t.Run("explicit api-key used when cmd and env are absent", func(t *testing.T) {
 		key, err := m.ensureKey(API{
-			APIKeyCmd: "echo cmd-val",
+			APIKey: "explicit-key",
 		}, "UNSET_XYZ", docsURL)
 		require.NoError(t, err)
-		require.Equal(t, "cmd-val", key)
+		require.Equal(t, "explicit-key", key)
 	})
 
 	t.Run("default env used as last resort", func(t *testing.T) {
@@ -236,6 +236,18 @@ func TestEnsureKeyPriority(t *testing.T) {
 
 	t.Run("error when all sources are empty", func(t *testing.T) {
 		_, err := m.ensureKey(API{}, "UNSET_MODS_KEY_XYZ", docsURL)
+		require.Error(t, err)
+	})
+
+	// A configured api-key-cmd is authoritative: if it fails, ensureKey must
+	// not silently fall back to a weaker source (explicit api-key, env, or
+	// the provider default env var) that happens to also be set.
+	t.Run("api-key-cmd failure does not fall back to a weaker source", func(t *testing.T) {
+		t.Setenv("FALLBACK_KEY", "fallback-val")
+		_, err := m.ensureKey(API{
+			APIKey:    "explicit-key",
+			APIKeyCmd: "false", // exits non-zero, produces no output
+		}, "FALLBACK_KEY", docsURL)
 		require.Error(t, err)
 	})
 }

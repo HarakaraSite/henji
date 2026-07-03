@@ -119,12 +119,17 @@ Cohere provider は使わない方針のため削除済み。
 
 ### API key 解決
 
-認証 key は次の順に探す。
+認証 key は次の順に探す（最もセキュアな手段を優先。詳細は README.md の
+"API key management" 参照）。
 
-1. `api-key`
+1. `api-key-cmd`（コマンド実行が失敗した場合はそのままエラーとし、下位の手段へはフォールバックしない）
 2. `api-key-env`
-3. `api-key-cmd`
+3. `api-key`
 4. provider ごとの default env
+
+旧仕様（本家 mods 由来、`api-key` が最優先）は README との不整合が発覚したため
+2026-07 に変更した。`api-key-cmd`・`api-key-env` を意図的に設定したユーザーの
+設定が、消し忘れた平文 `api-key` に黙って上書きされる方が実害が大きいと判断。
 
 default env:
 

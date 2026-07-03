@@ -104,7 +104,9 @@ Preferred order (most secure first):
    api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
    ```
 
-   The command must write only the key to stdout.
+   The command must write only the key to stdout. If it fails or exits
+   non-zero, henji reports an error rather than silently falling back to a
+   lower-priority source.
 
 2. **`api-key-env`** — read from a named environment variable
 

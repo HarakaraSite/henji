@@ -465,12 +465,13 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 	}
 }
 
+// ensureKey resolves the API key to use, most secure source first: a
+// command's stdout never touches disk, a named env var is at least not
+// checked into henji.yml, and a plaintext api-key is the least secure of
+// the three explicit options. See README.md's "API key management" section.
 func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
-	key := api.APIKey
-	if key == "" && api.APIKeyEnv != "" {
-		key = os.Getenv(api.APIKeyEnv)
-	}
-	if key == "" && api.APIKeyCmd != "" {
+	var key string
+	if api.APIKeyCmd != "" {
 		args, err := shellwords.Parse(api.APIKeyCmd)
 		if err != nil {
 			return "", modsError{err, "Failed to parse api-key-cmd"}
@@ -480,6 +481,12 @@ func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 			return "", modsError{err, "Cannot exec api-key-cmd"}
 		}
 		key = strings.TrimSpace(string(out))
+	}
+	if key == "" && api.APIKeyEnv != "" {
+		key = os.Getenv(api.APIKeyEnv)
+	}
+	if key == "" {
+		key = api.APIKey
 	}
 	if key == "" {
 		key = os.Getenv(defaultEnv)
