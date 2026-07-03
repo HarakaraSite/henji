@@ -288,8 +288,10 @@ Notes:
   reject or ignore it — the client-side validation step still catches
   anything that slips through.
 - Google's schema support is an OpenAPI 3.0 subset and doesn't accept every
-  JSON Schema keyword (e.g. `$ref`/`oneOf`-heavy schemas may be rejected);
-  keep schemas simple when targeting the Google dialect.
+  JSON Schema keyword. Confirmed via a real request: `additionalProperties`
+  is rejected outright (`400 Unknown name "additionalProperties"`); `$ref`/
+  `oneOf`-heavy schemas are also likely to be rejected. Keep schemas simple,
+  and drop `additionalProperties` when targeting the Google dialect.
 - `--json-schema` suppresses live streaming output — since a failed response
   gets discarded and retried, henji only prints once the answer has actually
   passed validation.

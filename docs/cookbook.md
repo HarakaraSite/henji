@@ -207,3 +207,8 @@ usual scripting envelope:
 ```sh
 henji --output json --json-schema review-schema.json "..." | jq -r '.content[0].text | fromjson'
 ```
+
+Targeting `--api google`? Drop `additionalProperties` from the schema —
+confirmed via a real request that Gemini rejects it outright (`400 Unknown
+name "additionalProperties"`). See README.md's Structured Output notes for
+other Google schema limitations.

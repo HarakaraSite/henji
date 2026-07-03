@@ -83,7 +83,7 @@ var help = map[string]string{
 	"format":              "Ask for the response to be formatted as markdown unless otherwise set",
 	"format-as":           "Format to request from the model when -f/--format is set; valid values are keys in format-text (default: markdown, json)",
 	"format-text":         "Text to append when using the -f flag",
-	"json-schema":         "Path to a JSON Schema file; the response is constrained to it (Anthropic/OpenAI-compatible/Google) and validated against it client-side",
+	"json-schema":         "Path to a JSON Schema file; the response is constrained to it (Anthropic/OpenAI-compatible/Google) and validated against it client-side. Google rejects some keywords (e.g. additionalProperties)",
 	"json-schema-retries": "Maximum number of times to ask the model to correct a response that failed JSON Schema validation",
 	"role":                "System role to use",
 	"roles":               "List of predefined system messages that can be used as roles",
