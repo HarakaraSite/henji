@@ -20,17 +20,17 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/caarlos0/go-shellwords"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 	"forge.harakara.site/littleisland/henji/internal/anthropic"
 	"forge.harakara.site/littleisland/henji/internal/cache"
 	"forge.harakara.site/littleisland/henji/internal/google"
 	"forge.harakara.site/littleisland/henji/internal/openai"
 	"forge.harakara.site/littleisland/henji/internal/proto"
 	"forge.harakara.site/littleisland/henji/internal/stream"
+	"github.com/caarlos0/go-shellwords"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/ordered"
 )
 
@@ -60,9 +60,9 @@ type Mods struct {
 	glamViewport  viewport.Model
 	glamOutput    string
 	glamHeight    int
-	messages []proto.Message
-	mcpPool  *mcpClientPool
-	anim     tea.Model
+	messages      []proto.Message
+	mcpPool       *mcpClientPool
+	anim          tea.Model
 	width         int
 	height        int
 

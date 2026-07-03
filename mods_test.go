@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"forge.harakara.site/littleisland/henji/internal/proto"
 	"forge.harakara.site/littleisland/henji/internal/stream"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,12 +17,12 @@ type fakeToolCallStream struct {
 	calls []proto.ToolCallStatus
 }
 
-func (f *fakeToolCallStream) Next() bool                           { return false }
-func (f *fakeToolCallStream) Current() (proto.Chunk, error)       { return proto.Chunk{}, nil }
-func (f *fakeToolCallStream) Close() error                         { return nil }
-func (f *fakeToolCallStream) Err() error                           { return nil }
-func (f *fakeToolCallStream) Messages() []proto.Message            { return nil }
-func (f *fakeToolCallStream) CallTools() []proto.ToolCallStatus    { return f.calls }
+func (f *fakeToolCallStream) Next() bool                        { return false }
+func (f *fakeToolCallStream) Current() (proto.Chunk, error)     { return proto.Chunk{}, nil }
+func (f *fakeToolCallStream) Close() error                      { return nil }
+func (f *fakeToolCallStream) Err() error                        { return nil }
+func (f *fakeToolCallStream) Messages() []proto.Message         { return nil }
+func (f *fakeToolCallStream) CallTools() []proto.ToolCallStatus { return f.calls }
 
 var _ stream.Stream = (*fakeToolCallStream)(nil)
 
@@ -32,11 +32,11 @@ type fakeMessagesStream struct {
 	messages []proto.Message
 }
 
-func (f *fakeMessagesStream) Next() bool                       { return false }
-func (f *fakeMessagesStream) Current() (proto.Chunk, error)    { return proto.Chunk{}, nil }
-func (f *fakeMessagesStream) Close() error                     { return nil }
-func (f *fakeMessagesStream) Err() error                       { return nil }
-func (f *fakeMessagesStream) Messages() []proto.Message        { return f.messages }
+func (f *fakeMessagesStream) Next() bool                        { return false }
+func (f *fakeMessagesStream) Current() (proto.Chunk, error)     { return proto.Chunk{}, nil }
+func (f *fakeMessagesStream) Close() error                      { return nil }
+func (f *fakeMessagesStream) Err() error                        { return nil }
+func (f *fakeMessagesStream) Messages() []proto.Message         { return f.messages }
 func (f *fakeMessagesStream) CallTools() []proto.ToolCallStatus { return nil }
 
 var _ stream.Stream = (*fakeMessagesStream)(nil)

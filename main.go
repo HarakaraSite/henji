@@ -13,12 +13,12 @@ import (
 	"slices"
 	"strings"
 
+	"forge.harakara.site/littleisland/henji/internal/cache"
 	"github.com/atotto/clipboard"
 	timeago "github.com/caarlos0/timea.go"
 	tea "github.com/charmbracelet/bubbletea"
 	glamour "github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/huh"
-	"forge.harakara.site/littleisland/henji/internal/cache"
 	"github.com/charmbracelet/x/editor"
 	mcobra "github.com/muesli/mango-cobra"
 	"github.com/muesli/roff"
