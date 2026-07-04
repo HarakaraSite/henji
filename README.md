@@ -44,12 +44,13 @@ All dependencies updated to current versions, including security patches for `x/
 ### Build from source
 
 ```sh
-git clone <this-repo>
+git clone https://forge.harakara.site/littleisland/henji.git
 cd henji
 go build -o henji .
 ```
 
-> `go install` support will be available once the module is published.
+> This repository is not yet publicly accessible, so `go install` isn't
+> available; building from a local clone is the only supported path for now.
 
 ### Shell completions
 
