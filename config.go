@@ -249,7 +249,10 @@ type MCPServerConfig struct {
 }
 
 func ensureConfig() (Config, error) {
-	var c Config
+	// Start from defaults so an omitted setting remains distinguishable from
+	// an explicitly configured zero value. This matters for sampling options:
+	// zero is valid (for example, temp: 0), while -1 means "do not send".
+	c := defaultConfig()
 	configHome, err := configHomeDir()
 	if err != nil {
 		return c, modsError{err, "Could not find settings path."}
@@ -332,8 +335,11 @@ func createConfigFile(path string) error {
 
 func defaultConfig() Config {
 	return Config{
-		Output:   "text",
-		FormatAs: "markdown",
+		Output:      "text",
+		FormatAs:    "markdown",
+		Temperature: -1,
+		TopP:        -1,
+		TopK:        -1,
 		FormatText: FormatText{
 			"markdown": defaultMarkdownFormatText,
 			"json":     defaultJSONFormatText,

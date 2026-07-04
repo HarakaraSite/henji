@@ -366,7 +366,7 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 
 | 項目 | 判断 | 理由 |
 |---|---|---|
-| 2-D（ptrOrNil の 0 値） | **廃止** | `config_template.yml` で `temp:1.0 / topp:1.0 / topk:50` と正の値が設定済み。デフォルト通りに使う限り実害なし |
+| 2-D（sampling の未指定と 0 値） | **再開・修正済み（未コミット）** | 最小構成で未指定値が0として送信される実害を確認。設定読込を `defaultConfig()` から開始し、未指定は `-1`、明示的な0は有効値として保持するよう修正 |
 | 2-E（retry blocking sleep） | **廃止** | `retry()` は tea.Cmd goroutine 内から呼ばれるため `time.Sleep` は Update ループをブロックしない。race条件も実害なし |
 | P3（overview.md 陳腐化） | PR#15 | コードバグではなくメモのズレ。PR#7 で修正済みの Google `Messages()` の記述が残っている。PR#15（doc 修正）で対処 |
 
@@ -389,11 +389,11 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 
 ## 8. 検証メモ（調査で判明した事実）
 
-- **2-D（ptrOrNil の 0 値扱い）再開候補**（2026-07-04、`henji docs` ドラフト作成時の実機検証で発見）: temp/topp を書かない最小構成の henji.yml では henji が 0 値をそのまま送信し、vmlx-engine ゲートウェイが 422 Unprocessable Entity を返した。2-D 廃止の根拠は「config_template.yml が正値を設定している」だったが、テンプレートを使わず手書きした最小構成では成り立たない。回避策は temp/topp の明示設定（docs ドラフトに記載済み）。根本対応は「0 を未指定として扱いフィールドごと省略する」変更で、`--temp` フラグは PR#26 で削除済みのため「0 を意図的に指定したい」ニーズとの衝突は YAML 経由のみ考慮すればよい
+- **2-D（sampling の未指定と 0 値を区別）修正**（2026-07-04、`henji docs` ドラフト作成時の実機検証で発見）: temp/topp を書かない最小構成の henji.yml では henji が 0 値をそのまま送信し、vmlx-engine ゲートウェイが 422 Unprocessable Entity を返した。`ensureConfig()` を `defaultConfig()` から開始し、sampling のデフォルトを `-1`（送信しない）に変更。YAMLまたは `HENJI_*` で明示した0は有効値として保持する。未指定・YAMLの0・環境変数の0・`ptrOrNil`の回帰テストを追加
 
 - `receiveCompletionStreamCmd` は `tea.Cmd`（goroutine）として実行される → `Current()` のブロッキング化は安全
 - `retry()` は tea.Cmd goroutine 内から呼ばれる → `time.Sleep` は Update ループをブロックしない
-- `config_template.yml`: `temp:1.0 / topp:1.0 / topk:50`（すべて正値）→ 2-D は不要
+- `config_template.yml`: `temp:1.0 / topp:1.0 / topk:50`（すべて正値）だが、手書きの最小構成でも正しく動作する必要があるため2-Dを再開・修正
 - `format.go:97` に `// anthropic v1.5 removed this method` コメントあり → 4-4 は「高」リスクと予測したが、実際は v1.26→v1.50 でコード変更不要だった
 - `errgroup.Group`（素）が `mcp.go:66` で確認済み → PR#10 で `errgroup.WithContext` に変更
 - `main.go:748`: `_ = cache.Delete(id)` が L4 の実体（DB保存失敗時の孤立cache削除エラーを無視）

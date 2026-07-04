@@ -39,7 +39,7 @@ PR#26 のフラグ削減（43→29項目、temp 等は YAML/env 専用化）を�
 stdout/stderr の分離、`--json-schema` と `--output json` の併用（エンベロープの
 `content[0].text` に検証済みJSONが文字列で入る）、`--list-models --output json` の
 出力形、非力なローカルモデルが schema を無視した際の失敗モード（リトライ枯渇で
-exit 1）、temp/topp 未設定の最小構成でゲートウェイが 422 を返すケース。
+exit 1）。
 
 ---
 
@@ -101,10 +101,6 @@ Local gateways (Ollama, mlx-lm, LM Studio, llama.cpp server, ...):
   404.
 - henji always sends an API key on the OpenAI-compatible path. Local
   servers don't check it, so set `api-key` to any placeholder.
-- If a gateway rejects requests with `422 Unprocessable Entity`, set
-  `temp:` and `topp:` explicitly in the config file; with a minimal config
-  that omits them, henji sends zero values, which some gateways refuse.
-
 ## Getting machine-readable output (scripts and agents)
 
 Three levels, from loosest to strictest:
@@ -252,12 +248,3 @@ API keys, in priority order (highest wins):
 4. ドキュメント内フラグ名の実在検証テスト + サイズ予算検査（12KB上限）
 5. opencode/codex による2段階検証（誘導に気づくか / 内容でタスク完遂できるか、
    ai-docs-plan.md 4.2）
-
-## 検証で発見した、docs とは別軸の課題（要トリアージ）
-
-- **temp/topp 未設定（=0）の最小構成で、henji が 0 値をそのまま送る問題**:
-  vmlx-engine ゲートウェイは 422 Unprocessable Entity を返した。旧 2-D（`ptrOrNil`
-  の 0 値扱い）は「config_template.yml が正値を設定しているから実害なし」として
-  廃止したが、テンプレートを使わない最小構成では前提が成り立たない。docs には
-  回避策（temp/topp を明示設定）を記載したが、根本対応（0 を「未指定」として
-  省略する）を再検討する価値がある → fix-roadmap.md の再開候補

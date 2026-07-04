@@ -41,6 +41,19 @@ func (f *fakeMessagesStream) CallTools() []proto.ToolCallStatus { return nil }
 
 var _ stream.Stream = (*fakeMessagesStream)(nil)
 
+func TestPtrOrNilPreservesExplicitZero(t *testing.T) {
+	require.Nil(t, ptrOrNil(float64(-1)))
+	require.Nil(t, ptrOrNil(int64(-1)))
+
+	temp := ptrOrNil(float64(0))
+	require.NotNil(t, temp)
+	require.Zero(t, *temp)
+
+	topK := ptrOrNil(int64(0))
+	require.NotNil(t, topK)
+	require.Zero(t, *topK)
+}
+
 func TestMaxToolCallsLimit(t *testing.T) {
 	fs := &fakeToolCallStream{
 		calls: []proto.ToolCallStatus{{Name: "search"}},
