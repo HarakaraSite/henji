@@ -57,6 +57,13 @@ func (cc Conversation) String() string {
 			sb.WriteString("**User**: ")
 		case RoleAssistant:
 			sb.WriteString("**Assistant**: ")
+		default:
+			// Unrecognized roles are skipped rather than printed raw. In
+			// particular, conversations saved before MCP support was removed
+			// may still contain Role: "tool" messages whose Content held a
+			// tool result payload (potentially including secrets) that was
+			// never meant to be displayed unlabeled.
+			continue
 		}
 		sb.WriteString(msg.Content)
 		sb.WriteString("\n\n")
