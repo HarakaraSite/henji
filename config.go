@@ -346,6 +346,7 @@ func defaultConfig() Config {
 		},
 		MCPTimeout:        15 * time.Second,
 		JSONSchemaRetries: 2,
+		MaxRetries:        5,
 	}
 }
 

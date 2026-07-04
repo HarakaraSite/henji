@@ -87,6 +87,19 @@ func TestEnsureConfigSamplingValues(t *testing.T) {
 	})
 }
 
+// TestEnsureConfigDefaultMaxRetries is the F-4 regression test: a minimal
+// hand-written henji.yml (without max-retries: 5, unlike the bundled
+// config_template.yml) used to leave MaxRetries at 0, causing m.retry() to
+// bail out on the very first error instead of retrying or falling back to
+// another model on a 404.
+func TestEnsureConfigDefaultMaxRetries(t *testing.T) {
+	writeTestConfig(t, "{}\n")
+
+	cfg, err := ensureConfig()
+	require.NoError(t, err)
+	require.Equal(t, 5, cfg.MaxRetries)
+}
+
 func TestEnsureConfigEnvironmentOverrides(t *testing.T) {
 	t.Run("parses supported scalar and slice types", func(t *testing.T) {
 		writeTestConfig(t, "{}\n")
