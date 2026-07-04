@@ -389,6 +389,8 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 
 ## 8. 検証メモ（調査で判明した事実）
 
+- **2-D（ptrOrNil の 0 値扱い）再開候補**（2026-07-04、`henji docs` ドラフト作成時の実機検証で発見）: temp/topp を書かない最小構成の henji.yml では henji が 0 値をそのまま送信し、vmlx-engine ゲートウェイが 422 Unprocessable Entity を返した。2-D 廃止の根拠は「config_template.yml が正値を設定している」だったが、テンプレートを使わず手書きした最小構成では成り立たない。回避策は temp/topp の明示設定（docs ドラフトに記載済み）。根本対応は「0 を未指定として扱いフィールドごと省略する」変更で、`--temp` フラグは PR#26 で削除済みのため「0 を意図的に指定したい」ニーズとの衝突は YAML 経由のみ考慮すればよい
+
 - `receiveCompletionStreamCmd` は `tea.Cmd`（goroutine）として実行される → `Current()` のブロッキング化は安全
 - `retry()` は tea.Cmd goroutine 内から呼ばれる → `time.Sleep` は Update ループをブロックしない
 - `config_template.yml`: `temp:1.0 / topp:1.0 / topk:50`（すべて正値）→ 2-D は不要
