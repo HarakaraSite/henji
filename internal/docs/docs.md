@@ -36,7 +36,10 @@ Models and providers ("APIs") are defined in the config file
 
     henji --list-models
     henji --list-models --output json   # {"version":1,"apis":[{"name":...,
-                                        #  "models":[{"id":...,"aliases":[...]}]}]}
+                                        #  "base_url":...,"models":[{"id":...,"aliases":[...]}]}]}
+
+`base_url` (present when an API entry sets `base-url`) tells local gateways
+apart from cloud endpoints in scripts, without hardcoding API names.
 
 - `-m <model>` accepts a model ID or alias from the config.
 - `-a <api>` selects the provider. The configured `default-model` belongs to

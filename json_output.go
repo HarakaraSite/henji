@@ -81,8 +81,13 @@ type ModelsListOutput struct {
 
 // APIModelsEntry describes one configured API endpoint and its models.
 type APIModelsEntry struct {
-	Name    string       `json:"name"`
-	Default bool         `json:"default,omitempty"`
+	Name    string `json:"name"`
+	Default bool   `json:"default,omitempty"`
+	// BaseURL lets scripts tell local gateways (e.g. http://localhost:...)
+	// apart from cloud endpoints without hardcoding API names. Empty for
+	// entries that don't set base-url (anthropic/google typically don't;
+	// they use their provider default).
+	BaseURL string       `json:"base_url,omitempty"`
 	Models  []ModelEntry `json:"models"`
 }
 
@@ -99,6 +104,7 @@ func buildModelsListOutput(cfg *Config) ModelsListOutput {
 		entry := APIModelsEntry{
 			Name:    api.Name,
 			Default: api.Name == cfg.API,
+			BaseURL: api.BaseURL,
 		}
 		for name, mod := range api.Models {
 			entry.Models = append(entry.Models, ModelEntry{
