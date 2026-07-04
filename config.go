@@ -80,7 +80,7 @@ var help = map[string]string{
 	"format":                "Ask for a formatted response (default: markdown; see --format-as)",
 	"format-as":             "Format to request when -f is set (markdown, json, or a format-text key)",
 	"format-text":           "Text to append when using the -f flag",
-	"json-schema":           "Constrain and validate the response with a JSON Schema file",
+	"json-schema":           "Constrain and validate the response with a JSON Schema file (raw JSON on stdout, no envelope unless combined with --output json)",
 	"json-schema-retries":   "Max correction attempts when the response fails schema validation",
 	"role":                  "System role to use",
 	"roles":                 "List of predefined system messages that can be used as roles",

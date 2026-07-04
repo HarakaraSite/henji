@@ -75,8 +75,12 @@ There are three levels, from loosest to strictest:
 
 3. `--json-schema <file>` sends a JSON Schema through the provider's native
    structured-output mechanism, then validates the answer client-side before
-   printing. On failure, henji explains the mismatch to the model and retries
-   (`--json-schema-retries`, default 2).
+   printing. On failure, henji sends the model a correction message quoting
+   the validation error and asking it to respond again with ONLY JSON that
+   strictly matches the schema, then retries (`--json-schema-retries`,
+   default 2). The failed attempt stays in conversation history for context;
+   if every retry repeats the same mistake, the schema itself may be
+   ambiguous or too strict for that model.
 
        henji --json-schema review.json "review this diff" < diff.patch | jq '.findings[]'
 
@@ -90,6 +94,9 @@ Structured-output pitfalls:
 - henji sends `strict:true` only for an API entry named `openai`. Other
   OpenAI-compatible entries receive the schema without `strict`; client-side
   validation still catches invalid responses.
+- OpenAI's strict mode requires every object in the schema to set
+  `"additionalProperties": false`; a schema without it is rejected by the
+  API before generation even starts.
 - Small local models may wrap JSON in Markdown fences or ignore the schema.
   Repeated violations exhaust the retries and exit non-zero. Adding "raw JSON
   only, no code fences" to the prompt can help weaker models comply.
