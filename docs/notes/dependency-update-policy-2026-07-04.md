@@ -166,9 +166,26 @@ Bubble Tea、Bubbles、Lip Gloss、Glamour、Huhをまとめて移行する。un
 - 対話prompt、選択UI、キャンセル
 - light/dark terminalでの色とerror表示
 
-module pathとAPI移行、全unit test、vet、build、help/docs/completionの実バイナリ確認は
-完了した。spinner、resize、対話prompt、light/dark配色の最終確認は、リリース前の
-TTY目視確認として残す。
+module pathとAPI移行、全unit test、vet、build、help/docs/completionの実バイナリ確認を
+完了した。さらに2026-07-04、隔離設定とローカルmock OpenAI互換APIを使い、実PTYで
+以下を確認した。外部API呼び出しと既存conversationデータの変更は行っていない。
+
+- huhのprompt入力画面とCtrl+Cキャンセル
+- spinnerからstreaming表示への遷移
+- Glamourの見出し、箇条書き、code block、word wrap
+- terminalを42x10から72x18へ変更した際のviewport再描画と追従
+- positional prompt、raw TTY、非TTY pipe、`--output json`
+- light/dark背景色variantと、terminal応答後の `BackgroundColorMsg` 反映
+
+実PTY確認で3件の回帰を検出し、同時に修正した。
+
+1. `docs` subcommand追加後、positional promptがCobraにunknown command扱いされる。
+2. Lip Gloss v2互換色のpackage初期化がOSC応答を同期的に待ち、起動が約4.5秒遅れる。
+3. background color queryがraw/pipe出力へ混入する。
+
+root commandへ `cobra.ArbitraryArgs` を設定し、背景色は非同期のBubble Tea messageと
+non-blockingな `COLORFGBG` fallbackで選択するよう変更した。background queryは通常の
+TTY renderer使用時だけ送信し、raw、pipe、JSONにはcontrol sequenceを出さない。
 
 ### Phase 4: 間接依存と脆弱性の再評価 ✅
 

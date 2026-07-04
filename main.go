@@ -94,6 +94,7 @@ var (
 	rootCmd = &cobra.Command{
 		Use:           "henji",
 		Short:         "GPT on the command line. Built for pipelines.",
+		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

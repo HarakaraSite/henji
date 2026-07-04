@@ -119,7 +119,14 @@ type completionOutput struct {
 
 // Init implements tea.Model.
 func (m *Mods) Init() tea.Cmd {
-	return m.findCacheOpsDetails()
+	if !shouldRequestBackgroundColor(isOutputTTY(), m.Config) {
+		return m.findCacheOpsDetails()
+	}
+	return tea.Batch(m.findCacheOpsDetails(), tea.RequestBackgroundColor)
+}
+
+func shouldRequestBackgroundColor(outputTTY bool, cfg *Config) bool {
+	return outputTTY && !cfg.Raw && cfg.Output != "json" && cfg.jsonSchemaValidator == nil
 }
 
 // Update implements tea.Model.
@@ -180,6 +187,9 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.glamViewport.SetWidth(m.width)
 		m.glamViewport.SetHeight(m.height)
+		return m, nil
+	case tea.BackgroundColorMsg:
+		m.Styles = makeStyles(m.Styles.profile, msg.IsDark())
 		return m, nil
 	case tea.KeyPressMsg:
 		switch msg.String() {

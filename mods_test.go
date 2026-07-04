@@ -54,6 +54,23 @@ func TestPtrOrNilPreservesExplicitZero(t *testing.T) {
 	require.Zero(t, *topK)
 }
 
+func TestShouldRequestBackgroundColor(t *testing.T) {
+	for name, test := range map[string]struct {
+		outputTTY bool
+		config    Config
+		want      bool
+	}{
+		"interactive renderer": {outputTTY: true, config: Config{Output: "text"}, want: true},
+		"piped output":         {outputTTY: false, config: Config{Output: "text"}, want: false},
+		"raw output":           {outputTTY: true, config: Config{Output: "text", Raw: true}, want: false},
+		"JSON output":          {outputTTY: true, config: Config{Output: "json"}, want: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, shouldRequestBackgroundColor(test.outputTTY, &test.config))
+		})
+	}
+}
+
 func TestMaxToolCallsLimit(t *testing.T) {
 	fs := &fakeToolCallStream{
 		calls: []proto.ToolCallStatus{{Name: "search"}},

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/compat"
 	"github.com/charmbracelet/colorprofile"
 )
 
@@ -31,16 +30,16 @@ type styles struct {
 	profile colorprofile.Profile
 }
 
-func makeStyles(profile colorprofile.Profile) (s styles) {
+func makeStyles(profile colorprofile.Profile, darkBackground bool) (s styles) {
 	const horizontalEdgePadding = 2
 	colorForProfile := func(color string) color.Color {
 		return profile.Convert(lipgloss.Color(color))
 	}
 	adaptiveColor := func(light, dark string) color.Color {
-		return profile.Convert(compat.AdaptiveColor{
-			Light: lipgloss.Color(light),
-			Dark:  lipgloss.Color(dark),
-		})
+		if darkBackground {
+			return colorForProfile(dark)
+		}
+		return colorForProfile(light)
 	}
 	bold := func(style lipgloss.Style) lipgloss.Style {
 		return style.Bold(profile > colorprofile.ASCII)

@@ -42,6 +42,17 @@ func TestDocsCommandPrintsPlainMarkdown(t *testing.T) {
 	}
 }
 
+func TestRootCommandAcceptsPromptArgumentsAlongsideSubcommands(t *testing.T) {
+	cmd, args, err := rootCmd.Find([]string{"explain", "this error"})
+	requireNoError(t, err)
+	if cmd != rootCmd {
+		t.Fatalf("prompt resolved to %q instead of root command", cmd.Name())
+	}
+	if strings.Join(args, " ") != "explain this error" {
+		t.Fatalf("prompt arguments changed: %q", args)
+	}
+}
+
 func TestManualLongFlagsExist(t *testing.T) {
 	initFlags()
 	re := regexp.MustCompile(`--([a-z][a-z0-9-]*)`)
