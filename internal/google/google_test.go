@@ -99,6 +99,65 @@ func TestRequestJSONSchema(t *testing.T) {
 	require.EqualValues(t, schema, genConfig["responseSchema"])
 }
 
+// TestRequestSendsExplicitZeroSamplingValues is the F-2 regression test.
+// GenerationConfig used value types with omitempty, so an explicit temp:0
+// (deterministic output) was indistinguishable from "unset" and dropped
+// from the request body, silently falling back to the server default.
+func TestRequestSendsExplicitZeroSamplingValues(t *testing.T) {
+	var gotBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := New(Config{BaseURL: server.URL, HTTPClient: server.Client()})
+	temp, topP, topK := 0.0, 0.0, int64(0)
+	s := client.Request(context.Background(), proto.Request{
+		Messages:    []proto.Message{{Role: proto.RoleUser, Content: "hi"}},
+		Temperature: &temp,
+		TopP:        &topP,
+		TopK:        &topK,
+	})
+	defer s.Close() //nolint:errcheck
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(gotBody, &body))
+	genConfig, ok := body["generationConfig"].(map[string]any)
+	require.True(t, ok, "generationConfig must be set")
+	require.Contains(t, genConfig, "temperature")
+	require.Equal(t, 0.0, genConfig["temperature"])
+	require.Contains(t, genConfig, "topP")
+	require.Equal(t, 0.0, genConfig["topP"])
+	require.Contains(t, genConfig, "topK")
+	require.Equal(t, 0.0, genConfig["topK"])
+}
+
+// TestRequestOmitsUnsetSamplingValues verifies unset (nil) sampling fields
+// are still omitted from the request body, so the server default applies.
+func TestRequestOmitsUnsetSamplingValues(t *testing.T) {
+	var gotBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := New(Config{BaseURL: server.URL, HTTPClient: server.Client()})
+	s := client.Request(context.Background(), proto.Request{
+		Messages: []proto.Message{{Role: proto.RoleUser, Content: "hi"}},
+	})
+	defer s.Close() //nolint:errcheck
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(gotBody, &body))
+	genConfig, ok := body["generationConfig"].(map[string]any)
+	require.True(t, ok, "generationConfig must be set")
+	require.NotContains(t, genConfig, "temperature")
+	require.NotContains(t, genConfig, "topP")
+	require.NotContains(t, genConfig, "topK")
+}
+
 func TestStreamMessagesReturnsCopy(t *testing.T) {
 	s := &Stream{
 		messages: []proto.Message{

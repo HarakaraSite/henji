@@ -68,9 +68,9 @@ type GenerationConfig struct {
 	ResponseSchema  any             `json:"responseSchema,omitempty"`
 	CandidateCount  uint            `json:"candidateCount,omitempty"`
 	MaxOutputTokens uint            `json:"maxOutputTokens,omitempty"`
-	Temperature     float64         `json:"temperature,omitempty"`
-	TopP            float64         `json:"topP,omitempty"`
-	TopK            int64           `json:"topK,omitempty"`
+	Temperature     *float64        `json:"temperature,omitempty"`
+	TopP            *float64        `json:"topP,omitempty"`
+	TopK            *int64          `json:"topK,omitempty"`
 	ThinkingConfig  *ThinkingConfig `json:"thinkingConfig,omitempty"`
 }
 
@@ -111,17 +111,10 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 			CandidateCount:   1,
 			StopSequences:    request.Stop,
 			MaxOutputTokens:  4096,
+			Temperature:      request.Temperature,
+			TopP:             request.TopP,
+			TopK:             request.TopK,
 		},
-	}
-
-	if request.Temperature != nil {
-		body.GenerationConfig.Temperature = *request.Temperature
-	}
-	if request.TopP != nil {
-		body.GenerationConfig.TopP = *request.TopP
-	}
-	if request.TopK != nil {
-		body.GenerationConfig.TopK = *request.TopK
 	}
 
 	if request.MaxTokens != nil {
