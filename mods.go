@@ -236,10 +236,6 @@ func (m *Mods) View() tea.View {
 			return tea.NewView(m.glamOutput)
 		}
 
-		if isOutputTTY() && !m.Config.Raw {
-			return tea.NewView(m.Output)
-		}
-
 		m.contentMutex.Lock()
 		if m.Config.Output != "json" && m.Config.jsonSchemaValidator == nil {
 			for _, c := range m.content {
