@@ -51,6 +51,28 @@ func TestDocsCommandPrintsPlainMarkdown(t *testing.T) {
 	}
 }
 
+// TestDocsCommandRejectsArgsWithHelpfulError is a C-2 regression test: a
+// prompt starting with the word "docs" (e.g. "docs って何") is parsed as
+// this subcommand with trailing arguments. The error must tell the user to
+// quote the prompt instead of cobra's generic "unknown command" message.
+func TestDocsCommandRejectsArgsWithHelpfulError(t *testing.T) {
+	cmd := newDocsCmd()
+	cmd.SetArgs([]string{"って何"})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected an error for docs with trailing arguments")
+	}
+	if !strings.Contains(err.Error(), "quote it") {
+		t.Fatalf("error does not mention quoting the prompt: %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "って何") {
+		t.Fatalf("error does not echo the offending arguments: %q", err.Error())
+	}
+}
+
 func TestRootCommandAcceptsPromptArgumentsAlongsideSubcommands(t *testing.T) {
 	cmd, args, err := rootCmd.Find([]string{"explain", "this error"})
 	requireNoError(t, err)

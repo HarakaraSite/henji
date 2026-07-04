@@ -71,9 +71,21 @@ func init() {
 
 func newDocsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "docs",
-		Short:        "Print the full task-oriented manual as Markdown",
-		Args:         cobra.NoArgs,
+		Use:   "docs",
+		Short: "Print the full task-oriented manual as Markdown",
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			// A prompt that happens to start with the word "docs" (e.g.
+			// "docs って何") is otherwise parsed as this subcommand with
+			// trailing arguments, which cobra.NoArgs rejects with an
+			// unhelpful "unknown command" error.
+			return fmt.Errorf(
+				"the docs subcommand takes no arguments; to use \"docs\" as part of a prompt, quote it, e.g.: henji \"docs %s\"",
+				strings.Join(args, " "),
+			)
+		},
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := fmt.Fprint(cmd.OutOrStdout(), manualdocs.Manual(Version))
