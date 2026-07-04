@@ -1,7 +1,9 @@
 # mods フォーク 修正ロードマップ
 
 作成日: 2026-06-21  
-更新日: 2026-06-26 v6（PR#14〜#16 完了・リファクタ検討項目を次バージョンセクションに追加）  
+更新日: 2026-07-04 v8（v0.9.3 リリース前の残タスク全件完了: version埋め込み・README仮URL修正・
+F-1〜F-4。test/vet/race全パス、F-2/F-3は実ゲートウェイでも検証済み）  
+更新日: 2026-07-04 v7（バージョニング方針を改定: 次リリースは v0.9.3、v2.0.0 は「AI が henji を能動的に使える状態」到達時に変更。v0.9.3 前の残タスクを整理。セクション4.5に全体レビュー指摘 F-1〜F-4 + クリーンアップ候補を追加）  
 対象ブランチ: main（Codex作業済みコミット `23810ab` 以降）
 
 ---
@@ -34,18 +36,23 @@ charmbracelet/mods は 2026-03-09 にアーカイブされた。本家 README �
 
 fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `roles:` 設定だけで実現できる見込み（コード改造不要）。これらはこの roadmap のバグ修正 PR とは独立した「設定・ドキュメント整備タスク」として管理する。設定だけで賄えるかはドッグフーディング後に判断し、使い勝手の問題が出た時点で初めて機能追加 PR を検討する。
 
-### 公開時の必須作業（コード修正とは別）★ **次フェーズ**
+### 公開時の必須作業（コード修正とは別）✅ おおむね完了（残タスクはセクション4末尾）
 
 - **README 更新**: アーカイブ済み本家からの fork である旨、本家が fork でのメンテを歓迎している事実、このフォークが何を変えたか（Cohere 削除・クラッシュ修正・依存更新・MCP 接続キャッシュ・MaxToolCalls・Ollama専用実装削除）の要約、LICENSE（MIT）の著作権表示維持と改変部分の表示追加。README に「ローカル MCP 多用時の推奨設定例（`max-tool-calls: 50`）」を記載し、用途に応じてユーザーが設定するよう案内する。**移行注記（PR#23）**: 旧バージョンで `api: ollama` を `base-url: http://localhost:11434`（`/v1`なし）で設定していたユーザー向けに、`/v1` の追記とダミー `api-key` 設定が必要になった旨を明記する。
 - **モジュール名変更**: `go install github.com/<user>/<新名称>` の形で配布する方針は確定。ただし module パスの変更は内部 import 全体に波及するため、**公開直前にまとめて実施**（今は触らない）。
 
-### バージョニング方針
+### バージョニング方針（2026-07-04 改定）
 
 このリポジトリは本家の git 履歴（`v0.1.1`〜`v1.8.1` 等の旧タグ）をそのまま引き継いでいるため、フォーク独自のタグと本家タグの番号が衝突する（例: 本家の `v0.2.0` は2023年のコミットを指しており、フォーク側で同じ番号を新規に使うと上書きになってしまう）。
 
-- **公開前（検証中）**: `v0.9.x` を使う（例: `v0.9.0` = PR#17 `--output json` + PR#18 `max-input-chars` バグ修正）。本家タグと衝突しない範囲で、公開前の動作確認・CI疎通確認用として刻む。
-- **公開時**: `v2.0.0` を打つ。本家の `v1.8.1` 系譜を引き継ぎつつ、モジュールパス変更・Cohere削除・環境変数プレフィックス変更（`MODS_`→`HENJI_`）等の破壊的変更を経た独立フォークとしてメジャーバージョンを上げる。`v2.x` 系タグは本家履歴に存在しないため衝突しない。
-- 公開直前タスク（README更新・モジュール名変更）が完了した時点で `v2.0.0` タグを作成しリリースする。
+- **当面のリリース**: `v0.9.x` 系列を使う。公開後も `v0.9.x` のまま継続してよい（「公開=v2.0.0」の旧基準は廃止）。次リリースは `v0.9.3`。
+- **`v2.0.0` の条件（新基準）**: 「AI が自律実行時に henji を能動的に発見・選択・実行するに足る」状態に達した時に打つ。バージョン番号は到達点の宣言であり、公開作業の完了とは切り離す。
+- **module path への `/v2` 追加**: Go の semantic import versioning 上、`v2.0.0` タグを打つ時点で module path 末尾に `/v2` が必要になる。`v0.9.x` の間は不要なので今は触らない。`v2.0.0` 判断時に import 一括変更とセットで実施する。
+- `v2.x` 系タグは本家履歴に存在しないため衝突しない、という前提は従来どおり有効。
+
+#### 改定の経緯
+
+2026-07-04、codex とのリリース準備作業中に「v2.0.0 をどのタイミングで打つか」を再検討。旧基準（公開直前タスク完了=v2.0.0）だと、単に README とモジュール名を整えただけでメジャーバージョンを消費してしまう。フォークの本来の目的（AI 自律利用の土台）に紐づけ、`henji docs`・`--output json`・`--list-models` 等の AI 向け機能が実際に「AI が能動的に使う」水準に達したことを確認できた時点で `v2.0.0` とする方針に変更した。
 
 ---
 
@@ -277,10 +284,91 @@ PR #25 ✅ (未コミット)  refactor     xdg ライブラリ削除、設定/�
 ── フラグ/機能のスリム化（人間向け --help 整理 + コード削減）─────────────────
 PR #26 ✅ (未コミット)  refactor     重要度の低いフラグ・機能を削除（--help 43→29項目、caarlos0/duration 依存除去）
 
-── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
-       ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
-       ⬜ モジュール名変更     go install 用に module パスを一括変更（import 全体に波及）
+── 公開直前（コード修正後）──────────────────────────────────────────────────
+       ✅ README 更新          上流との関係・変更内容・推奨設定の記載は完了（仮URL残あり、下記）
+       ✅ モジュール名変更     `forge.harakara.site/littleisland/henji` に変更済み
+       ✅ release workflow     tag push でクロスビルド + test/vet 検証（`0862d56`）
+
+── v0.9.3 リリース前の残タスク（2026-07-04 時点、2026-07-04 全件完了）───────
+       ✅ version 埋め込み     release.yml の ldflags に `-X main.Version=${{ github.ref_name }}` を追加
+                              （env経由でtag名をシェル展開せずに埋め込み）
+       ✅ README 仮URL・誤記   `git clone <this-repo>` を実URLに置換。リポジトリは現時点で未公開/招待制の
+                              ため「go install support will be available once the module is published」は
+                              「ソースからのビルドのみサポート」に書き換え
+       ✅ F-1〜F-4             2026-07-04 全体レビューの指摘修正（セクション4.5参照）。全件回帰テスト追加、
+                              test/vet/race全パス。F-2/F-3は実ゲートウェイ（localhost:8080）でも検証済み
 ```
+
+> **注**: `v2.0.0` タグはこのリスト完了では打たない。セクション0「バージョニング方針（2026-07-04 改定）」の新基準（AI が henji を能動的に発見・選択・実行できる状態）に達した時点で判断する。
+
+---
+
+## 4.5. 全体レビュー指摘（2026-07-04、Fable 5 によるコード+テスト全体レビュー）
+
+Charm v2 移行・`henji docs`・env v11 等の codex 大規模修正後に実施。ベースラインは健全
+（build/vet/test/race 全パス、実ゲートウェイで e2e-gateway-test.sh 4件パス）。以下は
+その上で発見した修正対象。**修正時は再現手順の確認 → 修正 → 回帰テスト追加の順で。**
+出力/リクエスト組み立てに触れる F-2・F-3 の修正後は e2e-gateway-test.sh を実行すること。
+
+### F-1. `-h`/`-v` 併用時のフラグエラーで nil db パニック（優先度: 高）✅ `a12199f`
+
+- 箇所: `main.go:423`（`_ = db.Close()`）、同型の経路が `maybeWriteMemProfile` の
+  `closers := []func() error{db.Close}`（`main.go:433`）にもある
+- 再現: `henji --bogus -h` → エラーメッセージ表示後に
+  `panic: runtime error: invalid memory address or nil pointer dereference`（再現確認済み）
+- 原因: `isVersionOrHelpCmd(os.Args)` が true だと `openDB` がスキップされ `db` が nil の
+  まま。その後 `rootCmd.Execute()` がフラグparseエラーを返すと nil の `db.Close()` を呼ぶ
+- 対処: 両箇所に nil ガード（`if db != nil`）。回帰テストは `--bogus -h` 相当の
+  Execute エラー経路で panic しないことを確認する形が良い
+
+### F-2. Google provider: 明示的な `temp: 0` 等が omitempty で送信されない（優先度: 中）✅ `ca423de`
+
+- 箇所: `internal/google/google.go:71-73`（`GenerationConfig` の
+  `Temperature float64` / `TopP float64` / `TopK int64`、いずれも `json:"...,omitempty"`）
+- 問題: 2-D 修正（`1ce2a77`、未指定=-1と明示0の区別）で config 層は 0 を有効値として
+  proto.Request まで届けるようになったが、Google だけ JSON 化の段階で値型 + omitempty の
+  ため 0 がフィールドごと脱落する。`temp: 0`（決定的出力）指定時にサーバデフォルト
+  （≒1.0）で動いてしまう。Anthropic/OpenAI は param.Opt/ポインタ型なので問題なし
+- 対処: 3フィールドをポインタ型（`*float64`/`*int64`）に変更し、`Request()` で
+  `request.Temperature` 等の非nil時のみ設定。`google_test.go` にリクエストボディ検証を追加
+  （openai_test.go の newMockOpenAIServer 方式が参考になる）
+
+### F-3. `--json-schema` のパイプ出力が `\n\n` で始まり末尾改行がない（優先度: 中）✅ `91f0363`
+
+- 箇所: `mods.go` View() の doneState（`if !isOutputTTY() && m.Config.Output != "json"`
+  で `\n` を印字する箇所）と `main.go:250`（`fmt.Print(mods.Output)`）
+- 実測: 実ゲートウェイで `henji --json-schema schema.json ... < /dev/null | od -c` →
+  出力が `\n \n { " a n s w e r ...` で始まり、末尾改行なし（2026-07-04 確認）
+- 原因: doneState の改行印字条件が `--output json` しか除外しておらず、
+  `--json-schema`（検証後に RunE 側でまとめて印字する方式）でも View が改行を吐く。
+  さらに RunE 側が `fmt.Print` のため末尾改行が付かない
+- 対処: doneState の条件に `m.Config.jsonSchemaValidator == nil` を追加し、
+  `main.go:250` を改行付き出力に変更。`--output json` と同じ「クリーンな1行」になる
+
+### F-4. 最小構成（手書き henji.yml）で `max-retries` が 0（優先度: 中）✅ `e98a11e`
+
+- 箇所: `config.go` `defaultConfig()`（`MaxRetries` 未設定）
+- 問題: 同梱テンプレートは `max-retries: 5` だが、テンプレートを使わない最小構成では
+  0 のままになり、`m.retry()`（`m.retries >= m.Config.MaxRetries` で打ち切り）が初回で
+  即エラーを返す。リトライ無効化だけでなく、**404 時の Fallback モデル切替
+  （`mods_errors.go` の StatusNotFound → `m.retry`）も1度も試行されずに死ぬ**
+- 対処: `defaultConfig()` に `MaxRetries: 5` を追加（2-D 修正と同じ
+  「最小構成でも正しく動く」思想）。`config_test.go` の
+  TestEnsureConfigSamplingValues と同様に最小構成 `{}` でのデフォルト値テストを追加
+
+### クリーンアップ候補（機能影響なし、ついでの時に）
+
+- **C-1. View() の到達不能分岐**: `mods.go` responseState 内の2つ目の
+  `if isOutputTTY() && !m.Config.Raw` は直前の条件と同一で dead code。上流では
+  `if isOutputTTY()`（Raw+TTY 用）だったが、現在その役割は content 印字パスが担って
+  いるため削除してよい
+- **C-2. `docs` サブコマンドとプロンプトの衝突**: プロンプトが単語 `docs` で始まると
+  （例: `henji docs って何`）subcommand 扱いで `NoArgs` エラーになる。cobra の仕様上の
+  トレードオフで実害は小さい。対応するなら docs コマンドのエラーメッセージに
+  「プロンプトとして使うには引用符で囲む等」の一言を足す程度
+- **確認済み・対応不要**: `ensureKey` の api-key-cmd 優先は意図的変更（`2ecd357`、
+  README の「most secure wins」準拠、テストあり）。MCP ツール名 `_` セパレータ問題は
+  R-E（セクション5）に記載済みのまま未対応で変わらず
 
 ---
 
