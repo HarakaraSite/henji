@@ -358,14 +358,14 @@ Charm v2 移行・`henji docs`・env v11 等の codex 大規模修正後に実�
 
 ### クリーンアップ候補（機能影響なし、ついでの時に）
 
-- **C-1. View() の到達不能分岐**: `mods.go` responseState 内の2つ目の
+- **C-1. View() の到達不能分岐** ✅ `108a2a7`: `mods.go` responseState 内の2つ目の
   `if isOutputTTY() && !m.Config.Raw` は直前の条件と同一で dead code。上流では
   `if isOutputTTY()`（Raw+TTY 用）だったが、現在その役割は content 印字パスが担って
-  いるため削除してよい
-- **C-2. `docs` サブコマンドとプロンプトの衝突**: プロンプトが単語 `docs` で始まると
-  （例: `henji docs って何`）subcommand 扱いで `NoArgs` エラーになる。cobra の仕様上の
-  トレードオフで実害は小さい。対応するなら docs コマンドのエラーメッセージに
-  「プロンプトとして使うには引用符で囲む等」の一言を足す程度
+  いるため削除
+- **C-2. `docs` サブコマンドとプロンプトの衝突** ✅ `6f8fabd`: プロンプトが単語 `docs`
+  で始まると（例: `henji docs って何`）subcommand 扱いで `NoArgs` エラーになる。
+  docs コマンドの `Args` をカスタム関数にし、「`docs` をプロンプトの一部として使うには
+  引用符で囲む」旨のエラーメッセージに変更（回帰テストあり）
 - **確認済み・対応不要**: `ensureKey` の api-key-cmd 優先は意図的変更（`2ecd357`、
   README の「most secure wins」準拠、テストあり）。MCP ツール名 `_` セパレータ問題は
   R-E（セクション5）に記載済みのまま未対応で変わらず
