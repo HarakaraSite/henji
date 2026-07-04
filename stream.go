@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 )
 
 func (m *Mods) setupStreamContext(content string, mod Model) error {

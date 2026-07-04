@@ -11,8 +11,8 @@ import (
 	"io"
 	"net/http"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
-	"forge.harakara.site/littleisland/henji/internal/stream"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/stream"
 	"github.com/openai/openai-go"
 )
 

@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 )
 
 const defaultConversationTitle = "Untitled conversation"

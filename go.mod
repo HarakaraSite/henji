@@ -1,4 +1,4 @@
-module forge.harakara.site/littleisland/henji
+module forge.harakara.site/littleisland/henji/v2
 
 go 1.26.0
 

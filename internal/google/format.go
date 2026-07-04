@@ -1,6 +1,6 @@
 package google
 
-import "forge.harakara.site/littleisland/henji/internal/proto"
+import "forge.harakara.site/littleisland/henji/v2/internal/proto"
 
 func fromProtoMessages(input []proto.Message) []Content {
 	result := make([]Content, 0, len(input))

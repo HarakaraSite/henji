@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	manualdocs "forge.harakara.site/littleisland/henji/internal/docs"
+	manualdocs "forge.harakara.site/littleisland/henji/v2/internal/docs"
 )
 
 // initFlags registers its flags on the shared rootCmd, so tests must only

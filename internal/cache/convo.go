@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 )
 
 // Conversations is the conversation cache.

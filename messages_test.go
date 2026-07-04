@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"github.com/stretchr/testify/require"
 )
 

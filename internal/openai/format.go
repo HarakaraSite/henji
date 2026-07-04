@@ -3,7 +3,7 @@ package openai
 import (
 	"fmt"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/shared/constant"

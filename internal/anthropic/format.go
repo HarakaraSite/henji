@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/mark3labs/mcp-go/mcp"
 )

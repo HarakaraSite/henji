@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 )
 
 // ErrNoContent happens when the client is returning no content.

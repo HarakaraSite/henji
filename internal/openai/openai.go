@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"forge.harakara.site/littleisland/henji/internal/proto"
-	"forge.harakara.site/littleisland/henji/internal/stream"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
+	"forge.harakara.site/littleisland/henji/v2/internal/stream"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/azure"
 	"github.com/openai/openai-go/option"
