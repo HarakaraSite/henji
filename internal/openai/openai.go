@@ -130,11 +130,7 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 
 	s := &Stream{
 		stream:   c.Chat.Completions.NewStreaming(ctx, body),
-		request:  body,
 		messages: request.Messages,
-	}
-	s.factory = func() *ssestream.Stream[openai.ChatCompletionChunk] {
-		return c.Chat.Completions.NewStreaming(ctx, s.request)
 	}
 	return s
 }
@@ -142,9 +138,7 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 // Stream openai stream.
 type Stream struct {
 	done     bool
-	request  openai.ChatCompletionNewParams
 	stream   *ssestream.Stream[openai.ChatCompletionChunk]
-	factory  func() *ssestream.Stream[openai.ChatCompletionChunk]
 	message  openai.ChatCompletionAccumulator
 	messages []proto.Message
 }
@@ -170,12 +164,11 @@ func (s *Stream) Err() error { return s.stream.Err() } //nolint:wrapcheck
 // Messages implements stream.Stream.
 func (s *Stream) Messages() []proto.Message { return s.messages }
 
-// Next implements stream.Stream.
+// Next implements stream.Stream. Once it returns false, it keeps returning
+// false without issuing any further requests.
 func (s *Stream) Next() bool {
 	if s.done {
-		s.done = false
-		s.stream = s.factory()
-		s.message = openai.ChatCompletionAccumulator{}
+		return false
 	}
 
 	if s.stream.Next() {
@@ -185,7 +178,6 @@ func (s *Stream) Next() bool {
 	s.done = true
 	if len(s.message.Choices) > 0 {
 		msg := s.message.Choices[0].Message.ToParam()
-		s.request.Messages = append(s.request.Messages, msg)
 		s.messages = append(s.messages, toProtoMessage(msg))
 	}
 

@@ -168,3 +168,32 @@ func TestRequestJSONSchemaOverridesResponseFormat(t *testing.T) {
 	require.True(t, ok, "response_format must be set")
 	require.Equal(t, "json_schema", rf["type"], "JSONSchema must win over the loose json ResponseFormat")
 }
+
+// TestNextStaysFalseAfterStreamEnds is a regression test: Stream.Next() used
+// to restart the underlying request (via a since-removed factory/done combo
+// built for the MCP tool-call loop) whenever it was called again after
+// already returning false once. With MCP removed, no caller does this
+// anymore, but the interface contract ("false means done") must still hold:
+// calling Next() again after it returns false must keep returning false
+// without issuing another HTTP request.
+func TestNextStaysFalseAfterStreamEnds(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(srv.Close)
+
+	cfg := DefaultConfig("test-key")
+	cfg.BaseURL = srv.URL
+	c := New(cfg)
+
+	s := c.Request(context.Background(), proto.Request{Model: "gpt-4o"})
+	require.False(t, s.Next(), "first Next() call should reach the end of the (empty) stream")
+	require.Equal(t, 1, requests)
+
+	require.False(t, s.Next(), "Next() must keep returning false once the stream is done")
+	require.False(t, s.Next(), "Next() must keep returning false on repeated calls")
+	require.Equal(t, 1, requests, "Next() must not issue another request after the stream is done")
+}
