@@ -36,6 +36,12 @@ type Stream interface {
 	// the whole conversation
 	Messages() []proto.Message
 
+	// PendingToolCalls reports the tool calls the model requested in the
+	// last completed round, without executing them. Callers that need to
+	// enforce a call-count limit must check this before calling CallTools,
+	// since CallTools both reports and executes.
+	PendingToolCalls() []proto.ToolCall
+
 	// handles any pending tool calls
 	CallTools() []proto.ToolCallStatus
 }

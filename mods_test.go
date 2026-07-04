@@ -15,16 +15,35 @@ import (
 
 // fakeToolCallStream is a stream.Stream that is always finished and always
 // returns the provided tool call statuses. Used to drive receiveCompletionStreamCmd.
+// callToolsInvoked counts real CallTools invocations, so tests can assert that
+// a round blocked by the MaxToolCalls limit never executes its tool calls.
 type fakeToolCallStream struct {
-	calls []proto.ToolCallStatus
+	calls            []proto.ToolCallStatus
+	pending          []proto.ToolCall
+	callToolsInvoked int
 }
 
-func (f *fakeToolCallStream) Next() bool                        { return false }
-func (f *fakeToolCallStream) Current() (proto.Chunk, error)     { return proto.Chunk{}, nil }
-func (f *fakeToolCallStream) Close() error                      { return nil }
-func (f *fakeToolCallStream) Err() error                        { return nil }
-func (f *fakeToolCallStream) Messages() []proto.Message         { return nil }
-func (f *fakeToolCallStream) CallTools() []proto.ToolCallStatus { return f.calls }
+func (f *fakeToolCallStream) Next() bool                    { return false }
+func (f *fakeToolCallStream) Current() (proto.Chunk, error) { return proto.Chunk{}, nil }
+func (f *fakeToolCallStream) Close() error                  { return nil }
+func (f *fakeToolCallStream) Err() error                    { return nil }
+func (f *fakeToolCallStream) Messages() []proto.Message     { return nil }
+
+func (f *fakeToolCallStream) PendingToolCalls() []proto.ToolCall {
+	if f.pending != nil {
+		return f.pending
+	}
+	pending := make([]proto.ToolCall, len(f.calls))
+	for i, call := range f.calls {
+		pending[i] = proto.ToolCall{Function: proto.Function{Name: call.Name}}
+	}
+	return pending
+}
+
+func (f *fakeToolCallStream) CallTools() []proto.ToolCallStatus {
+	f.callToolsInvoked++
+	return f.calls
+}
 
 var _ stream.Stream = (*fakeToolCallStream)(nil)
 
@@ -39,7 +58,8 @@ func (f *fakeMessagesStream) Current() (proto.Chunk, error)     { return proto.C
 func (f *fakeMessagesStream) Close() error                      { return nil }
 func (f *fakeMessagesStream) Err() error                        { return nil }
 func (f *fakeMessagesStream) Messages() []proto.Message         { return f.messages }
-func (f *fakeMessagesStream) CallTools() []proto.ToolCallStatus { return nil }
+func (f *fakeMessagesStream) PendingToolCalls() []proto.ToolCall { return nil }
+func (f *fakeMessagesStream) CallTools() []proto.ToolCallStatus  { return nil }
 
 var _ stream.Stream = (*fakeMessagesStream)(nil)
 
@@ -101,6 +121,7 @@ func TestMaxToolCallsLimit(t *testing.T) {
 
 	t.Run("stops when exceeding the limit", func(t *testing.T) {
 		m := &Mods{Config: &Config{MaxToolCalls: 2}}
+		before := fs.callToolsInvoked
 
 		// round 3 (nextRound=3 > limit=2): must stop
 		result := m.receiveCompletionStreamCmd(completionOutput{
@@ -109,6 +130,25 @@ func TestMaxToolCallsLimit(t *testing.T) {
 		err, ok := result.(modsError)
 		require.True(t, ok, "expected modsError, got %T", result)
 		require.Contains(t, err.Error(), "tool call limit of 2 reached")
+		require.Equal(t, before, fs.callToolsInvoked, "CallTools must not run once the limit is exceeded")
+	})
+
+	t.Run("blocks every pending call in a round that exceeds the limit", func(t *testing.T) {
+		multi := &fakeToolCallStream{
+			pending: []proto.ToolCall{
+				{Function: proto.Function{Name: "search"}},
+				{Function: proto.Function{Name: "fetch"}},
+			},
+			calls: []proto.ToolCallStatus{{Name: "search"}, {Name: "fetch"}},
+		}
+		m := &Mods{Config: &Config{MaxToolCalls: 1}}
+
+		result := m.receiveCompletionStreamCmd(completionOutput{
+			stream: multi, errh: errh, toolCallRound: 1,
+		})()
+		_, ok := result.(modsError)
+		require.True(t, ok, "expected modsError, got %T", result)
+		require.Zero(t, multi.callToolsInvoked, "none of the round's pending calls should execute once the limit is exceeded")
 	})
 
 	t.Run("zero means unlimited", func(t *testing.T) {

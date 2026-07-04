@@ -108,6 +108,24 @@ type Stream struct {
 	messages []proto.Message
 }
 
+// PendingToolCalls implements stream.Stream.
+func (s *Stream) PendingToolCalls() []proto.ToolCall {
+	var pending []proto.ToolCall
+	for _, block := range s.message.Content {
+		switch call := block.AsAny().(type) {
+		case anthropic.ToolUseBlock:
+			pending = append(pending, proto.ToolCall{
+				ID: call.ID,
+				Function: proto.Function{
+					Name:      call.Name,
+					Arguments: []byte(call.JSON.Input.Raw()),
+				},
+			})
+		}
+	}
+	return pending
+}
+
 // CallTools implements stream.Stream.
 func (s *Stream) CallTools() []proto.ToolCallStatus {
 	var statuses []proto.ToolCallStatus

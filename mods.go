@@ -568,8 +568,8 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 			return msg.errh(err)
 		}
 
-		results := msg.stream.CallTools()
-		if len(results) == 0 {
+		pending := msg.stream.PendingToolCalls()
+		if len(pending) == 0 {
 			m.messages = msg.stream.Messages()
 			if m.Config.jsonSchemaValidator != nil {
 				if errMsg := m.checkJSONSchema(msg); errMsg != nil {
@@ -579,7 +579,8 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 			return completionOutput{errh: msg.errh}
 		}
 
-		// Enforce MaxToolCalls limit (0 = unlimited)
+		// Enforce MaxToolCalls limit (0 = unlimited) before calling CallTools,
+		// so a round beyond the limit never executes its tool calls.
 		nextRound := msg.toolCallRound + 1
 		cfg := m.Config
 		if cfg.MaxToolCalls > 0 && nextRound > cfg.MaxToolCalls {
@@ -591,6 +592,8 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 				),
 			}
 		}
+
+		results := msg.stream.CallTools()
 
 		toolMsg := completionOutput{
 			stream:        msg.stream,
