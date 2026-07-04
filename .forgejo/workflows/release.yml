@@ -20,22 +20,100 @@ jobs:
           cache: false
 
       - name: Verify
+        id: verify
         run: |
-          go test ./...
-          go vet ./...
+          set -euo pipefail
+          { go test ./... && go vet ./...; } 2>&1 | tee verify.log
 
       - name: Build binaries
+        id: build
         env:
           LDFLAGS: -s -w -X main.Version=${{ github.ref_name }}
         run: |
+          set -euo pipefail
           mkdir -p dist
-          CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64   .
-          CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64   .
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64  .
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64  .
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-windows-amd64.exe .
+          {
+            CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64   .
+            CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64   .
+            CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64  .
+            CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64  .
+            CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-windows-amd64.exe .
+          } 2>&1 | tee build.log
+
+      # Forgejo has no public API for job/step logs, so a failure here would
+      # otherwise be invisible except by downloading the raw workflow log
+      # from the Actions UI by hand. Package a compact failure summary
+      # (which step failed, plus a tail of its captured output) as a release
+      # asset instead, so it can be fetched through the Releases API like
+      # any other asset (e.g. via `fja`, or plain curl).
+      - name: Write CI failure summary
+        if: failure()
+        env:
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          FORGE_URL: ${{ vars.FORGE_URL }}
+          REPO: ${{ github.repository }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+
+          FAILED_STEP="unknown"
+          LOG_FILE=""
+          if [ "$VERIFY_OUTCOME" = "failure" ]; then
+            FAILED_STEP="verify"
+            LOG_FILE="verify.log"
+          elif [ "$BUILD_OUTCOME" = "failure" ]; then
+            FAILED_STEP="build"
+            LOG_FILE="build.log"
+          fi
+          export FAILED_STEP
+
+          : > /tmp/log_tail.txt
+          if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
+            tail -c 4000 "$LOG_FILE" > /tmp/log_tail.txt
+          fi
+
+          cat > /tmp/ci-failure-summary.go <<'GOEOF'
+          package main
+
+          import (
+          	"encoding/json"
+          	"fmt"
+          	"os"
+          	"time"
+          )
+
+          func main() {
+          	logTail, _ := os.ReadFile("/tmp/log_tail.txt")
+          	out := map[string]any{
+          		"tag":            os.Getenv("TAG"),
+          		"sha":            os.Getenv("SHA"),
+          		"run_id":         os.Getenv("RUN_ID"),
+          		"run_number":     os.Getenv("RUN_NUMBER"),
+          		"run_url":        fmt.Sprintf("%s/%s/actions/runs/%s", os.Getenv("FORGE_URL"), os.Getenv("REPO"), os.Getenv("RUN_NUMBER")),
+          		"failed_step":    os.Getenv("FAILED_STEP"),
+          		"verify_outcome": os.Getenv("VERIFY_OUTCOME"),
+          		"build_outcome":  os.Getenv("BUILD_OUTCOME"),
+          		"log_tail":       string(logTail),
+          		"generated_at":   time.Now().UTC().Format(time.RFC3339),
+          	}
+          	enc := json.NewEncoder(os.Stdout)
+          	enc.SetIndent("", "  ")
+          	if err := enc.Encode(out); err != nil {
+          		fmt.Fprintln(os.Stderr, err)
+          		os.Exit(1)
+          	}
+          }
+          GOEOF
+          go run /tmp/ci-failure-summary.go > dist/ci-failure-summary.json
 
       - name: Upload release
+        if: always()
         uses: actions/forgejo-release@v2
         with:
           direction: upload
@@ -44,4 +122,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
           release-dir: dist
-          release-notes: "Release ${{ github.ref_name }}"
+          release-notes: ${{ (steps.verify.outcome == 'failure' || steps.build.outcome == 'failure') && 'CI failure summary' || format('Release {0}', github.ref_name) }}
