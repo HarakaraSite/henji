@@ -170,11 +170,28 @@ module pathとAPI移行、全unit test、vet、build、help/docs/completionの�
 完了した。spinner、resize、対話prompt、light/dark配色の最終確認は、リリース前の
 TTY目視確認として残す。
 
-### Phase 4: 間接依存と脆弱性の再評価
+### Phase 4: 間接依存と脆弱性の再評価 ✅
 
 直接依存更新後にmodule graphを再取得する。間接依存の新旧だけでなく、脆弱性が実際に
 henjiから到達可能かを `govulncheck ./...` で確認する。未到達の脆弱性と実行経路上の
 脆弱性を区別し、後者だけを優先して対応する。
+
+2026-07-04の再評価結果:
+
+- `go list -m -u all`: 選択済み175モジュール、直接依存の更新候補0件、間接依存の
+  更新候補73件
+- `govulncheck v1.5.0 -show verbose ./...`: root package 8件、実際のbuild対象となる
+  78モジュールとGo 1.26.4標準ライブラリを走査
+- 使用したGo脆弱性DBの更新日時: 2026-06-26 20:04:13 UTC
+- 検出された脆弱性: 0件
+
+175と78の差は、module graphには親ライブラリが宣言した依存やtest/tool向け依存も
+含まれる一方、`govulncheck`はhenjiのbuild対象packageから到達するコードを解析する
+ためである。AWS SDK群は引き続きAnthropic SDKが要求しているが、`go mod why`では
+henjiから不要と判定され、`govulncheck`の走査対象78モジュールにも含まれなかった。
+
+この結果から、73件の間接依存候補をhenji側で個別pinする根拠はない。親ライブラリ更新時に
+追随させ、月次・リリース前、または新しいsecurity advisory公開時に再走査する。
 
 ## 9. 継続運用
 
