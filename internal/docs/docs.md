@@ -121,11 +121,21 @@ message bodies on disk) unless `--no-cache` is set.
 - `-s <id-or-title>` prints a saved conversation without calling a model.
 - `-d <id-or-title>` deletes a conversation.
 
+Two equally valid ways to name a conversation for continuation:
+
+- Title-based: `-t <title>` at save time, then `-c <title>` to continue it.
+- ID-based: capture `conversation_id` from `--output json` (see "Getting
+  machine-readable output" and "A typical agent loop"), then `-c <id>`.
+  Convenient when scripting, since the ID is already in hand.
+
 Pitfalls:
 
 - Continuing a conversation resends its entire history. Per-request input and
   cumulative cost grow as the conversation gets longer. Start fresh when prior
   context is not needed.
+- Continuing with `-c`/`-C` and no `-a`/`-m` flags restores the API and model
+  that were used when the conversation was saved; there's no need to repeat
+  them to keep talking to the same provider.
 - If `--max-tokens` is too low, the answer may stop mid-sentence without a
   warning. Raise it rather than repeatedly recovering the rest with `-C`.
 - Reasoning models spend hidden thinking tokens first. If their per-model
