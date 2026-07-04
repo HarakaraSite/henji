@@ -8,11 +8,11 @@
 
 - 現在の module path の範囲で最新版: 29 件
 - 現在の module path の範囲で更新可能: 0 件
-- 別の major module path に安定版があるもの: 6 件
+- 別の major module path に安定版があるもの: 5 件
 - `go mod tidy -diff`: 差分なし
 - 同一 major 内の低リスク更新: 3 件完了
 
-新しい major version がある6件は API 互換性が保証されないため、通常の依存更新とは
+新しい major version がある5件は API 互換性が保証されないため、通常の依存更新とは
 分けて移行する。
 
 ## 2. 調査方法
@@ -45,7 +45,6 @@ path 自体が変わる major update は自動的には表示されないため�
 
 | ライブラリ | 現在 | 最新major | 方針 |
 |---|---:|---:|---|
-| `github.com/caarlos0/env` | `v9.0.0` | `v11.4.1` | 単独で移行可能。環境変数のdecodeとエラー挙動を確認する |
 | `github.com/charmbracelet/bubbles` | `v1.0.0` | `v2.1.0` | Charm系移行としてまとめて評価する |
 | `github.com/charmbracelet/bubbletea` | `v1.3.10` | `v2.0.8` | 状態更新、入出力、rendererのAPI差分を重点確認する |
 | `github.com/charmbracelet/glamour` | `v1.0.0` | `v2.0.1` | Markdown描画とstyle設定を確認する |
@@ -55,6 +54,11 @@ path 自体が変わる major update は自動的には表示されないため�
 Charm系5件は相互に関連し、import path と型の変更が波及する可能性がある。個別に
 最新版へ上げるのではなく、専用ブランチで一つの移行作業として扱う。ただしコミットは
 機械的な import/API 移行と、挙動修正・表示修正を分ける。
+
+major更新済み:
+
+- `github.com/caarlos0/env`: `v9.0.0` → `v11.4.1`（2026-07-04）。bool、数値、
+  slice、duration、明示的な0、不正値エラーの回帰テストを追加
 
 ## 5. 現在の module path で最新版だった主要依存
 
@@ -146,7 +150,7 @@ go vet ./...
 go build ./...
 ```
 
-### Phase 2: `caarlos0/env` のmajor移行
+### Phase 2: `caarlos0/env` のmajor移行 ✅
 
 Charm系と分離してv9からv11へ移行する。設定ファイル読込後の `HENJI_*` override、
 slice、duration、数値、boolのparseと、不正値のエラー表示をテストする。

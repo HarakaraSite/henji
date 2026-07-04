@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/anthropics/anthropic-sdk-go v1.56.0
 	github.com/atotto/clipboard v0.1.4
-	github.com/caarlos0/env/v9 v9.0.0
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/caarlos0/go-shellwords v1.0.12
 	github.com/caarlos0/timea.go v1.2.0
 	github.com/charmbracelet/bubbles v1.0.0

@@ -11,7 +11,7 @@ import (
 
 	_ "embed"
 
-	"github.com/caarlos0/env/v9"
+	"github.com/caarlos0/env/v11"
 	"github.com/muesli/termenv"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
