@@ -303,12 +303,13 @@ func ensureConfig() (Config, error) {
 }
 
 func writeConfigFile(path string) error {
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
 		return createConfigFile(path)
 	} else if err != nil {
 		return modsError{err, "Could not stat path."}
 	}
-	return nil
+	return securePermissions(path, info)
 }
 
 func createConfigFile(path string) error {

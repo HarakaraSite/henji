@@ -100,6 +100,27 @@ func TestEnsureConfigDefaultMaxRetries(t *testing.T) {
 	require.Equal(t, 5, cfg.MaxRetries)
 }
 
+// TestEnsureConfigRepairsLoosePermissions is the HENJI-SEC-003 regression
+// test: a settings file inherited from a pre-v2 install (or otherwise
+// created with a loose mode) must have its permissions restricted to 0600
+// before ensureConfig reads the plaintext api-key it may contain.
+func TestEnsureConfigRepairsLoosePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not meaningful on Windows; ACL handling is unimplemented")
+	}
+
+	writeTestConfig(t, "{}\n")
+	path := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "henji", "henji.yml")
+	require.NoError(t, os.Chmod(path, 0o644))
+
+	_, err := ensureConfig()
+	require.NoError(t, err)
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
 func TestEnsureConfigEnvironmentOverrides(t *testing.T) {
 	t.Run("parses supported scalar and slice types", func(t *testing.T) {
 		writeTestConfig(t, "{}\n")
