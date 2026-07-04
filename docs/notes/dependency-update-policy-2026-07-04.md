@@ -6,13 +6,13 @@
 
 `go.mod` の直接依存 29 件を Go module proxy の情報と照合した。
 
-- 現在の module path の範囲で最新版: 26 件
-- 現在の module path の範囲で更新可能: 3 件
+- 現在の module path の範囲で最新版: 27 件
+- 現在の module path の範囲で更新可能: 2 件
 - 別の major module path に安定版があるもの: 6 件
 - `go mod tidy -diff`: 差分なし
 - 調査による `go.mod` / `go.sum` の変更: なし
 
-同一 major 内の 3 件は小さく分けて先に更新できる。新しい major version がある
+同一 major 内の 2 件は小さく分けて先に更新できる。新しい major version がある
 6 件は API 互換性が保証されないため、通常の依存更新とは分けて移行する。
 
 ## 2. 調査方法
@@ -38,10 +38,13 @@ path 自体が変わる major update は自動的には表示されないため�
 |---|---:|---:|---|---|
 | `github.com/charmbracelet/x/exp/golden` | `v0.0.0-20241011142426-46044092ad91` | `v0.0.0-20260629091435-9c70f75e26a4` | golden test | 低。ただし pseudo-version 間の差分確認が必要 |
 | `github.com/lucasb-eyer/go-colorful` | `v1.3.0` | `v1.4.0` | ターミナルの色・gradient | 低〜中。表示確認が必要 |
-| `github.com/mattn/go-isatty` | `v0.0.20` | `v0.0.22` | stdin/stdout の TTY 判定 | 低。主要OSで入出力確認が必要 |
 
 これらは一括更新せず、原則として 1 件ずつ更新してテストする。問題発生時に原因を
 特定しやすくし、CLI表示やTTY判定の回帰を切り分けるためである。
+
+更新済み:
+
+- `github.com/mattn/go-isatty`: `v0.0.20` → `v0.0.22`（2026-07-04）
 
 ## 4. 新しい major version がある直接依存
 
@@ -135,7 +138,7 @@ module構成なので、henji側の `go mod tidy` だけではmodule graphから
 
 ### Phase 1: 同一majorの低リスク更新
 
-1. `go-isatty` を更新し、TTYあり・なし、pipe入力、raw出力を確認する。
+1. `go-isatty` を更新し、TTYあり・なし、pipe入力、raw出力を確認する。✅
 2. `go-colorful` を更新し、spinnerとterminal stylingを目視確認する。
 3. `x/exp/golden` を更新し、golden testを確認する。
 
@@ -179,4 +182,3 @@ henjiから到達可能かを `govulncheck ./...` で確認する。未到達の
 - dependency update PRでは `go.mod` / `go.sum` 以外のAPI追随変更を明示する。
 - versionが新しいことだけを理由に間接依存を直接pinしない。
 - security fixは通常更新より優先するが、到達可能性と影響範囲を確認する。
-
