@@ -25,13 +25,15 @@ jobs:
           go vet ./...
 
       - name: Build binaries
+        env:
+          LDFLAGS: -s -w -X main.Version=${{ github.ref_name }}
         run: |
           mkdir -p dist
-          CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/henji-linux-amd64   .
-          CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/henji-linux-arm64   .
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/henji-darwin-amd64  .
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/henji-darwin-arm64  .
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/henji-windows-amd64.exe .
+          CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64   .
+          CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64   .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64  .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64  .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-windows-amd64.exe .
 
       - name: Upload release
         uses: actions/forgejo-release@v2
