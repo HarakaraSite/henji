@@ -12,8 +12,8 @@ func TestManual(t *testing.T) {
 	if !strings.HasPrefix(manual, "# henji v2.0.0-test — manual\n") {
 		t.Fatalf("manual has unexpected heading: %q", manual[:min(len(manual), 80)])
 	}
-	if !strings.Contains(manual, "## MCP tools") {
-		t.Fatal("manual is missing the MCP section")
+	if !strings.Contains(manual, "## Roles") {
+		t.Fatal("manual is missing the Roles section")
 	}
 	if strings.Contains(manual, "\x1b[") {
 		t.Fatal("manual must not contain ANSI escapes")

@@ -114,9 +114,6 @@ Structured-output pitfalls:
     # 3. Follow up in the same conversation.
     henji --output json -c "$id" "now suggest fixes for finding 1"
 
-    # 4. Before relying on tools, check that MCP is configured.
-    henji --mcp-list-tools
-
 ## Conversations
 
 Successful model conversations are saved automatically (metadata in SQLite,
@@ -148,22 +145,6 @@ Pitfalls:
 - Reasoning models spend hidden thinking tokens first. If their per-model
   `max-completion-tokens` config is too small, the visible answer can be empty.
 
-## MCP tools
-
-henji can let a model call tools from servers configured under `mcp-servers:`.
-
-- MCP tool calling is supported by the OpenAI-compatible and Anthropic paths.
-  The native Google provider does not currently send MCP tools to Gemini.
-- Tools exist only when MCP servers are configured. `--max-tool-calls` does
-  nothing by itself. Inspect the setup with `--mcp-list` and
-  `--mcp-list-tools`.
-- Set `--max-tool-calls` for agentic workflows. `0` means unlimited rounds;
-  a confused model can loop. A finite value such as 10 is safer.
-
-      henji --max-tool-calls 10 "list the largest files in this project"
-
-- `--mcp-disable <name>` disables a server for one invocation.
-
 ## Roles
 
 Define named system prompts under `roles:` in the config file:
@@ -184,8 +165,8 @@ be an `http(s)://` or `file://` URL whose contents become system prompt text.
   `~/.local/share/henji/`.
 - Scalar settings with an environment mapping can be overridden with a
   `HENJI_` prefix, for example `HENJI_TEMP=0.2` or
-  `HENJI_MAX_TOKENS=4000`. Structured sections such as `apis`, `roles`, and
-  `mcp-servers` remain YAML configuration.
+  `HENJI_MAX_TOKENS=4000`. Structured sections such as `apis` and `roles`
+  remain YAML configuration.
 
 Some tuning knobs intentionally have no flag and are config/environment-only:
 `temp`, `topp`, `topk`, `stop`, `max-retries`, `word-wrap`, and `http-proxy`.

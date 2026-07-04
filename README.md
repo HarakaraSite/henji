@@ -3,7 +3,9 @@
 AI for the command line, built for pipelines.
 
 This is an actively maintained fork of [charmbracelet/mods](https://github.com/charmbracelet/mods),
-which was archived on March 9, 2026. The fork focuses on local LLM usage and MCP integration.
+which was archived on March 9, 2026. The fork focuses on local LLM usage and
+treating henji as a Unix filter: `stdin → LLM → stdout`, composable with the
+rest of your shell pipeline rather than acting on your behalf.
 
 ## What Changed from Upstream
 
@@ -17,7 +19,6 @@ which was archived on March 9, 2026. The fork focuses on local LLM usage and MCP
 | All providers | `cancelRequest` goroutine leak replaced with `defer cancel` |
 | All providers | `max-completion-tokens` (o1 models) now correctly wired through to the API |
 | All providers | `api-key-env` priority over `api-key-cmd` restored to match documented order |
-| MCP | Connection caching across tool-call rounds; `errgroup` cancels siblings on first failure |
 
 ### Security
 
@@ -38,6 +39,17 @@ All dependencies updated to current versions, including security patches for `x/
   - `-P`/`--prompt`, `-p`/`--prompt-args` prompt-echo modes (features removed)
   - `--fanciness`, `--status-text` spinner tuning (fixed defaults now)
   - `--temp`, `--topp`, `--topk`, `--stop`, `--max-retries`, `--word-wrap`, `--http-proxy` (still configurable via `henji.yml` / `HENJI_*` env)
+- **MCP (Model Context Protocol) support removed entirely**, along with
+  `--mcp-list`, `--mcp-list-tools`, `--mcp-disable`, `--max-tool-calls`, and
+  the `mcp-servers`/`mcp-timeout` config keys. MCP let a model call external
+  tools with no per-tool approval or read/write distinction, which a security
+  review flagged as a real risk when henji processes untrusted content
+  (a webpage, log, or issue containing text aimed at the model rather than
+  the user). Rather than build the allowlisting/sandboxing/audit machinery a
+  safe agentic tool loop needs, this fork returns henji to a plain Unix
+  filter: file and network access stay in the hands of `cat`, `curl`, `find`,
+  and the rest of the shell pipeline around henji. See "Generate, review,
+  then run" below for the intended pattern when a task needs those.
 
 ## Installation
 
@@ -88,15 +100,6 @@ default-model: llama3.2
 ```sh
 echo "explain this error" | henji
 ls -la | henji summarize these files
-```
-
-### MCP tool call limit
-
-When using MCP servers, set a tool-call limit to prevent runaway loops. `0` means unlimited (default).
-
-```yaml
-# ~/.config/henji/henji.yml
-max-tool-calls: 10
 ```
 
 ### API key management
@@ -175,7 +178,6 @@ for provider setup and scripting/agent patterns.
 | `--list-roles` | List roles defined in your configuration file |
 | `--list-models` | List configured APIs and their models (respects `--output json`; see the [cookbook](docs/cookbook.md#discovering-whats-configured)) |
 | `--max-tokens` | Maximum tokens in response |
-| `--max-tool-calls` | Maximum agentic tool call rounds; `0` = unlimited |
 | `--no-limit` | Do not limit response tokens |
 | `--settings` | Open settings file in `$EDITOR` |
 | `-h`, `--help` | Show help and exit |
@@ -197,14 +199,6 @@ corresponding `HENJI_*` environment variable (e.g. `HENJI_TEMP=0.2`).
 | `-s`, `--show` | Show a saved conversation |
 | `-d`, `--delete` | Delete conversations by title or SHA-1 |
 | `--no-cache` | Do not save this conversation |
-
-#### MCP
-
-| Flag | Description |
-|---|---|
-| `--mcp-list` | List configured MCP servers |
-| `--mcp-list-tools` | List available tools from enabled MCP servers |
-| `--mcp-disable` | Disable specific MCP servers for this run |
 
 ## Custom Roles
 
@@ -291,25 +285,36 @@ Notes:
   gets discarded and retried, henji only prints once the answer has actually
   passed validation.
 
-## MCP Integration
+## Generate, review, then run
 
-MCP (Model Context Protocol) allows the LLM to call external tools defined by MCP servers.
-
-```yaml
-# ~/.config/henji/henji.yml
-mcp-servers:
-  filesystem:
-    type: stdio
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-
-max-tool-calls: 10  # recommended; 0 = unlimited
-```
+henji doesn't call tools or touch your filesystem on its own — it reads
+stdin and writes stdout, nothing else. When a task needs file access, a
+network request, or a shell command, ask henji to generate that command and
+run it yourself:
 
 ```sh
-henji --mcp-list-tools          # inspect available tools
-henji --mcp-disable filesystem  # disable a server for this run
+henji -R shell "find the 10 largest files under the current directory"
 ```
+
+Read what came back before running it — `less`/`bat`, not `cat`, so long or
+adversarial output doesn't scroll straight past you — and never pipe
+henji's output directly into a shell:
+
+```sh
+# Don't: skips the review step entirely, executes whatever henji wrote
+henji -R shell "..." | sh
+
+# Do: look at it first, then run it yourself
+henji -R shell "..." > candidate.sh
+less candidate.sh
+bash candidate.sh
+```
+
+This matters most when the prompt or piped-in content comes from somewhere
+you don't fully trust (a fetched webpage, a log file, an issue body): text
+aimed at the model rather than at you can end up in its answer, so treat
+generated commands the same way you'd treat a shell snippet copied from a
+random webpage.
 
 ## License
 

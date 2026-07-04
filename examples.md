@@ -86,10 +86,10 @@ to it over Ollama's OpenAI-compatible `/v1` endpoint, not a dedicated client.
 
 ### Have henji Investigate Your Project's Bloat
 
-With an MCP filesystem server configured, henji can actually inspect your
-disk instead of guessing from memory, and explain what it finds.
+Pipe `du`'s own output in rather than asking henji to guess from memory —
+the shell does the disk inspection, henji explains what it finds.
 
-`henji --max-tool-calls 5 "list the largest files in my current project and explain what each is for"`
+`du -sh ./* | sort -rh | henji "list the largest files in my current project and explain what each is for"`
 
 ### Get a Rigorously Reasoned Answer to a Hard Problem
 
