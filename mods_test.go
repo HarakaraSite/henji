@@ -578,6 +578,34 @@ func TestResolveModel(t *testing.T) {
 		require.ErrorAs(t, err, &merr)
 		require.Contains(t, merr.reason, "does not contain")
 	})
+
+	// TestResolveModel/suggests the other API when the model exists elsewhere
+	// is a regression test for improvement backlog item 1 (model-eval-results
+	// 2026-07): 3/3 evaluated driver sessions specified a model belonging to
+	// a non-default API and got stuck on a bare "does not contain" error with
+	// no pointer to the fix.
+	t.Run("suggests the other API when the model exists elsewhere", func(t *testing.T) {
+		cfg := newConfig()
+		cfg.API = "openai"
+		cfg.Model = "sonnet"
+
+		_, _, err := mods.resolveModel(cfg)
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "-a anthropic")
+		require.Contains(t, err.Error(), "-m claude-sonnet")
+	})
+
+	t.Run("no suggestion when the model isn't configured anywhere", func(t *testing.T) {
+		cfg := newConfig()
+		cfg.API = "openai"
+		cfg.Model = "nonexistent-model"
+
+		_, _, err := mods.resolveModel(cfg)
+
+		require.Error(t, err)
+		require.NotContains(t, err.Error(), "Try:")
+	})
 }
 
 var cutPromptTests = map[string]struct {

@@ -779,6 +779,24 @@ func increaseIndent(s string) string {
 	return strings.Join(lines, "\n")
 }
 
+// findModelInOtherAPIs looks for model (or one of its aliases) among apis,
+// skipping excludeAPI. It returns the API name and canonical model name of
+// the first match, used to suggest -a/-m when a user specifies a model that
+// belongs to a different configured API than the one currently selected.
+func findModelInOtherAPIs(apis []API, excludeAPI, model string) (apiName, modelName string, found bool) {
+	for _, api := range apis {
+		if api.Name == excludeAPI {
+			continue
+		}
+		for name, mod := range api.Models {
+			if name == model || slices.Contains(mod.Aliases, model) {
+				return api.Name, name, true
+			}
+		}
+	}
+	return "", "", false
+}
+
 func (m *Mods) resolveModel(cfg *Config) (API, Model, error) {
 	for _, api := range cfg.APIs {
 		if api.Name != cfg.API && cfg.API != "" {
@@ -797,11 +815,20 @@ func (m *Mods) resolveModel(cfg *Config) (API, Model, error) {
 			return api, mod, nil
 		}
 		if cfg.API != "" {
+			errMsg := fmt.Sprintf(
+				"Available models are: %s",
+				strings.Join(slices.Collect(maps.Keys(api.Models)), ", "),
+			)
+			if otherAPI, otherModel, found := findModelInOtherAPIs(cfg.APIs, api.Name, cfg.Model); found {
+				errMsg += fmt.Sprintf(
+					"\nTry: %s %s %s",
+					m.Styles.InlineCode.Render("-a "+otherAPI),
+					m.Styles.InlineCode.Render("-m "+otherModel),
+					m.Styles.Comment.Render("(found in another configured API)"),
+				)
+			}
 			return API{}, Model{}, modsError{
-				err: newUserErrorf(
-					"Available models are: %s",
-					strings.Join(slices.Collect(maps.Keys(api.Models)), ", "),
-				),
+				err: newUserErrorf("%s", errMsg),
 				reason: fmt.Sprintf(
 					"The API endpoint %s does not contain the model %s",
 					m.Styles.InlineCode.Render(cfg.API),
