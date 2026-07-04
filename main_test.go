@@ -1,9 +1,69 @@
 package main
 
 import (
+	"bytes"
+	"regexp"
 	"strings"
 	"testing"
+
+	manualdocs "forge.harakara.site/littleisland/henji/internal/docs"
 )
+
+func TestIsDocsCmd(t *testing.T) {
+	for args, want := range map[string]bool{
+		"":            false,
+		"docs":        true,
+		"docs -h":     true,
+		"docs --help": true,
+		"docs extra":  true,
+		"say docs":    false,
+	} {
+		t.Run(args, func(t *testing.T) {
+			vargs := append([]string{"henji"}, strings.Fields(args)...)
+			if got := isDocsCmd(vargs); got != want {
+				t.Fatalf("isDocsCmd(%v) = %v, want %v", vargs, got, want)
+			}
+		})
+	}
+}
+
+func TestDocsCommandPrintsPlainMarkdown(t *testing.T) {
+	cmd := newDocsCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	requireNoError(t, cmd.Execute())
+
+	got := out.String()
+	if !strings.HasPrefix(got, "# henji ") {
+		t.Fatalf("docs output has unexpected heading: %q", got[:min(len(got), 80)])
+	}
+	if strings.Contains(got, "\x1b[") {
+		t.Fatal("docs output contains ANSI escapes")
+	}
+}
+
+func TestManualLongFlagsExist(t *testing.T) {
+	initFlags()
+	re := regexp.MustCompile(`--([a-z][a-z0-9-]*)`)
+	seen := map[string]bool{}
+	for _, match := range re.FindAllStringSubmatch(manualdocs.Body(), -1) {
+		name := match[1]
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		if rootCmd.Flags().Lookup(name) == nil {
+			t.Errorf("manual documents unknown flag --%s", name)
+		}
+	}
+}
+
+func requireNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestIsCompletionCmd(t *testing.T) {
 	for args, is := range map[string]bool{

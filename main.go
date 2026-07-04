@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"forge.harakara.site/littleisland/henji/internal/cache"
+	manualdocs "forge.harakara.site/littleisland/henji/internal/docs"
 	"github.com/atotto/clipboard"
 	timeago "github.com/caarlos0/timea.go"
 	tea "github.com/charmbracelet/bubbletea"
@@ -65,6 +66,25 @@ func init() {
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
+	rootCmd.AddCommand(newDocsCmd())
+}
+
+func newDocsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "docs",
+		Short:        "Print the full task-oriented manual as Markdown",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := fmt.Fprint(cmd.OutOrStdout(), manualdocs.Manual(Version))
+			return err //nolint:wrapcheck
+		},
+	}
+	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  henji docs\n")
+		return err //nolint:wrapcheck
+	})
+	return cmd
 }
 
 var (
@@ -337,6 +357,16 @@ func initFlags() {
 
 func main() {
 	defer maybeWriteMemProfile()
+	// The embedded manual must remain available even when the user's config or
+	// conversation database is missing or invalid.
+	if isDocsCmd(os.Args) {
+		if err := rootCmd.Execute(); err != nil {
+			handleError(err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	var err error
 	config, err = ensureConfig()
 	if err != nil {
@@ -361,14 +391,8 @@ func main() {
 	}
 
 	if isCompletionCmd(os.Args) {
-		// XXX: since mods doesn't have any sub-commands, Cobra won't create
-		// the default `completion` command. Forcefully create the completion
-		// related sub-commands by adding a fake command when completions are
-		// being used.
-		rootCmd.AddCommand(&cobra.Command{
-			Use:    "____fake_command_to_enable_completions",
-			Hidden: true,
-		})
+		// Keep completion initialization explicit. The default completion
+		// command remains hidden from the concise root help.
 		rootCmd.InitDefaultCompletionCmd()
 	}
 
@@ -775,6 +799,10 @@ func isManCmd(args []string) bool {
 		return args[2] == "-h" || args[2] == "--help"
 	}
 	return false
+}
+
+func isDocsCmd(args []string) bool {
+	return len(args) > 1 && args[1] == "docs"
 }
 
 //nolint:mnd

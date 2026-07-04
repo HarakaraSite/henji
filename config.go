@@ -364,11 +364,51 @@ func useLine() string {
 }
 
 func usageFunc(cmd *cobra.Command) error {
+	if cmd != rootCmd {
+		fmt.Printf("Usage:\n  %s\n", cmd.UseLine())
+		if cmd.HasAvailableLocalFlags() {
+			fmt.Println("\nOptions:")
+			printFlags(cmd)
+		}
+		return nil
+	}
+
 	fmt.Printf(
 		"Usage:\n  %s\n\n",
 		useLine(),
 	)
+	commands := cmd.Commands()
+	visibleCommands := make([]*cobra.Command, 0, len(commands))
+	for _, sub := range commands {
+		if !sub.Hidden && sub.IsAvailableCommand() {
+			visibleCommands = append(visibleCommands, sub)
+		}
+	}
+	if len(visibleCommands) > 0 {
+		fmt.Println("Commands:")
+		for _, sub := range visibleCommands {
+			fmt.Printf("  %-44s %s\n", sub.Name(), sub.Short)
+		}
+		fmt.Println()
+	}
 	fmt.Println("Options:")
+	printFlags(cmd)
+	if len(helpExamples) > 0 {
+		fmt.Println("\nExamples:")
+		for _, ex := range helpExamples {
+			fmt.Printf(
+				"  %s\n  %s\n\n",
+				stdoutStyles().Comment.Render("# "+ex.title),
+				cheapHighlighting(stdoutStyles(), ex.command),
+			)
+		}
+	}
+	fmt.Printf("Full manual:\n  %s\n", cheapHighlighting(stdoutStyles(), "henji docs"))
+
+	return nil
+}
+
+func printFlags(cmd *cobra.Command) {
 	cmd.Flags().VisitAll(func(f *flag.Flag) {
 		if f.Hidden {
 			return
@@ -389,16 +429,4 @@ func usageFunc(cmd *cobra.Command) error {
 			)
 		}
 	})
-	if len(helpExamples) > 0 {
-		fmt.Println("\nExamples:")
-		for _, ex := range helpExamples {
-			fmt.Printf(
-				"  %s\n  %s\n\n",
-				stdoutStyles().Comment.Render("# "+ex.title),
-				cheapHighlighting(stdoutStyles(), ex.command),
-			)
-		}
-	}
-
-	return nil
 }

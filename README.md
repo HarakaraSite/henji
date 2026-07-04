@@ -137,6 +137,9 @@ export HENJI_FORMAT=true
 ## Usage
 
 ```sh
+# Read the full task-oriented manual
+henji docs
+
 # Pipe command output to an LLM
 ls -la | henji "explain these files"
 cat error.log | henji "what went wrong?"
