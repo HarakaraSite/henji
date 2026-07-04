@@ -4,10 +4,19 @@ import (
 	"bytes"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	manualdocs "forge.harakara.site/littleisland/henji/internal/docs"
 )
+
+// initFlags registers its flags on the shared rootCmd, so tests must only
+// call it once per process or pflag panics on redefinition.
+var initFlagsOnce sync.Once
+
+func ensureFlagsInitialized() {
+	initFlagsOnce.Do(initFlags)
+}
 
 func TestIsDocsCmd(t *testing.T) {
 	for args, want := range map[string]bool{
@@ -54,7 +63,7 @@ func TestRootCommandAcceptsPromptArgumentsAlongsideSubcommands(t *testing.T) {
 }
 
 func TestManualLongFlagsExist(t *testing.T) {
-	initFlags()
+	ensureFlagsInitialized()
 	re := regexp.MustCompile(`--([a-z][a-z0-9-]*)`)
 	seen := map[string]bool{}
 	for _, match := range re.FindAllStringSubmatch(manualdocs.Body(), -1) {
@@ -109,6 +118,26 @@ func TestIsCompletionCmd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExecuteFlagErrorDoesNotPanicWithNilDB(t *testing.T) {
+	origDB := db
+	db = nil
+	t.Cleanup(func() { db = origDB })
+
+	ensureFlagsInitialized()
+	rootCmd.SetArgs([]string{"--bogus", "-h"})
+	t.Cleanup(func() { rootCmd.SetArgs(nil) })
+
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected a flag parse error for --bogus")
+	}
+
+	// Regression for F-1: this used to panic with a nil pointer dereference
+	// because db stays nil for -h/-v invocations, and main() unconditionally
+	// called db.Close() on the Execute() error path.
+	closeDB()
 }
 
 func TestIsManCmd(t *testing.T) {

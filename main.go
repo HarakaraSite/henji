@@ -420,8 +420,18 @@ func main() {
 
 	if err := rootCmd.Execute(); err != nil {
 		handleError(err)
-		_ = db.Close()
+		closeDB()
 		os.Exit(1)
+	}
+}
+
+// closeDB closes the conversation database if it was opened. db stays nil
+// when the command is a version/help/completion/man invocation (see
+// isVersionOrHelpCmd and friends), so callers on the error path must not
+// assume it was opened.
+func closeDB() {
+	if db != nil {
+		_ = db.Close() //nolint:errcheck
 	}
 }
 
@@ -430,7 +440,10 @@ func maybeWriteMemProfile() {
 		return
 	}
 
-	closers := []func() error{db.Close}
+	var closers []func() error
+	if db != nil {
+		closers = append(closers, db.Close)
+	}
 	defer func() {
 		for _, cl := range closers {
 			_ = cl()
