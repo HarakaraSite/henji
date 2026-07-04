@@ -20,6 +20,10 @@ import (
 	"time"
 	"unicode"
 
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
+	"charm.land/lipgloss/v2"
 	"forge.harakara.site/littleisland/henji/internal/anthropic"
 	"forge.harakara.site/littleisland/henji/internal/cache"
 	"forge.harakara.site/littleisland/henji/internal/google"
@@ -27,10 +31,6 @@ import (
 	"forge.harakara.site/littleisland/henji/internal/proto"
 	"forge.harakara.site/littleisland/henji/internal/stream"
 	"github.com/caarlos0/go-shellwords"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/ordered"
 )
 
@@ -55,7 +55,6 @@ type Mods struct {
 	state         state
 	retries       int
 	schemaRetries int
-	renderer      *lipgloss.Renderer
 	glam          *glamour.TermRenderer
 	glamViewport  viewport.Model
 	glamOutput    string
@@ -78,7 +77,6 @@ type Mods struct {
 
 func newMods(
 	ctx context.Context,
-	r *lipgloss.Renderer,
 	cfg *Config,
 	db *convoDB,
 	cache *cache.Conversations,
@@ -87,13 +85,12 @@ func newMods(
 		glamour.WithEnvironmentConfig(),
 		glamour.WithWordWrap(cfg.WordWrap),
 	)
-	vp := viewport.New(0, 0)
+	vp := viewport.New(viewport.WithWidth(0), viewport.WithHeight(0))
 	vp.GotoBottom()
 	return &Mods{
-		Styles:       makeStyles(r),
+		Styles:       stderrStyles(),
 		glam:         gr,
 		state:        startState,
-		renderer:     r,
 		glamViewport: vp,
 		contentMutex: &sync.Mutex{},
 		db:           db,
@@ -137,7 +134,7 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Config.Model = msg.Model
 
 		if !m.Config.Quiet {
-			m.anim = newAnim(defaultFanciness, defaultStatusText, m.renderer, m.Styles)
+			m.anim = newAnim(defaultFanciness, defaultStatusText, m.Styles)
 			cmds = append(cmds, m.anim.Init())
 		}
 		m.state = configLoadedState
@@ -181,10 +178,10 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.quit
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.glamViewport.Width = m.width
-		m.glamViewport.Height = m.height
+		m.glamViewport.SetWidth(m.width)
+		m.glamViewport.SetHeight(m.height)
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.state = doneState
@@ -211,11 +208,11 @@ func (m Mods) viewportNeeded() bool {
 }
 
 // View implements tea.Model.
-func (m *Mods) View() string {
+func (m *Mods) View() tea.View {
 	//nolint:exhaustive
 	switch m.state {
 	case errorState:
-		return ""
+		return tea.NewView("")
 	case requestState:
 		if !m.Config.Quiet {
 			return m.anim.View()
@@ -223,14 +220,14 @@ func (m *Mods) View() string {
 	case responseState:
 		if !m.Config.Raw && isOutputTTY() {
 			if m.viewportNeeded() {
-				return m.glamViewport.View()
+				return tea.NewView(m.glamViewport.View())
 			}
 			// We don't need the viewport yet.
-			return m.glamOutput
+			return tea.NewView(m.glamOutput)
 		}
 
 		if isOutputTTY() && !m.Config.Raw {
-			return m.Output
+			return tea.NewView(m.Output)
 		}
 
 		m.contentMutex.Lock()
@@ -245,9 +242,9 @@ func (m *Mods) View() string {
 		if !isOutputTTY() && m.Config.Output != "json" {
 			fmt.Printf("\n")
 		}
-		return ""
+		return tea.NewView("")
 	}
-	return ""
+	return tea.NewView("")
 }
 
 func (m *Mods) quit() tea.Msg {
@@ -723,7 +720,7 @@ func (m *Mods) appendToOutput(s string) {
 	m.glamOutput = strings.ReplaceAll(m.glamOutput, "\t", strings.Repeat(" ", tabWidth))
 	m.glamHeight = lipgloss.Height(m.glamOutput)
 	m.glamOutput += "\n"
-	truncatedGlamOutput := m.renderer.NewStyle().
+	truncatedGlamOutput := lipgloss.NewStyle().
 		MaxWidth(m.width).
 		Render(m.glamOutput)
 	m.glamViewport.SetContent(truncatedGlamOutput)

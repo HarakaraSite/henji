@@ -13,13 +13,13 @@ import (
 	"slices"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	glamour "charm.land/glamour/v2/styles"
+	"charm.land/huh/v2"
 	"forge.harakara.site/littleisland/henji/internal/cache"
 	manualdocs "forge.harakara.site/littleisland/henji/internal/docs"
 	"github.com/atotto/clipboard"
 	timeago "github.com/caarlos0/timea.go"
-	tea "github.com/charmbracelet/bubbletea"
-	glamour "github.com/charmbracelet/glamour/styles"
-	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/x/editor"
 	mcobra "github.com/muesli/mango-cobra"
 	"github.com/muesli/roff"
@@ -158,7 +158,7 @@ var (
 			if err != nil {
 				return modsError{err, "Couldn't start Bubble Tea program."}
 			}
-			mods := newMods(cmd.Context(), stderrRenderer(), &config, db, cache)
+			mods := newMods(cmd.Context(), &config, db, cache)
 			p := tea.NewProgram(mods, opts...)
 			m, err := p.Run()
 			if err != nil {

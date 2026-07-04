@@ -12,7 +12,7 @@ import (
 	_ "embed"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/muesli/termenv"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -352,7 +352,7 @@ func defaultConfig() Config {
 func useLine() string {
 	appName := filepath.Base(os.Args[0])
 
-	if stdoutRenderer().ColorProfile() == termenv.TrueColor {
+	if stdoutStyles().profile == colorprofile.TrueColor {
 		appName = makeGradientText(stdoutStyles().AppName, appName)
 	}
 

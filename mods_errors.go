@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/openai/openai-go"
 )
 

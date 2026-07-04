@@ -1,15 +1,16 @@
 package main
 
 import (
+	"image/color"
 	"math/rand"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/lucasb-eyer/go-colorful"
-	"github.com/muesli/termenv"
 )
 
 const (
@@ -83,7 +84,7 @@ type anim struct {
 	styles          styles
 }
 
-func newAnim(cyclingCharsSize uint, label string, r *lipgloss.Renderer, s styles) anim {
+func newAnim(cyclingCharsSize uint, label string, s styles) anim {
 	// #nosec G115
 	n := int(cyclingCharsSize)
 	if n > maxCyclingChars {
@@ -105,13 +106,13 @@ func newAnim(cyclingCharsSize uint, label string, r *lipgloss.Renderer, s styles
 	// If we're in truecolor mode (and there are enough cycling characters)
 	// color the cycling characters with a gradient ramp.
 	const minRampSize = 3
-	if n >= minRampSize && r.ColorProfile() == termenv.TrueColor {
+	if n >= minRampSize && s.profile == colorprofile.TrueColor {
 		// Note: double capacity for color cycling as we'll need to reverse and
 		// append the ramp for seamless transitions.
 		c.ramp = make([]lipgloss.Style, n, n*2) //nolint:mnd
 		ramp := makeGradientRamp(n)
 		for i, color := range ramp {
-			c.ramp[i] = r.NewStyle().Foreground(color)
+			c.ramp[i] = lipgloss.NewStyle().Foreground(color)
 		}
 		c.ramp = append(c.ramp, reverse(c.ramp)...) // reverse and append for color cycling
 	}
@@ -209,7 +210,7 @@ func (a *anim) updateChars(chars *[]cyclingChar) {
 }
 
 // View renders the animation.
-func (a anim) View() string {
+func (a anim) View() tea.View {
 	var b strings.Builder
 
 	for i, c := range a.cyclingChars {
@@ -224,14 +225,14 @@ func (a anim) View() string {
 		b.WriteRune(c.currentValue)
 	}
 
-	return b.String() + a.ellipsis.View()
+	return tea.NewView(b.String() + a.ellipsis.View())
 }
 
-func makeGradientRamp(length int) []lipgloss.Color {
+func makeGradientRamp(length int) []color.Color {
 	const startColor = "#F967DC"
 	const endColor = "#6B50FF"
 	var (
-		c        = make([]lipgloss.Color, length)
+		c        = make([]color.Color, length)
 		start, _ = colorful.Hex(startColor)
 		end, _   = colorful.Hex(endColor)
 	)

@@ -8,12 +8,11 @@
 
 - 現在の module path の範囲で最新版: 29 件
 - 現在の module path の範囲で更新可能: 0 件
-- 別の major module path に安定版があるもの: 5 件
+- 別の major module path への移行: 5 件完了
 - `go mod tidy -diff`: 差分なし
 - 同一 major 内の低リスク更新: 3 件完了
 
-新しい major version がある5件は API 互換性が保証されないため、通常の依存更新とは
-分けて移行する。
+Charm系5件は API 互換性が保証されないため、通常の依存更新とは分けて一括移行した。
 
 ## 2. 調査方法
 
@@ -41,19 +40,19 @@ path 自体が変わる major update は自動的には表示されないため�
 `golden` の更新に伴い、間接依存の `github.com/aymanbagabas/go-udiff` も
 `v0.3.1` から `v0.4.1` へ追随した。
 
-## 4. 新しい major version がある直接依存
+## 4. Charm系major version移行結果
 
-| ライブラリ | 現在 | 最新major | 方針 |
+| 旧module | 移行先 | 状態 | 主な確認点 |
 |---|---:|---:|---|
-| `github.com/charmbracelet/bubbles` | `v1.0.0` | `v2.1.0` | Charm系移行としてまとめて評価する |
-| `github.com/charmbracelet/bubbletea` | `v1.3.10` | `v2.0.8` | 状態更新、入出力、rendererのAPI差分を重点確認する |
-| `github.com/charmbracelet/glamour` | `v1.0.0` | `v2.0.1` | Markdown描画とstyle設定を確認する |
-| `github.com/charmbracelet/huh` | `v1.0.0` | `v2.0.3` | 対話入力とキャンセル時のエラー判定を確認する |
-| `github.com/charmbracelet/lipgloss` | `v1.1.1`系 pseudo-version | `v2.0.5` | layout、幅計算、色profileを確認する |
+| `github.com/charmbracelet/bubbles` `v1.0.0` | `charm.land/bubbles/v2` `v2.1.0` | 完了 | viewportのconstructorとsize setter |
+| `github.com/charmbracelet/bubbletea` `v1.3.10` | `charm.land/bubbletea/v2` `v2.0.8` | 完了 | `tea.View`、`KeyPressMsg`、入出力 |
+| `github.com/charmbracelet/glamour` `v1.0.0` | `charm.land/glamour/v2` `v2.0.1` | 完了 | Markdown描画とstyle設定 |
+| `github.com/charmbracelet/huh` `v1.0.0` | `charm.land/huh/v2` `v2.0.3` | 完了 | 対話入力とキャンセル判定 |
+| `github.com/charmbracelet/lipgloss` `v1.1.1`系 | `charm.land/lipgloss/v2` `v2.0.5` | 完了 | Renderer廃止、幅計算、色profile |
 
-Charm系5件は相互に関連し、import path と型の変更が波及する可能性がある。個別に
-最新版へ上げるのではなく、専用ブランチで一つの移行作業として扱う。ただしコミットは
-機械的な import/API 移行と、挙動修正・表示修正を分ける。
+Lip Gloss v2では出力先別の `Renderer` が廃止されたため、`NewStyle` と
+`colorprofile.Detect` を組み合わせた。stdout/stderrごとに色profileを判定し、非TTYへ
+pipeしたhelpやerrorへANSI escapeが混入しないことを回帰テストで固定した。
 
 major更新済み:
 
@@ -155,7 +154,7 @@ go build ./...
 Charm系と分離してv9からv11へ移行する。設定ファイル読込後の `HENJI_*` override、
 slice、duration、数値、boolのparseと、不正値のエラー表示をテストする。
 
-### Phase 3: Charm系v2移行
+### Phase 3: Charm系v2移行 ✅
 
 Bubble Tea、Bubbles、Lip Gloss、Glamour、Huhをまとめて移行する。unit testだけでなく、
 以下のinteractive/visual確認が必要になる。
@@ -166,6 +165,10 @@ Bubble Tea、Bubbles、Lip Gloss、Glamour、Huhをまとめて移行する。un
 - raw出力、pipe出力、`--output json`
 - 対話prompt、選択UI、キャンセル
 - light/dark terminalでの色とerror表示
+
+module pathとAPI移行、全unit test、vet、build、help/docs/completionの実バイナリ確認は
+完了した。spinner、resize、対話prompt、light/dark配色の最終確認は、リリース前の
+TTY目視確認として残す。
 
 ### Phase 4: 間接依存と脆弱性の再評価
 

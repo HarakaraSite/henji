@@ -217,15 +217,15 @@ MCP 設定は `Config.MCPServers` / `MCPServerConfig` に入る。設定 YAML �
 
 ### TUI / terminal 表示
 
-- `github.com/charmbracelet/bubbletea`
+- `charm.land/bubbletea/v2`
   - `Mods` の event loop / state machine。
-- `github.com/charmbracelet/bubbles`
+- `charm.land/bubbles/v2`
   - viewport など Bubble Tea 用 UI 部品。
-- `github.com/charmbracelet/lipgloss`
+- `charm.land/lipgloss/v2`
   - terminal styling。
-- `github.com/charmbracelet/glamour`
+- `charm.land/glamour/v2`
   - markdown rendering。
-- `github.com/charmbracelet/huh`
+- `charm.land/huh/v2`
   - interactive prompt。
 - `github.com/muesli/termenv`, `github.com/lucasb-eyer/go-colorful`
   - terminal color/profile や gradient 表示。
