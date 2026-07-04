@@ -3,6 +3,17 @@
 作成日: 2026-07-04
 目的: henji v2.0.0におけるMCP機能の扱いについて、セキュリティ、製品設計、Unix CLIとしての一貫性、フットプリントの観点から判断材料を整理する。
 
+## 決定と実施結果（2026-07-05追記）
+
+セクション14「Option A: MCPを完全廃止」を採用し、実施した。
+
+- 削除範囲: `mcp.go`（全221行）、`internal/openai`/`internal/anthropic`の`fromMCPTools`とtool-call経路、`internal/stream/stream.go`の`PendingToolCalls`/`CallTools`/`CallTool`、`internal/proto/proto.go`の`Request.Tools`/`ToolCaller`/`ToolCall`/`Function`/`ToolCallStatus`/`RoleTool`、`mods.go`のtool-callラウンド制御と`MaxToolCalls`、`config.go`の`MCPServerConfig`/`MCPServers`/`MCPList`/`MCPListTools`/`MCPDisable`/`MCPTimeout`/`MaxToolCalls`、`main.go`の対応フラグ、`config_template.yml`の`mcp-servers`セクション、`github.com/mark3labs/mcp-go`依存。
+- README/内蔵マニュアル（`internal/docs/docs.md`）/examples.md・ja からもMCP関連記述を削除し、README には「Generate, review, then run」節を新設（`henji -R shell`で生成したコマンドを`less`/`bat`で確認してから実行する運用パターン、`| sh`直結を避ける注意を明記）。
+- **HENJI-SEC-001・HENJI-SEC-002は原因コードごと解消**（`security-review-v2.0.md`の対応状況欄を更新済み）。
+- バイナリサイズ実測: 同一コミットでMCPあり/なしをビルド比較した結果、約56.2MB → 約55.1MB（約1.1MB、約2%減）。セクション15の未決事項にあった実測値を確定。
+- `go build`/`go vet`/`go test -race ./...` 全パス確認済み。
+- semver上、tool-calling機能全体の削除という破壊的変更のため、次のタグは `v2.0.0` ではなく `v3.0.0` を予定（別途ユーザー判断）。
+
 ## 1. 現在のhenjiの位置づけ
 
 henjiは本来、次のようなUnixフィルターとして理解できる。

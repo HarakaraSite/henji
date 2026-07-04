@@ -1,6 +1,12 @@
 # mods フォーク 修正ロードマップ
 
 作成日: 2026-06-21  
+更新日: 2026-07-05 v12（**MCP機能を完全削除**。`mcp-security-design-discussion.md`のOption Aを採用し、
+`mcp.go`・provider tool-call経路・`proto`/`stream`のtool-call型・`MaxToolCalls`系config/flag・
+`mcp-go`依存を除去。HENJI-SEC-001/002は原因コードごと解消（`security-review-v2.0.md`更新済み）。
+README/内蔵マニュアル/examplesからMCP記述を除去し、README に「Generate, review, then run」節を新設。
+バイナリサイズ約56.2MB→約55.1MB（約2%減）。`go build`/`go vet`/`go test -race`全パス。
+次タグは`v2.0.0`ではなく`v3.0.0`を予定。詳細はセクション0「別トラック：MCP機能の要否再検討」参照）  
 更新日: 2026-07-04 v11（**HENJI-SEC-002・HENJI-SEC-003を修正し、v2.0.0に含めた**。SEC-002:
 `Stream.PendingToolCalls()`追加により`MaxToolCalls`上限判定を`CallTools()`実行前に移動、上限超過ラウンドの
 副作用ゼロを回帰テストで確認。SEC-003: `securePermissions`（`config_unix.go`/`config_windows.go`）追加により
@@ -52,9 +58,9 @@ charmbracelet/mods は 2026-03-09 にアーカイブされた。本家 README �
 
 fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `roles:` 設定だけで実現できる見込み（コード改造不要）。これらはこの roadmap のバグ修正 PR とは独立した「設定・ドキュメント整備タスク」として管理する。設定だけで賄えるかはドッグフーディング後に判断し、使い勝手の問題が出た時点で初めて機能追加 PR を検討する。
 
-### 別トラック：MCP機能の要否再検討（2026-07-04 追加）
+### 別トラック：MCP機能の要否再検討（2026-07-04 追加 → 2026-07-05 完全削除で決着）
 
-セキュリティレビュー（`security-review-v2.0.md`）の HENJI-SEC-001 対応検討中に、(1) MCP関連コードがフットプリント全体に占める分量が無視できない、(2) ツール単位の許可制御を入れるには相応の設計投資が要る、の2点が判明した。MCP連携は当初「主目的」の一部（[[project-mods-fork]] 参照）に位置付けていたが、実際の利用状況（ドッグフーディング）を踏まえてユースケースを詳細検討し、**MCP呼び出し機能自体を縮小・廃止する選択肢も排除せず**方針を決める。allowlist機構等のセキュリティ投資は、この方針が固まってから行う方が手戻りがない。HENJI-SEC-001はこの検討が終わるまでv2.0.0では対応保留。
+セキュリティレビュー（`security-review-v2.0.md`）の HENJI-SEC-001 対応検討中に、(1) MCP関連コードがフットプリント全体に占める分量が無視できない、(2) ツール単位の許可制御を入れるには相応の設計投資が要る、の2点が判明した。`mcp-security-design-discussion.md`で選択肢（完全廃止/read-only限定/本格実装）を検討した結果、**Option A（MCP完全廃止）を採用し、2026-07-05に実施済み**。`mcp.go`・providerのtool-call経路・`proto.Request.Tools`/`ToolCaller`・`stream.Stream`のtool-callメソッド・`MaxToolCalls`等のconfig/flag・`mcp-go`依存を全て削除。バイナリサイズは約56.2MB→約55.1MB（約2%減）。HENJI-SEC-001/002は原因コードごと解消。README/内蔵マニュアルには「Generate, review, then run」パターン（生成→`less`/`bat`で確認→実行、`|sh`直結回避）を明文化。**semver上は破壊的変更のため次タグは`v3.0.0`を予定**（`v2.0.0`のまま出す方針は撤回）。
 
 ### 公開時の必須作業（コード修正とは別）✅ おおむね完了（残タスクはセクション4末尾）
 
@@ -66,10 +72,11 @@ fish スクリプト生成 role・翻訳 role・要約 role は `mods.yml` の `
 このリポジトリは本家の git 履歴（`v0.1.1`〜`v1.8.1` 等の旧タグ）をそのまま引き継いでいるため、フォーク独自のタグと本家タグの番号が衝突する（例: 本家の `v0.2.0` は2023年のコミットを指しており、フォーク側で同じ番号を新規に使うと上書きになってしまう）。
 
 - **当面のリリース**: `v0.9.x` 系列を使う。公開後も `v0.9.x` のまま継続してよい（「公開=v2.0.0」の旧基準は廃止）。直近リリースは `v0.9.3`。
-- **`v2.0.0` の条件（新基準）**: 「AI が自律実行時に henji を能動的に発見・選択・実行するに足る」状態に達した時に打つ。バージョン番号は到達点の宣言であり、公開作業の完了とは切り離す。**2026-07-04、モデル別利用能力テスト（Opus 4.8 / Sonnet 5 / Haiku 4.5、`-h`+`docs` のみで12/12達成）を根拠に基準達成と判断し、`v2.0.0` への移行準備を実施した。**
-- **module path への `/v2` 追加**: Go の semantic import versioning 上、`v2.0.0` タグを打つ時点で module path 末尾に `/v2` が必要になる。2026-07-04、`forge.harakara.site/littleisland/henji/v2` に変更し、全20ファイルの import を一括更新済み（`go build`/`go vet`/`go test ./...` 全パス確認済み）。
+- **`v2.0.0` の条件（新基準）**: 「AI が自律実行時に henji を能動的に発見・選択・実行するに足る」状態に達した時に打つ。バージョン番号は到達点の宣言であり、公開作業の完了とは切り離す。2026-07-04、モデル別利用能力テスト（Opus 4.8 / Sonnet 5 / Haiku 4.5、`-h`+`docs` のみで12/12達成）を根拠に基準達成と判断。
+- **module path への `/v2` 追加**: Go の semantic import versioning 上、`v2.0.0` タグを打つ時点で module path 末尾に `/v2` が必要になる。2026-07-04、`forge.harakara.site/littleisland/henji/v2` に変更し、全20ファイルの import を一括更新済み。
 - `v2.x` 系タグは本家履歴に存在しないため衝突しない、という前提は従来どおり有効。
-- **タグ作成状況（2026-07-04）**: `git tag v2.0.0` はローカルに作成済み。origin への push（forgejo release workflow 起動）はユーザーが別途明示的に指示するまで実施しない。
+- **`v2.0.0` タグ作成・公開済み（2026-07-04）**: HENJI-SEC-002/003修正を含む `ae7d272` に `git tag v2.0.0` を作成し、`main` ブランチと共に origin へ push 済み。forgejo release workflow が起動している。
+- **`v3.0.0` を予定（2026-07-05 追加）**: MCP機能を完全削除（tool-calling機能全体の削除）したため、破壊的変更として次は `v2.0.0` ではなく `v3.0.0` を打つ。module path も `/v2` → `/v3` へ再度変更が必要（v2.0.0 push 後の作業のため、v2.0.0 は「MCPありの最終版」として残る）。詳細は「別トラック：MCP機能の要否再検討」参照。タグ作成・push はユーザー判断待ち。
 
 #### 改定の経緯
 
@@ -423,7 +430,7 @@ openai/anthropic の `Stream` が `done`/`factory`/`Next` での再ストリー�
 
 `config.go:142-201` で YAML タグ付き永続設定値（`Format`・`MaxTokens` 等）とランタイム専用フラグ（`ShowHelp`・`Dirs`・`cacheReadFromID` 等）が1つの構造体に混在し、インデントも乱れている。「永続設定」と「セッション状態」を型で分離すると、グローバル `config` 問題の再発防止にもなる。大規模変更のため次バージョン向け。
 
-### R-E. MCP ツール名のセパレータ問題（`mcp.go:225`）
+### R-E. MCP ツール名のセパレータ問題（`mcp.go:225`）✅ 2026-07-05 MCP完全削除により解消（対象コード自体が消滅）
 
 MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引きしているが、区切り文字が `_` のためサーバ名自体に `_` を含むと誤ルーティングする。
 

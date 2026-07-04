@@ -23,8 +23,8 @@ v2.0 リリース前に優先して確認すべきなのは次の2点である�
 
 3件とも根拠・severityともに独立検証で妥当と確認済み（検証記録は本セッション外）。
 
-- **HENJI-SEC-001: v2.0.0では対応保留。** allowlist機構の実装規模が大きいことに加え、別件でMCP関連コードのフットプリントが無視できない分量であると判明し、MCP呼び出し機能自体の縮小・廃止も選択肢に入れたユースケース再検討が必要と判断した（詳細: `docs/notes/fix-roadmap.md` の「別トラック：MCP機能の要否再検討」）。この検討が固まってからセキュリティ投資の要否を再判断する。
-- **HENJI-SEC-002: 修正済み。** `Stream.PendingToolCalls()` を追加し、`MaxToolCalls` の上限判定を `CallTools()` 実行前に行うよう `mods.go` を変更。上限超過ラウンドは副作用ゼロで停止することを回帰テストで確認済み（コミット: module path変更後のセキュリティ修正コミット群を参照）。
+- **HENJI-SEC-001: 2026-07-05、MCP機能自体を完全削除したことで解消。** `mcp-security-design-discussion.md`での検討の結果Option A（MCP完全廃止）を採用。`mcp.go`、providerのtool-call経路（`internal/openai`/`internal/anthropic`のCallTools等）、`proto.Request.Tools`/`ToolCaller`、`stream.Stream`のtool-callメソッド、`MaxToolCalls`/`MCPServers`等のconfig/flag、`mcp-go`依存を全て削除。原因コードそのものが存在しなくなったため、本findingは対応不要になった。
+- **HENJI-SEC-002: 修正済み（2026-07-04）、その後2026-07-05のMCP完全削除で該当コード自体が消滅。** 修正時点では `Stream.PendingToolCalls()` を追加し `MaxToolCalls` の上限判定を `CallTools()` 実行前に行うよう変更し、副作用ゼロを回帰テストで確認していたが、MCP削除に伴いtool-call round制御・`MaxToolCalls`・`PendingToolCalls`/`CallTools` 自体を削除したため、現在は該当コードが存在しない。
 - **HENJI-SEC-003: 修正済み。** `securePermissions`（`config_unix.go`/`config_windows.go`）を追加し、既存設定ファイルの権限をv2起動時に自動修復。非所有ファイルは読取前に拒否。Windowsは現時点でno-op（README に明記）。
 
 ## HENJI-SEC-001: 未信頼コンテンツが承認なしでMCPツール実行へ到達できる
