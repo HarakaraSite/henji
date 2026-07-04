@@ -137,7 +137,7 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Config.Model = msg.Model
 
 		if !m.Config.Quiet {
-			m.anim = newAnim(m.Config.Fanciness, m.Config.StatusText, m.renderer, m.Styles)
+			m.anim = newAnim(defaultFanciness, defaultStatusText, m.renderer, m.Styles)
 			cmds = append(cmds, m.anim.Init())
 		}
 		m.state = configLoadedState
@@ -147,27 +147,17 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.content != "" {
 			m.Input = removeWhitespace(msg.content)
 		}
-		if m.Input == "" && m.Config.Prefix == "" && m.Config.Show == "" && !m.Config.ShowLast {
+		if m.Input == "" && m.Config.Prefix == "" && m.Config.Show == "" {
 			return m, m.quit
 		}
-		if m.Config.Dirs ||
-			len(m.Config.Delete) > 0 ||
-			m.Config.DeleteOlderThan != 0 ||
+		if len(m.Config.Delete) > 0 ||
 			m.Config.ShowHelp ||
 			m.Config.List ||
 			m.Config.ListRoles ||
-			m.Config.Settings ||
-			m.Config.ResetSettings {
+			m.Config.Settings {
 			return m, m.quit
 		}
 
-		if m.Config.IncludePromptArgs {
-			m.appendToOutput(m.Config.Prefix + "\n\n")
-		}
-
-		if prompt := promptExcerpt(m.Input, m.Config.IncludePrompt); prompt != "" {
-			m.appendToOutput(prompt)
-		}
 		m.state = requestState
 		cmds = append(cmds, m.startCompletionCmd(msg.content))
 	case completionOutput:
@@ -276,7 +266,7 @@ func (m *Mods) retry(content string, err modsError) tea.Msg {
 }
 
 func (m *Mods) startCompletionCmd(content string) tea.Cmd {
-	if m.Config.Show != "" || m.Config.ShowLast {
+	if m.Config.Show != "" {
 		return m.readFromCache()
 	}
 
@@ -625,7 +615,7 @@ func (m *Mods) findCacheOpsDetails() tea.Cmd {
 		model := m.Config.Model
 		api := m.Config.API
 
-		if readID != "" || continueLast || m.Config.ShowLast {
+		if readID != "" || continueLast {
 			found, err := m.findReadID(readID)
 			if err != nil {
 				return modsError{
@@ -751,21 +741,6 @@ func removeWhitespace(s string) string {
 		return ""
 	}
 	return s
-}
-
-func promptExcerpt(input string, lineCount int) string {
-	if input == "" || lineCount == 0 {
-		return ""
-	}
-	if lineCount < 0 {
-		return input + "\n"
-	}
-
-	parts := strings.Split(input, "\n")
-	if len(parts) > lineCount {
-		parts = parts[0:lineCount]
-	}
-	return strings.Join(parts, "\n") + "\n"
 }
 
 var tokenErrRe = regexp.MustCompile(`This model's maximum context length is (\d+) tokens. However, your messages resulted in (\d+) tokens`)

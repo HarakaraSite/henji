@@ -120,7 +120,7 @@ var (
 				config.Prefix = prompt
 			}
 
-			if (isNoArgs() || config.AskModel) && isInputTTY() {
+			if isNoArgs() && isInputTTY() {
 				if err := askInfo(); err != nil && err == huh.ErrUserAborted {
 					return modsError{
 						err:    err,
@@ -153,23 +153,6 @@ var (
 				return *mods.Error
 			}
 
-			if config.Dirs {
-				if len(args) > 0 {
-					switch args[0] {
-					case "config":
-						fmt.Println(filepath.Dir(config.SettingsPath))
-						return nil
-					case "cache":
-						fmt.Println(config.CachePath)
-						return nil
-					}
-				}
-				fmt.Printf("Configuration: %s\n", filepath.Dir(config.SettingsPath))
-				//nolint:mnd
-				fmt.Printf("%*sCache: %s\n", 8, " ", config.CachePath)
-				return nil
-			}
-
 			if config.Settings {
 				c, err := editor.Cmd("henji", config.SettingsPath)
 				if err != nil {
@@ -192,10 +175,6 @@ var (
 					fmt.Fprintln(os.Stderr, "Wrote config file to:", config.SettingsPath)
 				}
 				return nil
-			}
-
-			if config.ResetSettings {
-				return resetSettings()
 			}
 
 			if mods.Input == "" && isNoArgs() {
@@ -239,10 +218,6 @@ var (
 				return deleteConversations()
 			}
 
-			if config.DeleteOlderThan > 0 {
-				return deleteConversationOlderThan()
-			}
-
 			switch {
 			case config.Output == "json":
 				printJSONOutput(mods)
@@ -262,7 +237,7 @@ var (
 				}
 			}
 
-			if config.Show != "" || config.ShowLast {
+			if config.Show != "" {
 				return nil
 			}
 
@@ -284,52 +259,34 @@ func initFlags() {
 
 	flags := rootCmd.Flags()
 	flags.StringVarP(&config.Model, "model", "m", config.Model, stdoutStyles().FlagDesc.Render(help["model"]))
-	flags.BoolVarP(&config.AskModel, "ask-model", "M", config.AskModel, stdoutStyles().FlagDesc.Render(help["ask-model"]))
 	flags.StringVarP(&config.API, "api", "a", config.API, stdoutStyles().FlagDesc.Render(help["api"]))
-	flags.StringVarP(&config.HTTPProxy, "http-proxy", "x", config.HTTPProxy, stdoutStyles().FlagDesc.Render(help["http-proxy"]))
 	flags.BoolVarP(&config.Format, "format", "f", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
 	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, stdoutStyles().FlagDesc.Render(help["format-as"]))
 	flags.StringVar(&config.JSONSchemaPath, "json-schema", config.JSONSchemaPath, stdoutStyles().FlagDesc.Render(help["json-schema"]))
 	flags.IntVar(&config.JSONSchemaRetries, "json-schema-retries", config.JSONSchemaRetries, stdoutStyles().FlagDesc.Render(help["json-schema-retries"]))
 	flags.BoolVarP(&config.Raw, "raw", "r", config.Raw, stdoutStyles().FlagDesc.Render(help["raw"]))
 	flags.StringVar(&config.Output, "output", config.Output, stdoutStyles().FlagDesc.Render(help["output"]))
-	flags.IntVarP(&config.IncludePrompt, "prompt", "P", config.IncludePrompt, stdoutStyles().FlagDesc.Render(help["prompt"]))
-	flags.BoolVarP(&config.IncludePromptArgs, "prompt-args", "p", config.IncludePromptArgs, stdoutStyles().FlagDesc.Render(help["prompt-args"]))
 	flags.StringVarP(&config.Continue, "continue", "c", "", stdoutStyles().FlagDesc.Render(help["continue"]))
 	flags.BoolVarP(&config.ContinueLast, "continue-last", "C", false, stdoutStyles().FlagDesc.Render(help["continue-last"]))
 	flags.BoolVarP(&config.List, "list", "l", config.List, stdoutStyles().FlagDesc.Render(help["list"]))
 	flags.StringVarP(&config.Title, "title", "t", config.Title, stdoutStyles().FlagDesc.Render(help["title"]))
 	flags.StringArrayVarP(&config.Delete, "delete", "d", config.Delete, stdoutStyles().FlagDesc.Render(help["delete"]))
-	flags.Var(newDurationFlag(config.DeleteOlderThan, &config.DeleteOlderThan), "delete-older-than", stdoutStyles().FlagDesc.Render(help["delete-older-than"]))
 	flags.StringVarP(&config.Show, "show", "s", config.Show, stdoutStyles().FlagDesc.Render(help["show"]))
-	flags.BoolVarP(&config.ShowLast, "show-last", "S", false, stdoutStyles().FlagDesc.Render(help["show-last"]))
 	flags.BoolVarP(&config.Quiet, "quiet", "q", config.Quiet, stdoutStyles().FlagDesc.Render(help["quiet"]))
 	flags.BoolVarP(&config.ShowHelp, "help", "h", false, stdoutStyles().FlagDesc.Render(help["help"]))
 	flags.BoolVarP(&config.Version, "version", "v", false, stdoutStyles().FlagDesc.Render(help["version"]))
-	flags.IntVar(&config.MaxRetries, "max-retries", config.MaxRetries, stdoutStyles().FlagDesc.Render(help["max-retries"]))
 	flags.IntVar(&config.MaxToolCalls, "max-tool-calls", config.MaxToolCalls, stdoutStyles().FlagDesc.Render(help["max-tool-calls"]))
 	flags.BoolVar(&config.NoLimit, "no-limit", config.NoLimit, stdoutStyles().FlagDesc.Render(help["no-limit"]))
 	flags.Int64Var(&config.MaxTokens, "max-tokens", config.MaxTokens, stdoutStyles().FlagDesc.Render(help["max-tokens"]))
-	flags.IntVar(&config.WordWrap, "word-wrap", config.WordWrap, stdoutStyles().FlagDesc.Render(help["word-wrap"]))
-	flags.Float64Var(&config.Temperature, "temp", config.Temperature, stdoutStyles().FlagDesc.Render(help["temp"]))
-	flags.StringArrayVar(&config.Stop, "stop", config.Stop, stdoutStyles().FlagDesc.Render(help["stop"]))
-	flags.Float64Var(&config.TopP, "topp", config.TopP, stdoutStyles().FlagDesc.Render(help["topp"]))
-	flags.Int64Var(&config.TopK, "topk", config.TopK, stdoutStyles().FlagDesc.Render(help["topk"]))
-	flags.UintVar(&config.Fanciness, "fanciness", config.Fanciness, stdoutStyles().FlagDesc.Render(help["fanciness"]))
-	flags.StringVar(&config.StatusText, "status-text", config.StatusText, stdoutStyles().FlagDesc.Render(help["status-text"]))
 	flags.BoolVar(&config.NoCache, "no-cache", config.NoCache, stdoutStyles().FlagDesc.Render(help["no-cache"]))
-	flags.BoolVar(&config.ResetSettings, "reset-settings", config.ResetSettings, stdoutStyles().FlagDesc.Render(help["reset-settings"]))
 	flags.BoolVar(&config.Settings, "settings", false, stdoutStyles().FlagDesc.Render(help["settings"]))
-	flags.BoolVar(&config.Dirs, "dirs", false, stdoutStyles().FlagDesc.Render(help["dirs"]))
 	flags.StringVarP(&config.Role, "role", "R", config.Role, stdoutStyles().FlagDesc.Render(help["role"]))
 	flags.BoolVar(&config.ListRoles, "list-roles", config.ListRoles, stdoutStyles().FlagDesc.Render(help["list-roles"]))
 	flags.BoolVar(&config.ListModels, "list-models", config.ListModels, stdoutStyles().FlagDesc.Render(help["list-models"]))
-	flags.StringVar(&config.Theme, "theme", "charm", stdoutStyles().FlagDesc.Render(help["theme"]))
 	flags.BoolVarP(&config.openEditor, "editor", "e", false, stdoutStyles().FlagDesc.Render(help["editor"]))
 	flags.BoolVar(&config.MCPList, "mcp-list", false, stdoutStyles().FlagDesc.Render(help["mcp-list"]))
 	flags.BoolVar(&config.MCPListTools, "mcp-list-tools", false, stdoutStyles().FlagDesc.Render(help["mcp-list-tools"]))
 	flags.StringArrayVar(&config.MCPDisable, "mcp-disable", nil, stdoutStyles().FlagDesc.Render(help["mcp-disable"]))
-	flags.Lookup("prompt").NoOptDefVal = "-1"
 	flags.SortFlags = false
 
 	flags.BoolVar(&memprofile, "memprofile", false, "Write memory profiles to CWD")
@@ -368,14 +325,11 @@ func initFlags() {
 	rootCmd.MarkFlagsMutuallyExclusive(
 		"settings",
 		"show",
-		"show-last",
 		"delete",
-		"delete-older-than",
 		"list",
 		"list-models",
 		"continue",
 		"continue-last",
-		"reset-settings",
 		"mcp-list",
 		"mcp-list-tools",
 	)
@@ -527,104 +481,6 @@ func handleError(err error) {
 	}
 
 	fmt.Fprintf(os.Stderr, format, args...)
-}
-
-func resetSettings() error {
-	_, err := os.Stat(config.SettingsPath)
-	if err != nil {
-		return modsError{err, "Couldn't read config file."}
-	}
-	inputFile, err := os.Open(config.SettingsPath)
-	if err != nil {
-		return modsError{err, "Couldn't open config file."}
-	}
-	defer inputFile.Close() //nolint:errcheck
-	outputFile, err := os.OpenFile(config.SettingsPath+".bak", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return modsError{err, "Couldn't backup config file."}
-	}
-	defer outputFile.Close() //nolint:errcheck
-	_, err = io.Copy(outputFile, inputFile)
-	if err != nil {
-		return modsError{err, "Couldn't write config file."}
-	}
-	// The copy was successful, so now delete the original file
-	err = os.Remove(config.SettingsPath)
-	if err != nil {
-		return modsError{err, "Couldn't remove config file."}
-	}
-	err = writeConfigFile(config.SettingsPath)
-	if err != nil {
-		return modsError{err, "Couldn't write new config file."}
-	}
-	if !config.Quiet {
-		fmt.Fprintln(os.Stderr, "\nSettings restored to defaults!")
-		fmt.Fprintf(os.Stderr,
-			"\n  %s %s\n\n",
-			stderrStyles().Comment.Render("Your old settings have been saved to:"),
-			stderrStyles().Link.Render(config.SettingsPath+".bak"),
-		)
-	}
-	return nil
-}
-
-func deleteConversationOlderThan() error {
-	conversations, err := db.ListOlderThan(config.DeleteOlderThan)
-	if err != nil {
-		return modsError{err, "Couldn't find conversation to delete."}
-	}
-
-	if len(conversations) == 0 {
-		if !config.Quiet {
-			fmt.Fprintln(os.Stderr, "No conversations found.")
-			return nil
-		}
-		return nil
-	}
-
-	if !config.Quiet {
-		printList(conversations)
-
-		if !isOutputTTY() || !isInputTTY() {
-			fmt.Fprintln(os.Stderr)
-			return newUserErrorf(
-				"To delete the conversations above, run: %s",
-				strings.Join(append(os.Args, "--quiet"), " "),
-			)
-		}
-		var confirm bool
-		if err := huh.Run(
-			huh.NewConfirm().
-				Title(fmt.Sprintf("Delete conversations older than %s?", config.DeleteOlderThan)).
-				Description(fmt.Sprintf("This will delete all the %d conversations listed above.", len(conversations))).
-				Value(&confirm),
-		); err != nil {
-			return modsError{err, "Couldn't delete old conversations."}
-		}
-		if !confirm {
-			return newUserErrorf("Aborted by user")
-		}
-	}
-
-	cache, err := cache.NewConversations(config.CachePath)
-	if err != nil {
-		return modsError{err, "Couldn't delete conversation."}
-	}
-	for _, c := range conversations {
-		if err := db.Delete(c.ID); err != nil {
-			return modsError{err, "Couldn't delete conversation."}
-		}
-
-		if err := cache.Delete(c.ID); err != nil {
-			return modsError{err, "Couldn't delete conversation."}
-		}
-
-		if !config.Quiet {
-			fmt.Fprintln(os.Stderr, "Conversation deleted:", c.ID[:sha1minLen])
-		}
-	}
-
-	return nil
 }
 
 func deleteConversations() error {
@@ -836,18 +692,14 @@ func saveConversation(mods *Mods) error {
 func isNoArgs() bool {
 	return config.Prefix == "" &&
 		config.Show == "" &&
-		!config.ShowLast &&
 		len(config.Delete) == 0 &&
-		config.DeleteOlderThan == 0 &&
 		!config.ShowHelp &&
 		!config.List &&
 		!config.ListRoles &&
 		!config.ListModels &&
 		!config.MCPList &&
 		!config.MCPListTools &&
-		!config.Dirs &&
-		!config.Settings &&
-		!config.ResetSettings
+		!config.Settings
 }
 
 func askInfo() error {
@@ -859,10 +711,8 @@ func askInfo() error {
 		for name, model := range api.Models {
 			opts[api.Name] = append(opts[api.Name], huh.NewOption(name, name))
 
-			// checks if this is the model we intend to use if not using
-			// `--ask-model`:
-			if !config.AskModel &&
-				(config.API == "" || config.API == api.Name) &&
+			// checks if this is the model we intend to use:
+			if (config.API == "" || config.API == api.Name) &&
 				(config.Model == name || slices.Contains(model.Aliases, config.Model)) {
 				// if it is, adjusts api and model so its cheaper later on.
 				config.API = api.Name
@@ -898,13 +748,11 @@ func askInfo() error {
 				}, &config.API).
 				Value(&config.Model),
 		).WithHideFunc(func() bool {
-			// AskModel is true if the user is passing a flag to ask;
-			// FoundModel is true if a model is found for whatever config the
+			// foundModel is true if a model is found for whatever config the
 			// user has (either --api/--model or default-api and
-			// default-model in settings).
-			// So, it'll only hide this if the user didn't run with
-			// `--ask-model` AND the configuration yields a valid model.
-			return !config.AskModel && foundModel
+			// default-model in settings), so the API/model selection is only
+			// shown when the configuration doesn't yield a valid model.
+			return foundModel
 		}),
 		huh.NewGroup(
 			huh.NewText().
@@ -915,9 +763,7 @@ func askInfo() error {
 		).WithHideFunc(func() bool {
 			return config.Prefix != ""
 		}),
-	).
-		WithTheme(themeFrom(config.Theme)).
-		Run()
+	).Run()
 }
 
 //nolint:mnd
@@ -975,19 +821,6 @@ func isVersionOrHelpCmd(args []string) bool {
 		}
 	}
 	return false
-}
-
-func themeFrom(theme string) *huh.Theme {
-	switch theme {
-	case "dracula":
-		return huh.ThemeDracula()
-	case "catppuccin":
-		return huh.ThemeCatppuccin()
-	case "base16":
-		return huh.ThemeBase16()
-	default:
-		return huh.ThemeCharm()
-	}
 }
 
 // creates a temp file, opens it in user's editor, and then returns its contents.

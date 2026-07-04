@@ -274,6 +274,9 @@ PR #24 ✅ af58cdd  feature          --list-models 追加（--output json 対応
 ── 設定/データディレクトリの簡素化 ────────────────────────────────────────────
 PR #25 ✅ (未コミット)  refactor     xdg ライブラリ削除、設定/データディレクトリを mac/Linux で ~/.config・~/.local/share に統一
 
+── フラグ/機能のスリム化（人間向け --help 整理 + コード削減）─────────────────
+PR #26 ✅ (未コミット)  refactor     重要度の低いフラグ・機能を削除（--help 43→29項目、caarlos0/duration 依存除去）
+
 ── 公開直前（コード修正後）★ 次フェーズ ──────────────────────────────────────
        ⬜ README 更新          上流との関係・変更内容・推奨設定（max-tool-calls等）の記載
        ⬜ モジュール名変更     go install 用に module パスを一括変更（import 全体に波及）
@@ -411,4 +414,8 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
   - 過去のクラッシュバグ（1-B/1-C: busy-loop、closed channel panic）はまさにこの専用実装の手書きgoroutine/channel設計に起因しており、削除すれば保守負債ごと除去できる
   - ユーザー確認: `num_ctx`動的指定は未使用、`api: ollama`設定も未使用（後方互換の実害なし）と確認の上で削除を決定
   - 対処: `internal/ollama`削除、`mods.go`の`case "ollama"`を除去（`default`ケースに自然統合）、`go.mod`から`github.com/ollama/ollama`依存除去（`go mod tidy`）、`config_template.yml`の`ollama:`セクションを`base-url: http://localhost:11434/v1` + `api-key: ollama`（ダミー）に更新
+- フラグ/機能のスリム化（PR#26、2026-07-04）: `--help` のフラグが43個で多すぎるという判断から、重要度の低いものを削除（隠すのではなく機能ごと削除。v2.0.0 公開前なので破壊的変更コストなしと判断）。3分類で対応:
+  - **機能ごと削除**: `--ask-model`（no-args時の対話フォームは維持、`foundModel` 時のみ非表示）、`--show-last`（`-s` で代替）、`--delete-older-than`（`db.ListOlderThan`・`flag.go` の durationFlag・`caarlos0/duration` 依存ごと削除。`sqliteTimestampFormat` 定数も未使用化のため削除）、`--dirs`、`--reset-settings`（`.bak` 生成コードも消滅。README のセキュリティ記述を henji.yml のみに修正）、`--theme`（`themeFrom()` 削除、huh デフォルトの ThemeCharm に固定）、`-P`/`--prompt`・`-p`/`--prompt-args`（プロンプトエコー機能。`promptExcerpt()` とテストも削除）、`--fanciness`/`--status-text`（anim.go の `defaultFanciness=10`/`defaultStatusText="Generating"` 定数に固定。YAML 復活案［上流互換・status-text のローカライズ用途］も検討したが、ユーザー判断でスリム化を優先して完全削除）
+  - **フラグのみ削除・YAML/env 維持**: `--temp`/`--topp`/`--topk`/`--stop`/`--max-retries`/`--word-wrap`/`--http-proxy`。Config フィールドと yaml/env タグは残るため `henji.yml` と `HENJI_*` で設定可能。`stop`/`http-proxy` は config_template.yml にコメント行を追加して発見可能性を維持
+  - **注意点**: `MarkFlagsMutuallyExclusive` に削除済みフラグ名が残ると起動時 panic する（実際に踏んで修正）。テスト・vet・race 全パス、実ゲートウェイ（mlx-lm）での e2e-gateway-test.sh 4件パスを確認済み
 - 設定/データディレクトリの簡素化（PR#25、2026-07-01）: `github.com/adrg/xdg`は設定ファイル探索時に最大5段階のフォールバック（`XDG_CONFIG_HOME` → `~/Library/Application Support` → `~/Library/Preferences` → `/Library/Application Support` → `/Library/Preferences` → `~/.config`、macOS実装）を持ち、既存ディレクトリの有無で挙動が変わり分かりにくかった。依存自体は軽量（yaml.v3/x/sys/testifyのみ、Ollama SDKのような巨大依存ツリーはない）だが、Windowsの「Known Folders」API呼び出しロジックは代替が必要だった。対処: `config.go`に`configHomeDir()`/`dataHomeDir()`を自前実装（標準ライブラリのみ）。優先順位を「env var（`XDG_CONFIG_HOME`/`XDG_DATA_HOME`） → OS単一デフォルト」の2段階に単純化。macOS/Linuxは`~/.config`・`~/.local/share`に統一（fishシェル等のXDG準拠ツールと同じ配置）、Windowsは`%LOCALAPPDATA%`のまま変更なし（既存ライブラリと同一デフォルトを維持）。ユーザーの既存設定ファイル（`~/Library/Application Support/henji/henji.yml`）は`~/.config/henji/henji.yml`に手動コピーして移行済み

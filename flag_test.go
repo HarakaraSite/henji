@@ -28,11 +28,6 @@ var flagParseErrorTests = []struct {
 		"Flag %s needs an argument.",
 	},
 	{
-		`invalid argument "20dd" for "--delete-older-than" flag: time: unknown unit "dd" in duration "20dd"`,
-		"--delete-older-than",
-		"Flag %s have an invalid argument.",
-	},
-	{
 		`invalid argument "sdfjasdl" for "--max-tokens" flag: strconv.ParseInt: parsing "sdfjasdl": invalid syntax`,
 		"--max-tokens",
 		"Flag %s have an invalid argument.",

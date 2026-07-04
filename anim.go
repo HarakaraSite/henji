@@ -16,6 +16,9 @@ const (
 	charCyclingFPS  = time.Second / 22
 	colorCycleFPS   = time.Second / 5
 	maxCyclingChars = 120
+
+	defaultFanciness  = 10
+	defaultStatusText = "Generating"
 )
 
 var charRunes = []rune("0123456789abcdefABCDEF~!@#$£€%^&*()+=_")

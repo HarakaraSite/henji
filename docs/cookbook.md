@@ -10,7 +10,6 @@ For the full flag reference see `henji -h`; for the design rationale behind
   if unset (macOS and Linux share this location; Windows uses `%LOCALAPPDATA%`)
 - Conversation history/cache: `$XDG_DATA_HOME/henji/`, or
   `~/.local/share/henji/` if unset
-- `henji --dirs` prints both resolved paths for your current environment
 
 ## Setting up a new provider
 

@@ -5,7 +5,6 @@ go 1.26.0
 require (
 	github.com/anthropics/anthropic-sdk-go v1.56.0
 	github.com/atotto/clipboard v0.1.4
-	github.com/caarlos0/duration v0.0.0-20240108180406-5d492514f3c7
 	github.com/caarlos0/env/v9 v9.0.0
 	github.com/caarlos0/go-shellwords v1.0.12
 	github.com/caarlos0/timea.go v1.2.0
@@ -17,7 +16,6 @@ require (
 	github.com/charmbracelet/x/editor v0.2.0
 	github.com/charmbracelet/x/exp/golden v0.0.0-20241011142426-46044092ad91
 	github.com/charmbracelet/x/exp/ordered v0.1.0
-	github.com/charmbracelet/x/exp/strings v0.1.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lucasb-eyer/go-colorful v1.3.0
 	github.com/mark3labs/mcp-go v0.55.1
@@ -49,6 +47,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.6 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
+	github.com/charmbracelet/x/exp/strings v0.1.0 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.9.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect

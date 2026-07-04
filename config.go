@@ -11,9 +11,7 @@ import (
 
 	_ "embed"
 
-	"github.com/caarlos0/duration"
 	"github.com/caarlos0/env/v9"
-	"github.com/charmbracelet/x/exp/strings"
 	"github.com/muesli/termenv"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
@@ -78,7 +76,6 @@ var help = map[string]string{
 	"apis":                  "Aliases and endpoints for OpenAI compatible REST API",
 	"http-proxy":            "HTTP proxy to use for API requests",
 	"model":                 "Default model (gpt-3.5-turbo, gpt-4, ggml-gpt4all-j...)",
-	"ask-model":             "Ask which model to use via interactive prompt",
 	"max-input-chars":       "Default character limit on input to model",
 	"format":                "Ask for the response to be formatted as markdown unless otherwise set",
 	"format-as":             "Format to request from the model when -f/--format is set; valid values are keys in format-text (default: markdown, json)",
@@ -89,8 +86,6 @@ var help = map[string]string{
 	"roles":                 "List of predefined system messages that can be used as roles",
 	"list-roles":            "List the roles defined in your configuration file",
 	"list-models":           "List configured APIs and their models (respects --output json)",
-	"prompt":                "Include the prompt from the arguments and stdin, truncate stdin to specified number of lines",
-	"prompt-args":           "Include the prompt from the arguments in the response",
 	"raw":                   "Render output as raw text when connected to a TTY",
 	"quiet":                 "Quiet mode (hide the spinner while loading and stderr messages for success)",
 	"help":                  "Show help and exit",
@@ -105,21 +100,14 @@ var help = map[string]string{
 	"stop":                  "Up to 4 sequences where the API will stop generating further tokens",
 	"topp":                  "TopP, an alternative to temperature that narrows response, from 0.0 to 1.0, -1.0 to disable",
 	"topk":                  "TopK, only sample from the top K options for each subsequent token, -1 to disable",
-	"fanciness":             "Your desired level of fanciness",
-	"status-text":           "Text to show while generating",
 	"settings":              "Open settings in your $EDITOR",
-	"dirs":                  "Print the directories in which henji stores its data",
-	"reset-settings":        "Backup your old settings file and reset everything to the defaults",
 	"continue":              "Continue from the last response or a given save title",
 	"continue-last":         "Continue from the last response",
 	"no-cache":              "Disables caching of the prompt/response",
 	"title":                 "Saves the current conversation with the given title",
 	"list":                  "Lists saved conversations",
 	"delete":                "Deletes one or more saved conversations with the given titles or IDs",
-	"delete-older-than":     "Deletes all saved conversations older than the specified duration; valid values are " + strings.EnglishJoin(duration.ValidUnits(), true),
 	"show":                  "Show a saved conversation with the given title or ID",
-	"theme":                 "Theme to use in the forms; valid choices are charm, catppuccin, dracula, and base16",
-	"show-last":             "Show the last saved conversation",
 	"editor":                "Edit the prompt in your $EDITOR; only taken into account if no other args and if STDIN is a TTY",
 	"mcp-servers":           "MCP Servers configurations",
 	"mcp-disable":           "Disable specific MCP servers",
@@ -211,36 +199,26 @@ type Config struct {
 	NoLimit             bool       `yaml:"no-limit" env:"NO_LIMIT"`
 	CachePath           string     `yaml:"cache-path" env:"CACHE_PATH"`
 	NoCache             bool       `yaml:"no-cache" env:"NO_CACHE"`
-	IncludePromptArgs   bool       `yaml:"include-prompt-args" env:"INCLUDE_PROMPT_ARGS"`
-	IncludePrompt       int        `yaml:"include-prompt" env:"INCLUDE_PROMPT"`
 	MaxRetries          int        `yaml:"max-retries" env:"MAX_RETRIES"`
 	MaxToolCalls        int        `yaml:"max-tool-calls" env:"MAX_TOOL_CALLS"`
 	WordWrap            int        `yaml:"word-wrap" env:"WORD_WRAP"`
-	Fanciness           uint       `yaml:"fanciness" env:"FANCINESS"`
-	StatusText          string     `yaml:"status-text" env:"STATUS_TEXT"`
 	HTTPProxy           string     `yaml:"http-proxy" env:"HTTP_PROXY"`
 	APIs                APIs       `yaml:"apis"`
 	Role                string     `yaml:"role" env:"ROLE"`
-	AskModel            bool
 	Roles               map[string][]string
 	ShowHelp            bool
-	ResetSettings       bool
 	Prefix              string
 	Version             bool
 	Settings            bool
-	Dirs                bool
-	Theme               string
 	SettingsPath        string
 	ContinueLast        bool
 	Continue            string
 	Title               string
-	ShowLast            bool
 	Show                string
 	List                bool
 	ListRoles           bool
 	ListModels          bool
 	Delete              []string
-	DeleteOlderThan     time.Duration
 	User                string
 
 	MCPServers   map[string]MCPServerConfig `yaml:"mcp-servers"`

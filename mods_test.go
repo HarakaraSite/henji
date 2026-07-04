@@ -427,24 +427,6 @@ func TestRemoveWhitespace(t *testing.T) {
 	})
 }
 
-func TestPromptExcerpt(t *testing.T) {
-	t.Run("zero disables prompt echo", func(t *testing.T) {
-		require.Equal(t, "", promptExcerpt("line 1\nline 2", 0))
-	})
-
-	t.Run("positive includes requested lines", func(t *testing.T) {
-		require.Equal(t, "line 1\nline 2\n", promptExcerpt("line 1\nline 2\nline 3", 2))
-	})
-
-	t.Run("negative includes all input", func(t *testing.T) {
-		require.Equal(t, "line 1\nline 2\nline 3\n", promptExcerpt("line 1\nline 2\nline 3", -1))
-	})
-
-	t.Run("empty input stays empty", func(t *testing.T) {
-		require.Equal(t, "", promptExcerpt("", -1))
-	})
-}
-
 func TestResolveModel(t *testing.T) {
 	mods := &Mods{}
 	newConfig := func() *Config {

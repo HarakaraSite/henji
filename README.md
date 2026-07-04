@@ -21,7 +21,7 @@ which was archived on March 9, 2026. The fork focuses on local LLM usage and MCP
 
 ### Security
 
-- `henji.yml` and `.bak` are created with `0600` permissions (was `0644`)
+- `henji.yml` is created with `0600` permissions (was `0644`)
 - Google API key moved from URL query parameter to `x-goog-api-key` header, preventing key exposure in transport error messages
 - `henji.yml` and `*.bak` added to `.gitignore`
 
@@ -32,6 +32,12 @@ All dependencies updated to current versions, including security patches for `x/
 ### Removals
 
 - `Config.System` field removed (was unused)
+- Native Ollama client removed; Ollama is served by the OpenAI-compatible path (`base-url: http://localhost:11434/v1`)
+- Rarely-used flags removed to keep `--help` and the code small:
+  - `--ask-model`, `--show-last`, `--delete-older-than`, `--dirs`, `--reset-settings`, `--theme` (features removed)
+  - `-P`/`--prompt`, `-p`/`--prompt-args` prompt-echo modes (features removed)
+  - `--fanciness`, `--status-text` spinner tuning (fixed defaults now)
+  - `--temp`, `--topp`, `--topk`, `--stop`, `--max-retries`, `--word-wrap`, `--http-proxy` (still configurable via `henji.yml` / `HENJI_*` env)
 
 ## Installation
 
@@ -152,33 +158,27 @@ for provider setup and scripting/agent patterns.
 | Flag | Description |
 |---|---|
 | `-m`, `--model` | Specify the model to use |
-| `-M`, `--ask-model` | Choose model interactively |
 | `-a`, `--api` | OpenAI compatible REST API to use (openai, localai, anthropic, ...) |
 | `-f`, `--format` | Ask the LLM to format the response (e.g. markdown, json) |
 | `--format-as` | Specify output format (used with `--format`) |
 | `--json-schema` | Path to a JSON Schema file; constrains and validates the response (see [Structured Output](#structured-output)) |
 | `--json-schema-retries` | Times to ask the model to correct a response that fails schema validation (default 2) |
-| `-P`, `--prompt` | Include prompt from args and stdin; truncate stdin to N lines |
-| `-p`, `--prompt-args` | Include prompt from args in the response |
 | `-e`, `--editor` | Edit the prompt in `$EDITOR` (only when no other args and stdin is a TTY) |
 | `-q`, `--quiet` | Only output errors to stderr |
 | `-r`, `--raw` | Print raw response without syntax highlighting |
 | `-R`, `--role` | Specify a custom role (system prompt) |
 | `--list-roles` | List roles defined in your configuration file |
-| `-x`, `--http-proxy` | Use HTTP proxy for API connections |
-| `--max-retries` | Maximum number of retries |
 | `--max-tokens` | Maximum tokens in response |
 | `--max-tool-calls` | Maximum agentic tool call rounds; `0` = unlimited |
 | `--no-limit` | Do not limit response tokens |
-| `--stop` | Up to 4 sequences where the API stops generating |
-| `--word-wrap` | Wrap output at width (default 80) |
-| `--status-text` | Text shown while generating |
 | `--settings` | Open settings file in `$EDITOR` |
-| `--reset-settings` | Restore settings to default |
-| `--dirs` | Print the directories where henji stores its data |
-| `--theme` | UI theme: `charm`, `catppuccin`, `dracula`, `base16` |
 | `-h`, `--help` | Show help and exit |
 | `-v`, `--version` | Show version and exit |
+
+Tuning knobs that rarely change between runs — sampling parameters (`temp`,
+`topp`, `topk`, `stop`), `max-retries`, `word-wrap`, and `http-proxy` — have
+no dedicated flags; set them in `henji.yml` or override per run with the
+corresponding `HENJI_*` environment variable (e.g. `HENJI_TEMP=0.2`).
 
 #### Conversations
 
@@ -189,9 +189,7 @@ for provider setup and scripting/agent patterns.
 | `-c`, `--continue` | Continue a conversation by title or SHA-1 |
 | `-C`, `--continue-last` | Continue the last conversation |
 | `-s`, `--show` | Show a saved conversation |
-| `-S`, `--show-last` | Show the previous conversation |
 | `-d`, `--delete` | Delete conversations by title or SHA-1 |
-| `--delete-older-than` | Delete conversations older than duration (`10d`, `1mo`, `1y`) |
 | `--no-cache` | Do not save this conversation |
 
 #### MCP
@@ -201,15 +199,6 @@ for provider setup and scripting/agent patterns.
 | `--mcp-list` | List configured MCP servers |
 | `--mcp-list-tools` | List available tools from enabled MCP servers |
 | `--mcp-disable` | Disable specific MCP servers for this run |
-
-#### Advanced
-
-| Flag | Description |
-|---|---|
-| `--temp` | Sampling temperature (0.0–2.0, -1.0 to disable) |
-| `--topp` | Top-P (0.0–1.0, -1.0 to disable) |
-| `--topk` | Top-K (-1 to disable) |
-| `--fanciness` | Level of fanciness |
 
 ## Custom Roles
 
