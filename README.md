@@ -21,7 +21,7 @@ which was archived on March 9, 2026. The fork focuses on local LLM usage and MCP
 
 ### Security
 
-- `henji.yml` is created with `0600` permissions (was `0644`)
+- `henji.yml` is created with `0600` permissions (was `0644`); an existing file with looser permissions (e.g. inherited from a pre-v2 install) is restricted to `0600` automatically before it's read, and refused outright if it's owned by another user (Unix only; not yet enforced on Windows)
 - Google API key moved from URL query parameter to `x-goog-api-key` header, preventing key exposure in transport error messages
 - `henji.yml` and `*.bak` added to `.gitignore`
 
@@ -167,11 +167,13 @@ for provider setup and scripting/agent patterns.
 | `--format-as` | Specify output format (used with `--format`) |
 | `--json-schema` | Path to a JSON Schema file; constrains and validates the response (see [Structured Output](#structured-output)) |
 | `--json-schema-retries` | Times to ask the model to correct a response that fails schema validation (default 2) |
+| `--output` | Output format: `text` or `json` (single-line JSON envelope for scripting/agents; see the [cookbook](docs/cookbook.md#--output-json-for-scripting-and-ai-agents)) |
 | `-e`, `--editor` | Edit the prompt in `$EDITOR` (only when no other args and stdin is a TTY) |
 | `-q`, `--quiet` | Only output errors to stderr |
 | `-r`, `--raw` | Print raw response without syntax highlighting |
 | `-R`, `--role` | Specify a custom role (system prompt) |
 | `--list-roles` | List roles defined in your configuration file |
+| `--list-models` | List configured APIs and their models (respects `--output json`; see the [cookbook](docs/cookbook.md#discovering-whats-configured)) |
 | `--max-tokens` | Maximum tokens in response |
 | `--max-tool-calls` | Maximum agentic tool call rounds; `0` = unlimited |
 | `--no-limit` | Do not limit response tokens |
