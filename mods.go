@@ -249,7 +249,7 @@ func (m *Mods) View() tea.View {
 		m.content = []string{}
 		m.contentMutex.Unlock()
 	case doneState:
-		if !isOutputTTY() && m.Config.Output != "json" {
+		if !isOutputTTY() && m.Config.Output != "json" && m.Config.jsonSchemaValidator == nil {
 			fmt.Printf("\n")
 		}
 		return tea.NewView("")

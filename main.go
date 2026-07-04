@@ -247,7 +247,7 @@ var (
 			// here, once, after the model has produced something that
 			// actually matches the schema.
 			case config.jsonSchemaValidator != nil:
-				fmt.Print(mods.Output)
+				fmt.Println(mods.Output)
 			// raw mode already prints the output, no need to print it again
 			case isOutputTTY() && !config.Raw:
 				switch {

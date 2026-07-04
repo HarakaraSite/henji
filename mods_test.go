@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"sync"
 	"testing"
 
@@ -222,6 +224,52 @@ func TestCheckJSONSchemaFailsFastAfterRetriesExhausted(t *testing.T) {
 	msgErr, ok := result.(modsError)
 	require.True(t, ok, "expected modsError, got %T", result)
 	require.Contains(t, msgErr.Reason(), "did not match --json-schema")
+}
+
+// captureStdout redirects os.Stdout for the duration of fn and returns
+// everything written to it.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	orig := os.Stdout
+	os.Stdout = w
+	fn()
+	require.NoError(t, w.Close())
+	os.Stdout = orig
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
+}
+
+// TestDoneStateOutputNewline is a regression test for F-3: doneState's
+// trailing-newline print only excluded --output json, so --json-schema (whose
+// validated output main.go prints separately, once, after RunE returns) still
+// got an extra leading blank line from View() when piped.
+func TestDoneStateOutputNewline(t *testing.T) {
+	if isOutputTTY() {
+		t.Skip("requires non-TTY stdout")
+	}
+
+	_, schema, err := loadJSONSchema(writeTempSchema(t, `{"type":"object"}`))
+	require.NoError(t, err)
+
+	for name, test := range map[string]struct {
+		config Config
+		want   string
+	}{
+		"plain text output prints trailing newline":      {config: Config{Output: "text"}, want: "\n"},
+		"json output suppresses trailing newline":        {config: Config{Output: "json"}, want: ""},
+		"json-schema output suppresses trailing newline": {config: Config{Output: "text", jsonSchemaValidator: schema}, want: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := &Mods{Config: &test.config, contentMutex: &sync.Mutex{}}
+			m.state = doneState
+
+			out := captureStdout(t, func() { m.View() })
+			require.Equal(t, test.want, out)
+		})
+	}
 }
 
 func TestEnsureKeyPriority(t *testing.T) {
