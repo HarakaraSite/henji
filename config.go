@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"text/template"
-	"time"
 
 	_ "embed"
 
@@ -91,7 +90,6 @@ var help = map[string]string{
 	"help":                  "Show help and exit",
 	"version":               "Show version and exit",
 	"max-retries":           "Maximum number of times to retry API calls",
-	"max-tool-calls":        "Max MCP tool call rounds (0 = unlimited; needs mcp-servers configured)",
 	"no-limit":              "Turn off the client-side input size limit",
 	"word-wrap":             "Wrap formatted output at specific width (default is 80)",
 	"max-tokens":            "Maximum number of tokens in response",
@@ -109,11 +107,6 @@ var help = map[string]string{
 	"delete":                "Deletes one or more saved conversations with the given titles or IDs",
 	"show":                  "Show a saved conversation with the given title or ID",
 	"editor":                "Compose the prompt in your $EDITOR",
-	"mcp-servers":           "MCP Servers configurations",
-	"mcp-disable":           "Disable specific MCP servers",
-	"mcp-list":              "List configured MCP servers",
-	"mcp-list-tools":        "List tools from enabled MCP servers",
-	"mcp-timeout":           "Timeout for MCP server calls, defaults to 15 seconds",
 	"output":                "Output format: text or json (single-line JSON envelope)",
 }
 
@@ -200,7 +193,6 @@ type Config struct {
 	CachePath           string     `yaml:"cache-path" env:"CACHE_PATH"`
 	NoCache             bool       `yaml:"no-cache" env:"NO_CACHE"`
 	MaxRetries          int        `yaml:"max-retries" env:"MAX_RETRIES"`
-	MaxToolCalls        int        `yaml:"max-tool-calls" env:"MAX_TOOL_CALLS"`
 	WordWrap            int        `yaml:"word-wrap" env:"WORD_WRAP"`
 	HTTPProxy           string     `yaml:"http-proxy" env:"HTTP_PROXY"`
 	APIs                APIs       `yaml:"apis"`
@@ -220,12 +212,6 @@ type Config struct {
 	ListModels          bool
 	Delete              []string
 	User                string
-
-	MCPServers   map[string]MCPServerConfig `yaml:"mcp-servers"`
-	MCPList      bool
-	MCPListTools bool
-	MCPDisable   []string
-	MCPTimeout   time.Duration `yaml:"mcp-timeout" env:"MCP_TIMEOUT"`
 	// Note: the former top-level "system:" YAML key (Config.System) has been
 	// removed. Use the "roles:" section to define system prompts instead.
 
@@ -237,15 +223,6 @@ type Config struct {
 	// Both are populated once in RunE if JSONSchemaPath is set.
 	jsonSchemaDoc       map[string]any
 	jsonSchemaValidator *jsonschema.Schema
-}
-
-// MCPServerConfig holds configuration for an MCP server.
-type MCPServerConfig struct {
-	Type    string   `yaml:"type"`
-	Command string   `yaml:"command"`
-	Env     []string `yaml:"env"`
-	Args    []string `yaml:"args"`
-	URL     string   `yaml:"url"`
 }
 
 func ensureConfig() (Config, error) {
@@ -345,7 +322,6 @@ func defaultConfig() Config {
 			"markdown": defaultMarkdownFormatText,
 			"json":     defaultJSONFormatText,
 		},
-		MCPTimeout:        15 * time.Second,
 		JSONSchemaRetries: 2,
 		MaxRetries:        5,
 	}

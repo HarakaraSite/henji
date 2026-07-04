@@ -217,18 +217,6 @@ type Stream struct {
 	httpHeader
 }
 
-// PendingToolCalls implements stream.Stream.
-func (s *Stream) PendingToolCalls() []proto.ToolCall {
-	// No tool calls in Gemini/Google API yet.
-	return nil
-}
-
-// CallTools implements stream.Stream.
-func (s *Stream) CallTools() []proto.ToolCallStatus {
-	// No tool calls in Gemini/Google API yet.
-	return nil
-}
-
 // Err implements stream.Stream.
 func (s *Stream) Err() error { return s.err }
 

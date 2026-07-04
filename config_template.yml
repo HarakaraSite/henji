@@ -6,25 +6,6 @@ default-model: gpt-5.5
 format-text:
   markdown: '{{ index .Config.FormatText "markdown" }}'
   json: '{{ index .Config.FormatText "json" }}'
-# {{ index .Help "mcp-servers" }}
-mcp-servers:
-  # Example: GitHub MCP via Docker:
-  # github:
-  #   command: docker
-  #   env:
-  #     - GITHUB_PERSONAL_ACCESS_TOKEN=xxxyyy
-  #   args:
-  #     - run
-  #     - "-i"
-  #     - "--rm"
-  #     - "-e"
-  #     - GITHUB_PERSONAL_ACCESS_TOKEN
-  #     - "ghcr.io/github/github-mcp-server"
-# {{ index .Help "mcp-timeout" }}
-mcp-timeout: 15s
-# {{ index .Help "max-tool-calls" }}
-# Recommended when using local MCP servers for agentic workflows (e.g. max-tool-calls: 50).
-# max-tool-calls: 0
 # {{ index .Help "roles" }}
 roles:
   "default": []

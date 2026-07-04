@@ -21,19 +21,6 @@ func TestStringer(t *testing.T) {
 			Content: "1, 2, 3, 4",
 		},
 		{
-			Role:    RoleTool,
-			Content: `{"the":"result"}`,
-			ToolCalls: []ToolCall{
-				{
-					ID: "aaa",
-					Function: Function{
-						Name:      "myfunc",
-						Arguments: []byte(`{"a":"b"}`),
-					},
-				},
-			},
-		},
-		{
 			Role:    RoleUser,
 			Content: "as a json array",
 		},

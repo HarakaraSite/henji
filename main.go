@@ -2,7 +2,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -236,17 +235,6 @@ var (
 				return listConversations(config.Raw)
 			}
 
-			if config.MCPList {
-				mcpList()
-				return nil
-			}
-
-			if config.MCPListTools {
-				ctx, cancel := context.WithTimeout(cmd.Context(), config.MCPTimeout)
-				defer cancel()
-				return mcpListTools(ctx)
-			}
-
 			if len(config.Delete) > 0 {
 				return deleteConversations()
 			}
@@ -308,7 +296,6 @@ func initFlags() {
 	flags.BoolVarP(&config.Quiet, "quiet", "q", config.Quiet, stdoutStyles().FlagDesc.Render(help["quiet"]))
 	flags.BoolVarP(&config.ShowHelp, "help", "h", false, stdoutStyles().FlagDesc.Render(help["help"]))
 	flags.BoolVarP(&config.Version, "version", "v", false, stdoutStyles().FlagDesc.Render(help["version"]))
-	flags.IntVar(&config.MaxToolCalls, "max-tool-calls", config.MaxToolCalls, stdoutStyles().FlagDesc.Render(help["max-tool-calls"]))
 	flags.BoolVar(&config.NoLimit, "no-limit", config.NoLimit, stdoutStyles().FlagDesc.Render(help["no-limit"]))
 	flags.Int64Var(&config.MaxTokens, "max-tokens", config.MaxTokens, stdoutStyles().FlagDesc.Render(help["max-tokens"]))
 	flags.BoolVar(&config.NoCache, "no-cache", config.NoCache, stdoutStyles().FlagDesc.Render(help["no-cache"]))
@@ -317,9 +304,6 @@ func initFlags() {
 	flags.BoolVar(&config.ListRoles, "list-roles", config.ListRoles, stdoutStyles().FlagDesc.Render(help["list-roles"]))
 	flags.BoolVar(&config.ListModels, "list-models", config.ListModels, stdoutStyles().FlagDesc.Render(help["list-models"]))
 	flags.BoolVarP(&config.openEditor, "editor", "e", false, stdoutStyles().FlagDesc.Render(help["editor"]))
-	flags.BoolVar(&config.MCPList, "mcp-list", false, stdoutStyles().FlagDesc.Render(help["mcp-list"]))
-	flags.BoolVar(&config.MCPListTools, "mcp-list-tools", false, stdoutStyles().FlagDesc.Render(help["mcp-list-tools"]))
-	flags.StringArrayVar(&config.MCPDisable, "mcp-disable", nil, stdoutStyles().FlagDesc.Render(help["mcp-disable"]))
 	flags.SortFlags = false
 
 	flags.BoolVar(&memprofile, "memprofile", false, "Write memory profiles to CWD")
@@ -347,10 +331,6 @@ func initFlags() {
 		config.FormatText[config.FormatAs] = defaultConfig().FormatText[config.FormatAs]
 	}
 
-	if config.MCPTimeout == 0 {
-		config.MCPTimeout = defaultConfig().MCPTimeout
-	}
-
 	if config.JSONSchemaRetries == 0 {
 		config.JSONSchemaRetries = defaultConfig().JSONSchemaRetries
 	}
@@ -363,8 +343,6 @@ func initFlags() {
 		"list-models",
 		"continue",
 		"continue-last",
-		"mcp-list",
-		"mcp-list-tools",
 	)
 }
 
@@ -747,8 +725,6 @@ func isNoArgs() bool {
 		!config.List &&
 		!config.ListRoles &&
 		!config.ListModels &&
-		!config.MCPList &&
-		!config.MCPListTools &&
 		!config.Settings
 }
 

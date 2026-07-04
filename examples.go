@@ -8,20 +8,12 @@ type example struct {
 }
 
 // helpExamples are shown in --help, in this order, every time (not a random
-// pick): one familiar pipe-and-summarize example for orientation, then three
+// pick): one familiar pipe-and-summarize example for orientation, then two
 // that cover the AI/scripted-consumption surface (--output json for a safe
-// text envelope, --json-schema for a strictly-typed answer, and MCP for
-// agentic tool calls) since those are the features an agent invoking henji
-// as a tool is least likely to discover from flag descriptions alone.
-//
-// Re-verified by having opencode and codex independently write commands for
-// two tasks using only `henji --help` as input (no README/source access).
-// Both correctly picked --json-schema over the loose --format-as json, but
-// both also assumed --max-tool-calls implies filesystem/tool access is
-// available -- --help said nothing about tools being MCP-server-dependent,
-// so an agent could write a plausible command against an unconfigured MCP
-// setup and get back nothing useful with no indication why. Fixed via the
-// max-tool-calls help text and this example's title.
+// text envelope, --json-schema for a strictly-typed answer) since those are
+// the features an agent invoking henji as a tool is least likely to discover
+// from flag descriptions alone, then one showing henji composed with an
+// existing CLI tool rather than performing file/tool access itself.
 var helpExamples = []example{
 	{
 		title:   "Editorialize your video files",
@@ -36,8 +28,8 @@ var helpExamples = []example{
 		command: `git diff main | henji --json-schema review-schema.json "review this diff for security issues" | jq '.findings[]'`,
 	},
 	{
-		title:   "Have henji investigate your project's bloat via MCP (needs mcp-servers configured; check with --mcp-list-tools)",
-		command: `henji --max-tool-calls 5 "list the largest files in my current project and explain what each is for"`,
+		title:   "Investigate your project's disk usage",
+		command: `du -sh * | sort -rh | henji "explain what's taking up the most space and why"`,
 	},
 }
 

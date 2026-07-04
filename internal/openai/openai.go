@@ -84,7 +84,6 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 		Model:    request.Model,
 		User:     openai.String(request.User),
 		Messages: fromProtoMessages(request.Messages),
-		Tools:    fromMCPTools(request.Tools),
 	}
 
 	if request.API != "perplexity" || !strings.Contains(request.Model, "online") {
@@ -132,7 +131,6 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 	s := &Stream{
 		stream:   c.Chat.Completions.NewStreaming(ctx, body),
 		request:  body,
-		toolCall: request.ToolCaller,
 		messages: request.Messages,
 	}
 	s.factory = func() *ssestream.Stream[openai.ChatCompletionChunk] {
@@ -149,51 +147,6 @@ type Stream struct {
 	factory  func() *ssestream.Stream[openai.ChatCompletionChunk]
 	message  openai.ChatCompletionAccumulator
 	messages []proto.Message
-	toolCall func(name string, data []byte) (string, error)
-}
-
-// PendingToolCalls implements stream.Stream.
-func (s *Stream) PendingToolCalls() []proto.ToolCall {
-	if len(s.message.Choices) == 0 {
-		return nil
-	}
-	calls := s.message.Choices[0].Message.ToolCalls
-	pending := make([]proto.ToolCall, 0, len(calls))
-	for _, call := range calls {
-		pending = append(pending, proto.ToolCall{
-			ID: call.ID,
-			Function: proto.Function{
-				Name:      call.Function.Name,
-				Arguments: []byte(call.Function.Arguments),
-			},
-		})
-	}
-	return pending
-}
-
-// CallTools implements stream.Stream.
-func (s *Stream) CallTools() []proto.ToolCallStatus {
-	if len(s.message.Choices) == 0 {
-		return nil
-	}
-	calls := s.message.Choices[0].Message.ToolCalls
-	statuses := make([]proto.ToolCallStatus, 0, len(calls))
-	for _, call := range calls {
-		msg, status := stream.CallTool(
-			call.ID,
-			call.Function.Name,
-			[]byte(call.Function.Arguments),
-			s.toolCall,
-		)
-		resp := openai.ToolMessage(
-			msg.Content,
-			call.ID,
-		)
-		s.request.Messages = append(s.request.Messages, resp)
-		s.messages = append(s.messages, msg)
-		statuses = append(statuses, status)
-	}
-	return statuses
 }
 
 // Close implements stream.Stream.

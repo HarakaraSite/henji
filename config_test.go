@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -128,7 +127,6 @@ func TestEnsureConfigEnvironmentOverrides(t *testing.T) {
 		t.Setenv("HENJI_MAX_TOKENS", "2048")
 		t.Setenv("HENJI_TEMP", "0.25")
 		t.Setenv("HENJI_STOP", "END,DONE")
-		t.Setenv("HENJI_MCP_TIMEOUT", "3s")
 
 		cfg, err := ensureConfig()
 		require.NoError(t, err)
@@ -136,7 +134,6 @@ func TestEnsureConfigEnvironmentOverrides(t *testing.T) {
 		require.Equal(t, int64(2048), cfg.MaxTokens)
 		require.Equal(t, 0.25, cfg.Temperature)
 		require.Equal(t, []string{"END", "DONE"}, cfg.Stop)
-		require.Equal(t, 3*time.Second, cfg.MCPTimeout)
 	})
 
 	t.Run("rejects an invalid value", func(t *testing.T) {

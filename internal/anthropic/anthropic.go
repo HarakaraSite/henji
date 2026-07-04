@@ -27,7 +27,6 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 		Model:         anthropic.Model(request.Model),
 		Messages:      messages,
 		System:        system,
-		Tools:         fromMCPTools(request.Tools),
 		StopSequences: request.Stop,
 	}
 
@@ -56,7 +55,6 @@ func (c *Client) Request(ctx context.Context, request proto.Request) stream.Stre
 	s := &Stream{
 		stream:   c.Messages.NewStreaming(ctx, body),
 		request:  body,
-		toolCall: request.ToolCaller,
 		messages: request.Messages,
 	}
 
@@ -104,53 +102,7 @@ type Stream struct {
 	request  anthropic.MessageNewParams
 	factory  func() *ssestream.Stream[anthropic.MessageStreamEventUnion]
 	message  anthropic.Message
-	toolCall func(name string, data []byte) (string, error)
 	messages []proto.Message
-}
-
-// PendingToolCalls implements stream.Stream.
-func (s *Stream) PendingToolCalls() []proto.ToolCall {
-	var pending []proto.ToolCall
-	for _, block := range s.message.Content {
-		switch call := block.AsAny().(type) {
-		case anthropic.ToolUseBlock:
-			pending = append(pending, proto.ToolCall{
-				ID: call.ID,
-				Function: proto.Function{
-					Name:      call.Name,
-					Arguments: []byte(call.JSON.Input.Raw()),
-				},
-			})
-		}
-	}
-	return pending
-}
-
-// CallTools implements stream.Stream.
-func (s *Stream) CallTools() []proto.ToolCallStatus {
-	var statuses []proto.ToolCallStatus
-	for _, block := range s.message.Content {
-		switch call := block.AsAny().(type) {
-		case anthropic.ToolUseBlock:
-			msg, status := stream.CallTool(
-				call.ID,
-				call.Name,
-				[]byte(call.JSON.Input.Raw()),
-				s.toolCall,
-			)
-			resp := anthropic.NewUserMessage(
-				newToolResultBlock(
-					call.ID,
-					msg.Content,
-					status.Err != nil,
-				),
-			)
-			s.request.Messages = append(s.request.Messages, resp)
-			s.messages = append(s.messages, msg)
-			statuses = append(statuses, status)
-		}
-	}
-	return statuses
 }
 
 // Close implements stream.Stream.

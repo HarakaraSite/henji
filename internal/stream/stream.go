@@ -18,8 +18,7 @@ type Client interface {
 
 // Stream is an ongoing stream.
 type Stream interface {
-	// returns false when no more messages, caller should run [Stream.CallTools()]
-	// once that happens, and then check for this again
+	// returns false when no more messages
 	Next() bool
 
 	// the current chunk
@@ -35,44 +34,4 @@ type Stream interface {
 
 	// the whole conversation
 	Messages() []proto.Message
-
-	// PendingToolCalls reports the tool calls the model requested in the
-	// last completed round, without executing them. Callers that need to
-	// enforce a call-count limit must check this before calling CallTools,
-	// since CallTools both reports and executes.
-	PendingToolCalls() []proto.ToolCall
-
-	// handles any pending tool calls
-	CallTools() []proto.ToolCallStatus
-}
-
-// CallTool calls a tool using the provided data and caller, and returns the
-// resulting [proto.Message] and [proto.ToolCallStatus].
-func CallTool(
-	id, name string,
-	data []byte,
-	caller func(name string, data []byte) (string, error),
-) (proto.Message, proto.ToolCallStatus) {
-	content, err := caller(name, data)
-	if content == "" && err != nil {
-		content = err.Error()
-	}
-	return proto.Message{
-			Role:    proto.RoleTool,
-			Content: content,
-			ToolCalls: []proto.ToolCall{
-				{
-					ID:      id,
-					IsError: err != nil,
-					Function: proto.Function{
-						Name:      name,
-						Arguments: data,
-					},
-				},
-			},
-		},
-		proto.ToolCallStatus{
-			Name: name,
-			Err:  err,
-		}
 }

@@ -60,7 +60,6 @@ type Mods struct {
 	glamOutput    string
 	glamHeight    int
 	messages      []proto.Message
-	mcpPool       *mcpClientPool
 	anim          tea.Model
 	width         int
 	height        int
@@ -97,7 +96,6 @@ func newMods(
 		cache:        cache,
 		Config:       cfg,
 		ctx:          ctx,
-		mcpPool:      newMCPClientPool(),
 	}
 }
 
@@ -108,10 +106,9 @@ type completionInput struct {
 
 // completionOutput a tea.Msg that wraps the content returned from openai.
 type completionOutput struct {
-	content       string
-	stream        stream.Stream
-	errh          func(error) tea.Msg
-	toolCallRound int // counts completed tool call rounds for MaxToolCalls enforcement
+	content string
+	stream  stream.Stream
+	errh    func(error) tea.Msg
 	// retryFn re-issues the request with a correction message appended,
 	// used when the response fails --json-schema validation.
 	retryFn func(correction string) tea.Msg
@@ -174,10 +171,9 @@ func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = responseState
 		}
 		cmds = append(cmds, m.receiveCompletionStreamCmd(completionOutput{
-			stream:        msg.stream,
-			errh:          msg.errh,
-			toolCallRound: msg.toolCallRound,
-			retryFn:       msg.retryFn,
+			stream:  msg.stream,
+			errh:    msg.errh,
+			retryFn: msg.retryFn,
 		}))
 	case modsError:
 		m.Error = &msg
@@ -254,7 +250,6 @@ func (m *Mods) View() tea.View {
 }
 
 func (m *Mods) quit() tea.Msg {
-	m.mcpPool.closeAll()
 	return tea.Quit()
 }
 
@@ -374,16 +369,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			cfg.MaxTokens = 0
 		}
 
-		// MCPTimeout context: only for tool listing / individual tool calls.
-		// The LLM stream below uses m.ctx directly (no timeout) so long
-		// responses are not cut off by the MCP deadline.
-		ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
-		tools, err := m.mcpTools(ctx)
-		cancel()
-		if err != nil {
-			return err
-		}
-
 		if err := m.setupStreamContext(content, mod); err != nil {
 			return err
 		}
@@ -397,13 +382,6 @@ func (m *Mods) startCompletionCmd(content string) tea.Cmd {
 			TopP:        ptrOrNil(cfg.TopP),
 			TopK:        ptrOrNil(cfg.TopK),
 			Stop:        cfg.Stop,
-			Tools:       tools,
-			ToolCaller: func(name string, data []byte) (string, error) {
-				// Per-call timeout: each tool invocation is bounded independently.
-				ctx, cancel := context.WithTimeout(m.ctx, cfg.MCPTimeout)
-				defer cancel()
-				return m.toolCall(ctx, name, data)
-			},
 		}
 		if cfg.MaxTokens > 0 {
 			request.MaxTokens = &cfg.MaxTokens
@@ -555,11 +533,10 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 				return msg.errh(err)
 			}
 			return completionOutput{
-				content:       chunk.Content,
-				stream:        msg.stream,
-				errh:          msg.errh,
-				toolCallRound: msg.toolCallRound,
-				retryFn:       msg.retryFn,
+				content: chunk.Content,
+				stream:  msg.stream,
+				errh:    msg.errh,
+				retryFn: msg.retryFn,
 			}
 		}
 
@@ -568,43 +545,13 @@ func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
 			return msg.errh(err)
 		}
 
-		pending := msg.stream.PendingToolCalls()
-		if len(pending) == 0 {
-			m.messages = msg.stream.Messages()
-			if m.Config.jsonSchemaValidator != nil {
-				if errMsg := m.checkJSONSchema(msg); errMsg != nil {
-					return errMsg
-				}
-			}
-			return completionOutput{errh: msg.errh}
-		}
-
-		// Enforce MaxToolCalls limit (0 = unlimited) before calling CallTools,
-		// so a round beyond the limit never executes its tool calls.
-		nextRound := msg.toolCallRound + 1
-		cfg := m.Config
-		if cfg.MaxToolCalls > 0 && nextRound > cfg.MaxToolCalls {
-			return modsError{
-				err: fmt.Errorf("tool call limit of %d reached", cfg.MaxToolCalls),
-				reason: fmt.Sprintf(
-					"Exceeded max-tool-calls limit of %d. Set max-tool-calls: 0 in henji.yml to disable.",
-					cfg.MaxToolCalls,
-				),
+		m.messages = msg.stream.Messages()
+		if m.Config.jsonSchemaValidator != nil {
+			if errMsg := m.checkJSONSchema(msg); errMsg != nil {
+				return errMsg
 			}
 		}
-
-		results := msg.stream.CallTools()
-
-		toolMsg := completionOutput{
-			stream:        msg.stream,
-			errh:          msg.errh,
-			toolCallRound: nextRound,
-			retryFn:       msg.retryFn,
-		}
-		for _, call := range results {
-			toolMsg.content += call.String()
-		}
-		return toolMsg
+		return completionOutput{errh: msg.errh}
 	}
 }
 

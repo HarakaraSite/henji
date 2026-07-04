@@ -13,13 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCallToolsEmptyChoicesNoPanic is the PR#1 regression test.
-// CallTools must return nil when the accumulator has no Choices.
-func TestCallToolsEmptyChoicesNoPanic(t *testing.T) {
-	s := &Stream{}
-	require.Nil(t, s.CallTools())
-}
-
 // newMockOpenAIServer starts an httptest server that captures the request body
 // and responds with a minimal SSE "[DONE]" event to terminate the stream.
 func newMockOpenAIServer(t *testing.T) (*Client, func() map[string]any) {
