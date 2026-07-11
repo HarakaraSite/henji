@@ -4,21 +4,27 @@ one-line flag reference, run `henji -h`.
 
 ## Invocation basics
 
-The prompt is assembled from arguments and stdin, in that order:
+The prompt is assembled from arguments, an optional file, and stdin, in that
+order:
 
     henji "explain this error"                # args only
     cat error.log | henji                     # stdin only
     cat error.log | henji "what went wrong?"  # args first, then stdin,
                                               # joined by a blank line
+    henji -f report.txt "summarize this"       # args first, then file content
 
 Piped input is indented before it is appended, so it remains visually distinct
 from the instruction supplied as arguments.
+
+`-f` / `--file` accepts one UTF-8 text file. A second `--file` is an error,
+and binary-looking files are rejected rather than silently being mangled. For
+multiple files, concatenate them with the shell and pipe the result to stdin.
 
 Output contract for model invocations:
 
 - **stdout carries only the model's response** (or the JSON envelope with
   `--output json`). It is safe to pipe or capture.
-- Progress spinners, "Conversation saved" notices, and error details go to
+- A progress spinner, "Conversation saved" notices, and error details go to
   **stderr**. `-q` silences non-error stderr chatter.
 - When stdout is not a terminal, the response is plain text with no ANSI
   codes. Markdown rendering only happens on a TTY (`-r` disables it there too).
@@ -26,13 +32,15 @@ Output contract for model invocations:
 - With `--output json`, errors reached during model execution also produce an
   error envelope on stdout. Startup errors such as an invalid flag, config, or
   schema file are reported on stderr before a JSON session exists.
-- With no prompt on a TTY, henji opens an interactive prompt. With empty stdin
-  in a non-interactive script, it exits with an error instead of waiting.
+- Prompts must be supplied as arguments and/or stdin. With no prompt, henji
+  exits with an error instead of waiting for interactive input.
+- `Ctrl-C` cancels a model request or an upstream command that has not closed
+  stdin yet; it does not wait for that command to reach EOF.
 
 ## Choosing a provider and model
 
-Models and providers ("APIs") are defined in the config file
-(`henji --settings` opens it). To see what is configured:
+Models and providers ("APIs") are defined in the config file. To see what is
+configured:
 
     henji --list-models
     henji --list-models --output json   # {"version":1,"apis":[{"name":...,
@@ -119,7 +127,8 @@ Structured-output pitfalls:
 Successful model conversations are saved automatically (metadata in SQLite,
 message bodies on disk) unless `--no-cache` is set.
 
-- `-l` lists saved conversations; `-t <title>` names one at save time.
+- `-l` prints a tab-separated list of saved conversations; `-t <title>` names
+  one at save time. It never opens an interactive selector.
 - `-C` continues the most recent conversation; `-c <id-or-title>` continues a
   specific one. IDs may be abbreviated to a unique SHA-1 prefix.
 - `-s <id-or-title>` prints a saved conversation without calling a model.
@@ -131,6 +140,10 @@ Two equally valid ways to name a conversation for continuation:
 - ID-based: capture `conversation_id` from `--output json` (see "Getting
   machine-readable output" and "A typical agent loop"), then `-c <id>`.
   Convenient when scripting, since the ID is already in hand.
+
+    henji --list
+    henji --show <id-or-title>
+    henji --continue <id-or-title> "follow-up prompt"
 
 Pitfalls:
 
@@ -160,7 +173,7 @@ be an `http(s)://` or `file://` URL whose contents become system prompt text.
 ## Configuration and tuning
 
 - Config: `$XDG_CONFIG_HOME/henji/henji.yml`, default
-  `~/.config/henji/henji.yml` (`henji --settings` opens it in `$EDITOR`).
+  `~/.config/henji/henji.yml`.
 - Conversation data: `$XDG_DATA_HOME/henji/`, default
   `~/.local/share/henji/`.
 - Scalar settings with an environment mapping can be overridden with a

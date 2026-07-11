@@ -5,14 +5,14 @@
 Piping source code to henji and giving it an instruction on what to do with it
 gives you a lot of options for refactoring, enhancing or debugging code.
 
-`henji -f "what are your thoughts on improving this code?" < main.go`
+`henji --format "what are your thoughts on improving this code?" < main.go`
 
 ### Come Up With Product Features
 
 henji can also come up with entirely new features based on source code (or a
 README file).
 
-`henji -f "come up with 10 new features for this tool." < main.go`
+`henji --format "come up with 10 new features for this tool." < main.go`
 
 ### Help Write Docs
 
@@ -26,7 +26,7 @@ The file system can be an amazing source of input for henji. If you have music
 or video files, henji can parse the output of `ls` and offer really good
 editorialization of your content.
 
-`ls ~/vids | henji -f "organize these by decade and summarize each"`
+`ls ~/vids | henji --format "organize these by decade and summarize each"`
 
 ### Make Recommendations
 
@@ -34,29 +34,29 @@ henji is really good at generating recommendations based on what you have as
 well, both for similar content but also content in an entirely different media
 (like getting music recommendations based on movies you have).
 
-`ls ~/vids | henji -f "recommend me 10 shows based on these, make them obscure"`
+`ls ~/vids | henji --format "recommend me 10 shows based on these, make them obscure"`
 
-`ls ~/vids | henji -f "recommend me 10 albums based on these shows, do not include any soundtrack music or music from the show"`
+`ls ~/vids | henji --format "recommend me 10 albums based on these shows, do not include any soundtrack music or music from the show"`
 
 ### Read Your Fortune
 
 It's easy to let your downloads folder grow into a chaotic never-ending pit of
 files, but with henji you can use that to your advantage!
 
-`ls ~/Downloads | henji -f "tell my fortune based on these files"`
+`ls ~/Downloads | henji --format "tell my fortune based on these files"`
 
 ### Understand APIs
 
 henji can parse and understand the output of an API call with `curl` and convert
 it to something human readable.
 
-`curl "https://api.open-meteo.com/v1/forecast?latitude=29.00&longitude=-90.00&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m" 2>/dev/null | henji -f "summarize this weather data for a human."`
+`curl "https://api.open-meteo.com/v1/forecast?latitude=29.00&longitude=-90.00&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m" 2>/dev/null | henji --format "summarize this weather data for a human."`
 
 ### Read The Comments (so you don't have to)
 
 Just like with APIs, henji can read through raw HTML and summarize the contents.
 
-`curl "https://news.ycombinator.com/item?id=30048332" 2>/dev/null | henji -f "what are the authors of these comments saying?"`
+`curl "https://news.ycombinator.com/item?id=30048332" 2>/dev/null | henji --format "what are the authors of these comments saying?"`
 
 ### Draft Your Commit Message For You
 
@@ -82,7 +82,7 @@ not satisfied with the answer.
 `ollama` here is just the name given to the API in `henji.yml`; henji talks
 to it over Ollama's OpenAI-compatible `/v1` endpoint, not a dedicated client.
 
-`echo "explain this regex: ^(?:[a-z0-9]+_)+[a-z0-9]+$" | henji --api ollama --model llama3.2 -f`
+`echo "explain this regex: ^(?:[a-z0-9]+_)+[a-z0-9]+$" | henji --api ollama --model llama3.2 --format`
 
 ### Have henji Investigate Your Project's Bloat
 

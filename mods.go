@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,14 +14,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
-	"charm.land/bubbles/v2/viewport"
-	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
-	"charm.land/lipgloss/v2"
 	"forge.harakara.site/littleisland/henji/v2/internal/anthropic"
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	"forge.harakara.site/littleisland/henji/v2/internal/google"
@@ -34,412 +29,441 @@ import (
 	"github.com/charmbracelet/x/exp/ordered"
 )
 
-type state int
-
-const (
-	startState state = iota
-	configLoadedState
-	requestState
-	responseState
-	doneState
-	errorState
-)
-
-// Mods is the Bubble Tea model that manages reading stdin and querying the
-// OpenAI API.
+// Mods executes one henji request and retains the response for output and
+// conversation caching. It deliberately has no terminal event loop.
 type Mods struct {
 	Output        string
 	Input         string
 	Styles        styles
-	Error         *modsError
-	state         state
 	retries       int
 	schemaRetries int
-	glam          *glamour.TermRenderer
-	glamViewport  viewport.Model
-	glamOutput    string
-	glamHeight    int
 	messages      []proto.Message
-	anim          tea.Model
-	width         int
-	height        int
 
 	db     *convoDB
 	cache  *cache.Conversations
 	Config *Config
-
-	content      []string
-	contentMutex *sync.Mutex
-
-	ctx context.Context
+	ctx    context.Context
 }
 
-func newMods(
-	ctx context.Context,
-	cfg *Config,
-	db *convoDB,
-	cache *cache.Conversations,
-) *Mods {
-	gr, _ := glamour.NewTermRenderer(
-		glamour.WithEnvironmentConfig(),
-		glamour.WithWordWrap(cfg.WordWrap),
-	)
-	vp := viewport.New(viewport.WithWidth(0), viewport.WithHeight(0))
-	vp.GotoBottom()
+func newMods(ctx context.Context, cfg *Config, db *convoDB, cache *cache.Conversations) *Mods {
 	return &Mods{
-		Styles:       stderrStyles(),
-		glam:         gr,
-		state:        startState,
-		glamViewport: vp,
-		contentMutex: &sync.Mutex{},
-		db:           db,
-		cache:        cache,
-		Config:       cfg,
-		ctx:          ctx,
+		Styles: stderrStyles(),
+		db:     db,
+		cache:  cache,
+		Config: cfg,
+		ctx:    ctx,
 	}
 }
 
-// completionInput is a tea.Msg that wraps the content read from stdin.
-type completionInput struct {
-	content string
-}
-
-// completionOutput a tea.Msg that wraps the content returned from openai.
-type completionOutput struct {
-	content string
-	stream  stream.Stream
-	errh    func(error) tea.Msg
-	// retryFn re-issues the request with a correction message appended,
-	// used when the response fails --json-schema validation.
-	retryFn func(correction string) tea.Msg
-}
-
-// Init implements tea.Model.
-func (m *Mods) Init() tea.Cmd {
-	if !shouldRequestBackgroundColor(isOutputTTY(), m.Config) {
-		return m.findCacheOpsDetails()
-	}
-	return tea.Batch(m.findCacheOpsDetails(), tea.RequestBackgroundColor)
-}
-
-func shouldRequestBackgroundColor(outputTTY bool, cfg *Config) bool {
-	return outputTTY && !cfg.Raw && cfg.Output != "json" && cfg.jsonSchemaValidator == nil
-}
-
-// Update implements tea.Model.
-func (m *Mods) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-	switch msg := msg.(type) {
-	case cacheDetailsMsg:
-		m.Config.cacheWriteToID = msg.WriteID
-		m.Config.cacheWriteToTitle = msg.Title
-		m.Config.cacheReadFromID = msg.ReadID
-		m.Config.API = msg.API
-		m.Config.Model = msg.Model
-
-		if !m.Config.Quiet {
-			m.anim = newAnim(defaultFanciness, defaultStatusText, m.Styles)
-			cmds = append(cmds, m.anim.Init())
-		}
-		m.state = configLoadedState
-		cmds = append(cmds, m.readStdinCmd)
-
-	case completionInput:
-		if msg.content != "" {
-			m.Input = removeWhitespace(msg.content)
-		}
-		if m.Input == "" && m.Config.Prefix == "" && m.Config.Show == "" {
-			return m, m.quit
-		}
-		if len(m.Config.Delete) > 0 ||
-			m.Config.ShowHelp ||
-			m.Config.List ||
-			m.Config.ListRoles ||
-			m.Config.Settings {
-			return m, m.quit
-		}
-
-		m.state = requestState
-		cmds = append(cmds, m.startCompletionCmd(msg.content))
-	case completionOutput:
-		if msg.stream == nil {
-			m.state = doneState
-			return m, m.quit
-		}
-		if msg.content != "" {
-			m.appendToOutput(msg.content)
-			m.state = responseState
-		}
-		cmds = append(cmds, m.receiveCompletionStreamCmd(completionOutput{
-			stream:  msg.stream,
-			errh:    msg.errh,
-			retryFn: msg.retryFn,
-		}))
-	case modsError:
-		m.Error = &msg
-		m.state = errorState
-		return m, m.quit
-	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-		m.glamViewport.SetWidth(m.width)
-		m.glamViewport.SetHeight(m.height)
-		return m, nil
-	case tea.BackgroundColorMsg:
-		m.Styles = makeStyles(m.Styles.profile, msg.IsDark())
-		return m, nil
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			m.state = doneState
-			return m, m.quit
-		}
-	}
-	if !m.Config.Quiet && (m.state == configLoadedState || m.state == requestState) {
-		var cmd tea.Cmd
-		m.anim, cmd = m.anim.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-	if m.viewportNeeded() {
-		// Only respond to keypresses when the viewport (i.e. the content) is
-		// taller than the window.
-		var cmd tea.Cmd
-		m.glamViewport, cmd = m.glamViewport.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-	return m, tea.Batch(cmds...)
-}
-
-func (m Mods) viewportNeeded() bool {
-	return m.glamHeight > m.height
-}
-
-// View implements tea.Model.
-func (m *Mods) View() tea.View {
-	//nolint:exhaustive
-	switch m.state {
-	case errorState:
-		return tea.NewView("")
-	case requestState:
-		if !m.Config.Quiet {
-			return m.anim.View()
-		}
-	case responseState:
-		if !m.Config.Raw && isOutputTTY() {
-			if m.viewportNeeded() {
-				return tea.NewView(m.glamViewport.View())
-			}
-			// We don't need the viewport yet.
-			return tea.NewView(m.glamOutput)
-		}
-
-		m.contentMutex.Lock()
-		if m.Config.Output != "json" && m.Config.jsonSchemaValidator == nil {
-			for _, c := range m.content {
-				fmt.Print(c)
-			}
-		}
-		m.content = []string{}
-		m.contentMutex.Unlock()
-	case doneState:
-		if !isOutputTTY() && m.Config.Output != "json" && m.Config.jsonSchemaValidator == nil {
-			fmt.Printf("\n")
-		}
-		return tea.NewView("")
-	}
-	return tea.NewView("")
-}
-
-func (m *Mods) quit() tea.Msg {
-	return tea.Quit()
-}
-
-func (m *Mods) retry(content string, err modsError) tea.Msg {
-	m.retries++
-	if m.retries >= m.Config.MaxRetries {
+// run prepares conversation state, reads piped input, and completes a model
+// request. Commands that only inspect local state are handled by main.go.
+func (m *Mods) run() error {
+	details, err := m.findCacheOpsDetails()
+	if err != nil {
 		return err
 	}
-	wait := time.Millisecond * 100 * time.Duration(math.Pow(2, float64(m.retries))) //nolint:mnd
-	time.Sleep(wait)
-	return completionInput{content}
-}
+	m.Config.cacheWriteToID = details.WriteID
+	m.Config.cacheWriteToTitle = details.Title
+	m.Config.cacheReadFromID = details.ReadID
+	m.Config.API = details.API
+	m.Config.Model = details.Model
 
-func (m *Mods) startCompletionCmd(content string) tea.Cmd {
+	fileInput, err := readFileInput(m.Config.file)
+	if err != nil {
+		return err
+	}
+	stdinInput, err := m.readStdin()
+	if err != nil {
+		return err
+	}
+	input := joinInputParts(fileInput, stdinInput)
+	m.Input = removeWhitespace(input)
+
 	if m.Config.Show != "" {
 		return m.readFromCache()
 	}
+	if m.Input == "" && m.Config.Prefix == "" {
+		return nil
+	}
+	return m.complete(input)
+}
 
-	return func() tea.Msg {
-		var mod Model
-		var api API
-		var ccfg openai.Config
-		var accfg anthropic.Config
-		var gccfg google.Config
+type completionStarter func(string) (stream.Stream, func(string) stream.Stream, Model, error)
 
-		cfg := m.Config
-		api, mod, err := m.resolveModel(cfg)
-		cfg.API = mod.API
+func (m *Mods) complete(content string) error {
+	return m.completeWith(content, m.startCompletion)
+}
+
+// completeWith keeps the retry loop independent from provider construction so
+// the full fallback path can be tested with deterministic streams.
+func (m *Mods) completeWith(content string, start completionStarter) error {
+	var spinner *progressSpinner
+	defer func() { spinner.stop() }()
+
+	for {
+		// Google starts the HTTP request synchronously inside Client.Request,
+		// which is reached by startCompletion. Start progress reporting before
+		// that call so connection and first-byte latency remain visible.
+		if spinner == nil {
+			spinner = startSpinner(os.Stderr, m.Config.Quiet)
+		}
+		response, retrySchema, mod, err := start(content)
 		if err != nil {
 			return err
 		}
-		if api.Name == "" {
-			eps := make([]string, 0)
-			for _, a := range cfg.APIs {
-				eps = append(eps, m.Styles.InlineCode.Render(a.Name))
-			}
-			return modsError{
-				err: newUserErrorf(
-					"Your configured API endpoints are: %s",
-					eps,
-				),
-				reason: fmt.Sprintf(
-					"The API endpoint %s is not configured.",
-					m.Styles.InlineCode.Render(cfg.API),
-				),
-			}
+		err = m.consumeCompletion(response, retrySchema)
+		if err == nil {
+			return nil
 		}
 
-		switch mod.API {
-		case "anthropic":
-			key, err := m.ensureKey(api, "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys")
-			if err != nil {
-				return modsError{err, "Anthropic authentication failed"}
-			}
-			accfg = anthropic.DefaultConfig(key)
-			if api.BaseURL != "" {
-				accfg.BaseURL = api.BaseURL
-			}
-		case "google":
-			key, err := m.ensureKey(api, "GOOGLE_API_KEY", "https://aistudio.google.com/app/apikey")
-			if err != nil {
-				return modsError{err, "Google authentication failed"}
-			}
-			gccfg = google.DefaultConfig(mod.Name, key)
-			gccfg.ThinkingBudget = mod.ThinkingBudget
-		case "azure", "azure-ad": //nolint:goconst
-			key, err := m.ensureKey(api, "AZURE_OPENAI_KEY", "https://aka.ms/oai/access")
-			if err != nil {
-				return modsError{err, "Azure authentication failed"}
-			}
-			ccfg = openai.Config{
-				AuthToken: key,
-				BaseURL:   api.BaseURL,
-			}
-			if mod.API == "azure-ad" {
-				ccfg.APIType = "azure-ad"
-			}
-			if api.User != "" {
-				cfg.User = api.User
-			}
-		default:
-			key, err := m.ensureKey(api, "OPENAI_API_KEY", "https://platform.openai.com/account/api-keys")
-			if err != nil {
-				return modsError{err, "OpenAI authentication failed"}
-			}
-			ccfg = openai.Config{
-				AuthToken: key,
-				BaseURL:   api.BaseURL,
-			}
-		}
-
-		if cfg.HTTPProxy != "" {
-			proxyURL, err := url.Parse(cfg.HTTPProxy)
-			if err != nil {
-				return modsError{err, "There was an error parsing your proxy URL."}
-			}
-			httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
-			ccfg.HTTPClient = httpClient
-			accfg.HTTPClient = httpClient
-			gccfg.HTTPClient = httpClient
-		}
-
-		if mod.MaxChars == 0 {
-			mod.MaxChars = cfg.MaxInputChars
-		}
-		// Model-level max-completion-tokens overrides the global setting when set.
-		if mod.MaxCompletionTokens > 0 {
-			cfg.MaxCompletionTokens = mod.MaxCompletionTokens
-		}
-
-		// o1 models do not support max_tokens; use max_completion_tokens instead.
-		// If the user set max-tokens but not max-completion-tokens, promote it.
-		if strings.HasPrefix(mod.Name, "o1") {
-			if cfg.MaxCompletionTokens == 0 && cfg.MaxTokens > 0 {
-				cfg.MaxCompletionTokens = cfg.MaxTokens
-			}
-			cfg.MaxTokens = 0
-		}
-
-		if err := m.setupStreamContext(content, mod); err != nil {
+		err = m.handleRequestError(err, mod, content)
+		var retry retryRequest
+		if !errors.As(err, &retry) {
 			return err
 		}
-
-		request := proto.Request{
-			Messages:    m.messages,
-			API:         mod.API,
-			Model:       mod.Name,
-			User:        cfg.User,
-			Temperature: ptrOrNil(cfg.Temperature),
-			TopP:        ptrOrNil(cfg.TopP),
-			TopK:        ptrOrNil(cfg.TopK),
-			Stop:        cfg.Stop,
-		}
-		if cfg.MaxTokens > 0 {
-			request.MaxTokens = &cfg.MaxTokens
-		}
-		if cfg.MaxCompletionTokens > 0 {
-			request.MaxCompletionTokens = &cfg.MaxCompletionTokens
-		}
-		request.JSONSchema = cfg.jsonSchemaDoc
-
-		var client stream.Client
-		switch mod.API {
-		case "anthropic":
-			client = anthropic.New(accfg)
-		case "google":
-			client = google.New(gccfg)
-		default:
-			client = openai.New(ccfg)
-			if cfg.Format && cfg.FormatAs == "json" {
-				request.ResponseFormat = &cfg.FormatAs
-			}
-		}
-
-		errh := func(err error) tea.Msg {
-			return m.handleRequestError(err, mod, m.Input)
-		}
-
-		// retryFn re-issues the request with the failed assistant response
-		// still in context plus a correction message, so the model sees
-		// what it got wrong instead of blindly regenerating from scratch
-		// (unlike m.retry, which resets the whole conversation via
-		// setupStreamContext).
-		var retryFn func(correction string) tea.Msg
-		retryFn = func(correction string) tea.Msg {
-			retryReq := request
-			retryReq.Messages = append(append([]proto.Message{}, m.messages...), proto.Message{
-				Role:    proto.RoleUser,
-				Content: correction,
-			})
-			return m.receiveCompletionStreamCmd(completionOutput{
-				stream:  client.Request(m.ctx, retryReq),
-				errh:    errh,
-				retryFn: retryFn,
-			})()
-		}
-
-		stream := client.Request(m.ctx, request)
-		return m.receiveCompletionStreamCmd(completionOutput{
-			stream:  stream,
-			errh:    errh,
-			retryFn: retryFn,
-		})()
+		content = retry.content
 	}
 }
 
-// ensureKey resolves the API key to use, most secure source first: a
-// command's stdout never touches disk, a named env var is at least not
-// checked into henji.yml, and a plaintext api-key is the least secure of
-// the three explicit options. See README.md's "API key management" section.
+func (m *Mods) startCompletion(content string) (stream.Stream, func(string) stream.Stream, Model, error) {
+	var ccfg openai.Config
+	var accfg anthropic.Config
+	var gccfg google.Config
+
+	cfg := m.Config
+	api, mod, err := m.resolveModel(cfg)
+	cfg.API = mod.API
+	if err != nil {
+		return nil, nil, Model{}, err
+	}
+	if api.Name == "" {
+		eps := make([]string, 0, len(cfg.APIs))
+		for _, a := range cfg.APIs {
+			eps = append(eps, m.Styles.InlineCode.Render(a.Name))
+		}
+		return nil, nil, Model{}, modsError{
+			err:    newUserErrorf("Your configured API endpoints are: %s", eps),
+			reason: fmt.Sprintf("The API endpoint %s is not configured.", m.Styles.InlineCode.Render(cfg.API)),
+		}
+	}
+
+	switch mod.API {
+	case "anthropic":
+		key, err := m.ensureKey(api, "ANTHROPIC_API_KEY", "https://console.anthropic.com/settings/keys")
+		if err != nil {
+			return nil, nil, Model{}, modsError{err, "Anthropic authentication failed"}
+		}
+		accfg = anthropic.DefaultConfig(key)
+		if api.BaseURL != "" {
+			accfg.BaseURL = api.BaseURL
+		}
+	case "google":
+		key, err := m.ensureKey(api, "GOOGLE_API_KEY", "https://aistudio.google.com/app/apikey")
+		if err != nil {
+			return nil, nil, Model{}, modsError{err, "Google authentication failed"}
+		}
+		gccfg = google.DefaultConfig(mod.Name, key)
+		gccfg.ThinkingBudget = mod.ThinkingBudget
+	case "azure", "azure-ad":
+		key, err := m.ensureKey(api, "AZURE_OPENAI_KEY", "https://aka.ms/oai/access")
+		if err != nil {
+			return nil, nil, Model{}, modsError{err, "Azure authentication failed"}
+		}
+		ccfg = openai.Config{AuthToken: key, BaseURL: api.BaseURL}
+		if mod.API == "azure-ad" {
+			ccfg.APIType = "azure-ad"
+		}
+		if api.User != "" {
+			cfg.User = api.User
+		}
+	default:
+		key, err := m.ensureKey(api, "OPENAI_API_KEY", "https://platform.openai.com/account/api-keys")
+		if err != nil {
+			return nil, nil, Model{}, modsError{err, "OpenAI authentication failed"}
+		}
+		ccfg = openai.Config{AuthToken: key, BaseURL: api.BaseURL}
+	}
+
+	if cfg.HTTPProxy != "" {
+		proxyURL, err := url.Parse(cfg.HTTPProxy)
+		if err != nil {
+			return nil, nil, Model{}, modsError{err, "There was an error parsing your proxy URL."}
+		}
+		httpClient := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+		ccfg.HTTPClient = httpClient
+		accfg.HTTPClient = httpClient
+		gccfg.HTTPClient = httpClient
+	}
+
+	if mod.MaxChars == 0 {
+		mod.MaxChars = cfg.MaxInputChars
+	}
+	if mod.MaxCompletionTokens > 0 {
+		cfg.MaxCompletionTokens = mod.MaxCompletionTokens
+	}
+	if strings.HasPrefix(mod.Name, "o1") {
+		if cfg.MaxCompletionTokens == 0 && cfg.MaxTokens > 0 {
+			cfg.MaxCompletionTokens = cfg.MaxTokens
+		}
+		cfg.MaxTokens = 0
+	}
+	if err := m.setupStreamContext(content, mod); err != nil {
+		return nil, nil, Model{}, err
+	}
+
+	request := proto.Request{
+		Messages:    m.messages,
+		API:         mod.API,
+		Model:       mod.Name,
+		User:        cfg.User,
+		Temperature: ptrOrNil(cfg.Temperature),
+		TopP:        ptrOrNil(cfg.TopP),
+		TopK:        ptrOrNil(cfg.TopK),
+		Stop:        cfg.Stop,
+		JSONSchema:  cfg.jsonSchemaDoc,
+	}
+	if cfg.MaxTokens > 0 {
+		request.MaxTokens = &cfg.MaxTokens
+	}
+	if cfg.MaxCompletionTokens > 0 {
+		request.MaxCompletionTokens = &cfg.MaxCompletionTokens
+	}
+
+	var client stream.Client
+	switch mod.API {
+	case "anthropic":
+		client = anthropic.New(accfg)
+	case "google":
+		client = google.New(gccfg)
+	default:
+		client = openai.New(ccfg)
+		if cfg.Format && cfg.FormatAs == "json" {
+			request.ResponseFormat = &cfg.FormatAs
+		}
+	}
+
+	retrySchema := func(correction string) stream.Stream {
+		retryRequest := request
+		retryRequest.Messages = append(append([]proto.Message{}, m.messages...), proto.Message{
+			Role: proto.RoleUser, Content: correction,
+		})
+		return client.Request(m.ctx, retryRequest)
+	}
+	return client.Request(m.ctx, request), retrySchema, mod, nil
+}
+
+func (m *Mods) consumeCompletion(response stream.Stream, retrySchema func(string) stream.Stream) error {
+	for {
+		for response.Next() {
+			chunk, err := response.Current()
+			if err != nil && !errors.Is(err, stream.ErrNoContent) {
+				_ = response.Close()
+				return err
+			}
+			m.appendToOutput(chunk.Content)
+		}
+		if err := response.Err(); err != nil {
+			return err
+		}
+
+		m.messages = response.Messages()
+		correction, err := m.checkJSONSchema()
+		if err != nil {
+			return err
+		}
+		if correction == "" {
+			return nil
+		}
+		response = retrySchema(correction)
+	}
+}
+
+// checkJSONSchema returns a correction prompt when another attempt is needed.
+func (m *Mods) checkJSONSchema() (string, error) {
+	if m.Config.jsonSchemaValidator == nil {
+		return "", nil
+	}
+	var content string
+	if len(m.messages) > 0 {
+		content = m.messages[len(m.messages)-1].Content
+	}
+	if err := validateAgainstSchema(m.Config.jsonSchemaValidator, content); err == nil {
+		return "", nil
+	} else {
+		m.schemaRetries++
+		if m.schemaRetries > m.Config.JSONSchemaRetries {
+			return "", modsError{err: err, reason: fmt.Sprintf("Response did not match --json-schema after %d attempt(s).", m.schemaRetries)}
+		}
+		m.Output = ""
+		return fmt.Sprintf("Your previous response did not conform to the required JSON Schema: %s\nRespond again with ONLY JSON that strictly matches the schema, and nothing else.", err), nil
+	}
+}
+
+func (m *Mods) findCacheOpsDetails() (cacheDetailsMsg, error) {
+	continueLast := m.Config.ContinueLast || (m.Config.Continue != "" && m.Config.Title == "")
+	readID := ordered.First(m.Config.Continue, m.Config.Show)
+	writeID := ordered.First(m.Config.Title, m.Config.Continue)
+	title := writeID
+	model := m.Config.Model
+	api := m.Config.API
+
+	if readID != "" || continueLast {
+		found, err := m.findReadID(readID)
+		if err != nil {
+			return cacheDetailsMsg{}, modsError{err: err, reason: "Could not find the conversation."}
+		}
+		if found != nil {
+			readID = found.ID
+			if found.Model != nil && found.API != nil {
+				model = *found.Model
+				api = *found.API
+			}
+		}
+	}
+	if continueLast {
+		writeID = readID
+	}
+	if writeID == "" {
+		writeID = newConversationID()
+	}
+	if !sha1reg.MatchString(writeID) {
+		convo, err := m.db.Find(writeID)
+		if err != nil {
+			writeID = newConversationID()
+		} else {
+			writeID = convo.ID
+		}
+	}
+	return cacheDetailsMsg{WriteID: writeID, Title: title, ReadID: readID, API: api, Model: model}, nil
+}
+
+type cacheDetailsMsg struct{ WriteID, Title, ReadID, API, Model string }
+
+func (m *Mods) findReadID(in string) (*Conversation, error) {
+	convo, err := m.db.Find(in)
+	if err == nil {
+		return convo, nil
+	}
+	if errors.Is(err, errNoMatches) && m.Config.Show == "" {
+		return m.db.FindHEAD()
+	}
+	return nil, err
+}
+
+func (m *Mods) readStdin() (string, error) {
+	if isInputTTY() {
+		return "", nil
+	}
+	stdinBytes, err := readAllContext(m.ctx, os.Stdin)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", modsError{err, "Interrupted while reading stdin."}
+		}
+		return "", modsError{err, "Unable to read stdin."}
+	}
+	return increaseIndent(string(stdinBytes)), nil
+}
+
+func readFileInput(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", modsError{err, "Could not read file input."}
+	}
+	if strings.IndexByte(string(content), 0) >= 0 || !utf8.Valid(content) {
+		return "", modsError{
+			err:    fmt.Errorf("%q is not valid UTF-8 text", path),
+			reason: "File input appears to be binary; --file only accepts text.",
+		}
+	}
+	return string(content), nil
+}
+
+// joinInputParts preserves the deterministic input order documented for
+// --file: attached file content precedes stdin content, and both follow the
+// instruction passed as command arguments in setupStreamContext.
+func joinInputParts(parts ...string) string {
+	nonEmpty := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if removeWhitespace(part) != "" {
+			nonEmpty = append(nonEmpty, part)
+		}
+	}
+	return strings.Join(nonEmpty, "\n\n")
+}
+
+// readAllContext waits for EOF without making an interrupted pipeline
+// unkillable. Closing the reader unblocks io.ReadAll when Ctrl-C cancels the
+// root command context.
+func readAllContext(ctx context.Context, reader io.ReadCloser) ([]byte, error) {
+	type result struct {
+		content []byte
+		err     error
+	}
+	results := make(chan result, 1)
+	go func() {
+		content, err := io.ReadAll(reader)
+		results <- result{content: content, err: err}
+	}()
+
+	select {
+	case result := <-results:
+		return result.content, result.err
+	case <-ctx.Done():
+		_ = reader.Close()
+		return nil, ctx.Err()
+	}
+}
+
+func (m *Mods) readFromCache() error {
+	var messages []proto.Message
+	if err := m.cache.Read(m.Config.cacheReadFromID, &messages); err != nil {
+		return modsError{err, "There was an error loading the conversation."}
+	}
+	m.messages = messages
+	m.appendToOutput(proto.Conversation(messages).String())
+	return nil
+}
+
+func (m *Mods) appendToOutput(s string) {
+	m.Output += s
+	if m.Config.Output == "json" || m.Config.jsonSchemaValidator != nil {
+		return
+	}
+	if !isOutputTTY() || m.Config.Raw {
+		fmt.Print(s)
+	}
+}
+
+// printTextOutput finishes text-mode output after a request completes.
+func (m *Mods) printTextOutput() {
+	if m.Config.jsonSchemaValidator != nil {
+		fmt.Println(m.Output)
+		return
+	}
+	if !isOutputTTY() {
+		fmt.Println()
+		return
+	}
+	if m.Config.Raw {
+		return
+	}
+	renderer, err := glamour.NewTermRenderer(glamour.WithEnvironmentConfig(), glamour.WithWordWrap(m.Config.WordWrap))
+	if err != nil {
+		fmt.Println(m.Output)
+		return
+	}
+	rendered, err := renderer.Render(m.Output)
+	if err != nil {
+		fmt.Println(m.Output)
+		return
+	}
+	fmt.Println(strings.TrimRightFunc(rendered, unicode.IsSpace))
+}
+
+// ensureKey resolves the API key to use, most secure source first.
 func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 	var key string
 	if api.APIKeyCmd != "" {
@@ -466,229 +490,18 @@ func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 		return key, nil
 	}
 	return "", modsError{
-		reason: fmt.Sprintf(
-			"%[1]s required; set the environment variable %[1]s or update %[2]s through %[3]s.",
-			m.Styles.InlineCode.Render(defaultEnv),
-			m.Styles.InlineCode.Render("henji.yml"),
-			m.Styles.InlineCode.Render("henji --settings"),
-		),
-		err: newUserErrorf(
-			"You can grab one at %s",
-			m.Styles.Link.Render(docsURL),
-		),
+		reason: fmt.Sprintf("%[1]s required; set the environment variable %[1]s or update %[2]s in %[3]s.", m.Styles.InlineCode.Render(defaultEnv), m.Styles.InlineCode.Render("henji.yml"), m.Styles.InlineCode.Render(settingsPathHint(m.Config))),
+		err:    newUserErrorf("You can grab one at %s", m.Styles.Link.Render(docsURL)),
 	}
 }
 
-// checkJSONSchema validates the last assistant message against
-// --json-schema. On failure it either asks the model to correct itself
-// (via msg.retryFn, which keeps the failed response in context) or, once
-// --json-schema-retries is exhausted, returns a terminal error.
-func (m *Mods) checkJSONSchema(msg completionOutput) tea.Msg {
-	var content string
-	if len(m.messages) > 0 {
-		content = m.messages[len(m.messages)-1].Content
+func settingsPathHint(cfg *Config) string {
+	if cfg != nil && cfg.SettingsPath != "" {
+		return cfg.SettingsPath
 	}
-
-	err := validateAgainstSchema(m.Config.jsonSchemaValidator, content)
-	if err == nil {
-		return nil
-	}
-
-	m.schemaRetries++
-	if m.schemaRetries > m.Config.JSONSchemaRetries {
-		return modsError{
-			err: err,
-			reason: fmt.Sprintf(
-				"Response did not match --json-schema after %d attempt(s).",
-				m.schemaRetries,
-			),
-		}
-	}
-
-	correction := fmt.Sprintf(
-		"Your previous response did not conform to the required JSON Schema: %s\n"+
-			"Respond again with ONLY JSON that strictly matches the schema, and nothing else.",
-		err,
-	)
-
-	// Discard the failed attempt's accumulated display/save output. m.Output
-	// is appended to unconditionally in appendToOutput, so without this a
-	// retry's chunks would be concatenated onto the rejected response
-	// instead of replacing it (m.messages, used to build the corrected
-	// request below, is unaffected and correctly keeps the failed turn).
-	m.Output = ""
-	m.contentMutex.Lock()
-	m.content = nil
-	m.contentMutex.Unlock()
-
-	return msg.retryFn(correction)
+	return defaultConfig().SettingsPath
 }
 
-func (m *Mods) receiveCompletionStreamCmd(msg completionOutput) tea.Cmd {
-	return func() tea.Msg {
-		if msg.stream.Next() {
-			chunk, err := msg.stream.Current()
-			if err != nil && !errors.Is(err, stream.ErrNoContent) {
-				_ = msg.stream.Close()
-				return msg.errh(err)
-			}
-			return completionOutput{
-				content: chunk.Content,
-				stream:  msg.stream,
-				errh:    msg.errh,
-				retryFn: msg.retryFn,
-			}
-		}
-
-		// stream is done, check for errors
-		if err := msg.stream.Err(); err != nil {
-			return msg.errh(err)
-		}
-
-		m.messages = msg.stream.Messages()
-		if m.Config.jsonSchemaValidator != nil {
-			if errMsg := m.checkJSONSchema(msg); errMsg != nil {
-				return errMsg
-			}
-		}
-		return completionOutput{errh: msg.errh}
-	}
-}
-
-type cacheDetailsMsg struct {
-	WriteID, Title, ReadID, API, Model string
-}
-
-func (m *Mods) findCacheOpsDetails() tea.Cmd {
-	return func() tea.Msg {
-		continueLast := m.Config.ContinueLast || (m.Config.Continue != "" && m.Config.Title == "")
-		readID := ordered.First(m.Config.Continue, m.Config.Show)
-		writeID := ordered.First(m.Config.Title, m.Config.Continue)
-		title := writeID
-		model := m.Config.Model
-		api := m.Config.API
-
-		if readID != "" || continueLast {
-			found, err := m.findReadID(readID)
-			if err != nil {
-				return modsError{
-					err:    err,
-					reason: "Could not find the conversation.",
-				}
-			}
-			if found != nil {
-				readID = found.ID
-				if found.Model != nil && found.API != nil {
-					model = *found.Model
-					api = *found.API
-				}
-			}
-		}
-
-		// if we are continuing last, update the existing conversation
-		if continueLast {
-			writeID = readID
-		}
-
-		if writeID == "" {
-			writeID = newConversationID()
-		}
-
-		if !sha1reg.MatchString(writeID) {
-			convo, err := m.db.Find(writeID)
-			if err != nil {
-				// its a new conversation with a title
-				writeID = newConversationID()
-			} else {
-				writeID = convo.ID
-			}
-		}
-
-		return cacheDetailsMsg{
-			WriteID: writeID,
-			Title:   title,
-			ReadID:  readID,
-			API:     api,
-			Model:   model,
-		}
-	}
-}
-
-func (m *Mods) findReadID(in string) (*Conversation, error) {
-	convo, err := m.db.Find(in)
-	if err == nil {
-		return convo, nil
-	}
-	if errors.Is(err, errNoMatches) && m.Config.Show == "" {
-		convo, err := m.db.FindHEAD()
-		if err != nil {
-			return nil, err
-		}
-		return convo, nil
-	}
-	return nil, err
-}
-
-func (m *Mods) readStdinCmd() tea.Msg {
-	if !isInputTTY() {
-		reader := bufio.NewReader(os.Stdin)
-		stdinBytes, err := io.ReadAll(reader)
-		if err != nil {
-			return modsError{err, "Unable to read stdin."}
-		}
-
-		return completionInput{increaseIndent(string(stdinBytes))}
-	}
-	return completionInput{""}
-}
-
-func (m *Mods) readFromCache() tea.Cmd {
-	return func() tea.Msg {
-		var messages []proto.Message
-		if err := m.cache.Read(m.Config.cacheReadFromID, &messages); err != nil {
-			return modsError{err, "There was an error loading the conversation."}
-		}
-
-		m.appendToOutput(proto.Conversation(messages).String())
-		return completionOutput{
-			errh: func(err error) tea.Msg {
-				return modsError{err: err}
-			},
-		}
-	}
-}
-
-const tabWidth = 4
-
-func (m *Mods) appendToOutput(s string) {
-	m.Output += s
-	if !isOutputTTY() || m.Config.Raw || m.Config.Output == "json" || m.Config.jsonSchemaValidator != nil {
-		m.contentMutex.Lock()
-		m.content = append(m.content, s)
-		m.contentMutex.Unlock()
-		return
-	}
-
-	wasAtBottom := m.glamViewport.ScrollPercent() == 1.0
-	oldHeight := m.glamHeight
-	m.glamOutput, _ = m.glam.Render(m.Output)
-	m.glamOutput = strings.TrimRightFunc(m.glamOutput, unicode.IsSpace)
-	m.glamOutput = strings.ReplaceAll(m.glamOutput, "\t", strings.Repeat(" ", tabWidth))
-	m.glamHeight = lipgloss.Height(m.glamOutput)
-	m.glamOutput += "\n"
-	truncatedGlamOutput := lipgloss.NewStyle().
-		MaxWidth(m.width).
-		Render(m.glamOutput)
-	m.glamViewport.SetContent(truncatedGlamOutput)
-	if oldHeight < m.glamHeight && wasAtBottom {
-		// If the viewport's at the bottom and we've received a new
-		// line of content, follow the output by auto scrolling to
-		// the bottom.
-		m.glamViewport.GotoBottom()
-	}
-}
-
-// if the input is whitespace only, make it empty.
 func removeWhitespace(s string) string {
 	if strings.TrimSpace(s) == "" {
 		return ""
@@ -703,21 +516,15 @@ func cutPrompt(msg, prompt string) string {
 	if len(found) != 3 { //nolint:mnd
 		return prompt
 	}
-
 	maxt, _ := strconv.Atoi(found[1])
 	current, _ := strconv.Atoi(found[2])
-
 	if maxt > current {
 		return prompt
 	}
-
-	// 1 token =~ 4 chars
-	// cut 10 extra chars 'just in case'
 	reduceBy := 10 + (current-maxt)*4 //nolint:mnd
 	if len(prompt) > reduceBy {
 		return prompt[:len(prompt)-reduceBy]
 	}
-
 	return prompt
 }
 
@@ -729,10 +536,6 @@ func increaseIndent(s string) string {
 	return strings.Join(lines, "\n")
 }
 
-// findModelInOtherAPIs looks for model (or one of its aliases) among apis,
-// skipping excludeAPI. It returns the API name and canonical model name of
-// the first match, used to suggest -a/-m when a user specifies a model that
-// belongs to a different configured API than the one currently selected.
 func findModelInOtherAPIs(apis []API, excludeAPI, model string) (apiName, modelName string, found bool) {
 	for _, api := range apis {
 		if api.Name == excludeAPI {
@@ -765,39 +568,16 @@ func (m *Mods) resolveModel(cfg *Config) (API, Model, error) {
 			return api, mod, nil
 		}
 		if cfg.API != "" {
-			errMsg := fmt.Sprintf(
-				"Available models are: %s",
-				strings.Join(slices.Collect(maps.Keys(api.Models)), ", "),
-			)
+			errMsg := fmt.Sprintf("Available models are: %s", strings.Join(slices.Collect(maps.Keys(api.Models)), ", "))
 			if otherAPI, otherModel, found := findModelInOtherAPIs(cfg.APIs, api.Name, cfg.Model); found {
-				errMsg += fmt.Sprintf(
-					"\nTry: %s %s %s",
-					m.Styles.InlineCode.Render("-a "+otherAPI),
-					m.Styles.InlineCode.Render("-m "+otherModel),
-					m.Styles.Comment.Render("(found in another configured API)"),
-				)
+				errMsg += fmt.Sprintf("\nTry: %s %s %s", m.Styles.InlineCode.Render("-a "+otherAPI), m.Styles.InlineCode.Render("-m "+otherModel), m.Styles.Comment.Render("(found in another configured API)"))
 			}
-			return API{}, Model{}, modsError{
-				err: newUserErrorf("%s", errMsg),
-				reason: fmt.Sprintf(
-					"The API endpoint %s does not contain the model %s",
-					m.Styles.InlineCode.Render(cfg.API),
-					m.Styles.InlineCode.Render(cfg.Model),
-				),
-			}
+			return API{}, Model{}, modsError{err: newUserErrorf("%s", errMsg), reason: fmt.Sprintf("The API endpoint %s does not contain the model %s", m.Styles.InlineCode.Render(cfg.API), m.Styles.InlineCode.Render(cfg.Model))}
 		}
 	}
-
 	return API{}, Model{}, modsError{
-		reason: fmt.Sprintf(
-			"Model %s is not in the settings file.",
-			m.Styles.InlineCode.Render(cfg.Model),
-		),
-		err: newUserErrorf(
-			"Please specify an API endpoint with %s or configure the model in the settings: %s",
-			m.Styles.InlineCode.Render("--api"),
-			m.Styles.InlineCode.Render("henji --settings"),
-		),
+		reason: fmt.Sprintf("Model %s is not in the settings file.", m.Styles.InlineCode.Render(cfg.Model)),
+		err:    newUserErrorf("Please specify an API endpoint with %s or configure the model in %s", m.Styles.InlineCode.Render("--api"), m.Styles.InlineCode.Render(settingsPathHint(cfg))),
 	}
 }
 
@@ -808,4 +588,21 @@ func ptrOrNil[T number](t T) *T {
 		return nil
 	}
 	return &t
+}
+
+type retryRequest struct {
+	content string
+	err     modsError
+}
+
+func (r retryRequest) Error() string { return r.err.Error() }
+func (r retryRequest) Unwrap() error { return r.err }
+
+func (m *Mods) retry(content string, err modsError) error {
+	m.retries++
+	if m.retries >= m.Config.MaxRetries {
+		return err
+	}
+	time.Sleep(time.Millisecond * 100 * time.Duration(1<<m.retries)) //nolint:mnd
+	return retryRequest{content: content, err: err}
 }

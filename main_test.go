@@ -100,6 +100,33 @@ func TestManualLongFlagsExist(t *testing.T) {
 	}
 }
 
+func TestInteractiveFlagsAreRemoved(t *testing.T) {
+	ensureFlagsInitialized()
+	for _, name := range []string{"editor", "settings"} {
+		if rootCmd.Flags().Lookup(name) != nil {
+			t.Errorf("--%s must not be registered", name)
+		}
+	}
+}
+
+func TestFileUsesShortFAndFormatIsLongOnly(t *testing.T) {
+	ensureFlagsInitialized()
+	file := rootCmd.Flags().Lookup("file")
+	if file == nil {
+		t.Fatal("--file is not registered")
+	}
+	if file.Shorthand != "f" {
+		t.Fatalf("--file shorthand = %q, want f", file.Shorthand)
+	}
+	format := rootCmd.Flags().Lookup("format")
+	if format == nil {
+		t.Fatal("--format is not registered")
+	}
+	if format.Shorthand != "" {
+		t.Fatalf("--format shorthand = %q, want empty", format.Shorthand)
+	}
+}
+
 func requireNoError(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {

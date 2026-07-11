@@ -1,9 +1,38 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
+
+// singleFileValue rejects repeated --file flags instead of silently keeping
+// only the last path, which makes shell glob mistakes visible immediately.
+type singleFileValue struct {
+	path *string
+	set  bool
+}
+
+func (v *singleFileValue) Set(path string) error {
+	if v.set {
+		return fmt.Errorf("--file may be specified only once")
+	}
+	if path == "" {
+		return fmt.Errorf("--file requires a non-empty path")
+	}
+	*v.path = path
+	v.set = true
+	return nil
+}
+
+func (v *singleFileValue) String() string {
+	if v == nil || v.path == nil {
+		return ""
+	}
+	return *v.path
+}
+
+func (*singleFileValue) Type() string { return "path" }
 
 func newFlagParseError(err error) flagParseError {
 	var reason, flag string

@@ -77,8 +77,9 @@ var help = map[string]string{
 	"model":                 "Default model; see --list-models for configured models",
 	"max-input-chars":       "Default character limit on input to model",
 	"format":                "Ask for a formatted response (default: markdown; see --format-as)",
-	"format-as":             "Format to request when -f is set (markdown, json, or a format-text key)",
-	"format-text":           "Text to append when using the -f flag",
+	"format-as":             "Format to request when --format is set (markdown, json, or a format-text key)",
+	"format-text":           "Text to append when using --format",
+	"file":                  "Attach one UTF-8 text file to the prompt",
 	"json-schema":           "Constrain and validate the response with a JSON Schema file (raw JSON on stdout, no envelope unless combined with --output json)",
 	"json-schema-retries":   "Max correction attempts when the response fails schema validation",
 	"role":                  "System role to use",
@@ -86,7 +87,7 @@ var help = map[string]string{
 	"list-roles":            "List the roles defined in your configuration file",
 	"list-models":           "List configured APIs and their models (respects --output json)",
 	"raw":                   "Render output as raw text when connected to a TTY",
-	"quiet":                 "Hide the spinner and success messages on stderr",
+	"quiet":                 "Hide the progress spinner and non-error status messages on stderr",
 	"help":                  "Show help and exit",
 	"version":               "Show version and exit",
 	"max-retries":           "Maximum number of times to retry API calls",
@@ -98,7 +99,6 @@ var help = map[string]string{
 	"stop":                  "Up to 4 sequences where the API will stop generating further tokens",
 	"topp":                  "TopP, an alternative to temperature that narrows response, from 0.0 to 1.0, -1.0 to disable",
 	"topk":                  "TopK, only sample from the top K options for each subsequent token, -1 to disable",
-	"settings":              "Open settings in your $EDITOR",
 	"continue":              "Continue from the last response or a given save title",
 	"continue-last":         "Continue from the last response",
 	"no-cache":              "Disables caching of the prompt/response",
@@ -106,7 +106,6 @@ var help = map[string]string{
 	"list":                  "Lists saved conversations",
 	"delete":                "Deletes one or more saved conversations with the given titles or IDs",
 	"show":                  "Show a saved conversation with the given title or ID",
-	"editor":                "Compose the prompt in your $EDITOR",
 	"output":                "Output format: text or json (single-line JSON envelope)",
 }
 
@@ -200,8 +199,8 @@ type Config struct {
 	Roles               map[string][]string
 	ShowHelp            bool
 	Prefix              string
+	file                string
 	Version             bool
-	Settings            bool
 	SettingsPath        string
 	ContinueLast        bool
 	Continue            string
@@ -215,7 +214,6 @@ type Config struct {
 	// Note: the former top-level "system:" YAML key (Config.System) has been
 	// removed. Use the "roles:" section to define system prompts instead.
 
-	openEditor                                         bool
 	cacheReadFromID, cacheWriteToID, cacheWriteToTitle string
 
 	// jsonSchemaDoc is the parsed --json-schema file, sent to providers as-is.

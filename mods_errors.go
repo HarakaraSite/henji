@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/openai/openai-go"
 )
 
-func (m *Mods) handleRequestError(err error, mod Model, content string) tea.Msg {
+func (m *Mods) handleRequestError(err error, mod Model, content string) error {
 	ae := &openai.Error{}
 	if errors.As(err, &ae) {
 		return m.handleAPIError(ae, mod, content)
@@ -20,7 +19,7 @@ func (m *Mods) handleRequestError(err error, mod Model, content string) tea.Msg 
 	)}
 }
 
-func (m *Mods) handleAPIError(err *openai.Error, mod Model, content string) tea.Msg {
+func (m *Mods) handleAPIError(err *openai.Error, mod Model, content string) error {
 	cfg := m.Config
 	switch err.StatusCode {
 	case http.StatusNotFound:

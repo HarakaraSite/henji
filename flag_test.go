@@ -49,3 +49,12 @@ func TestFlagParseError(t *testing.T) {
 		})
 	}
 }
+
+func TestSingleFileValueRejectsRepeatedFlags(t *testing.T) {
+	var path string
+	value := singleFileValue{path: &path}
+	require.NoError(t, value.Set("first.txt"))
+	require.Equal(t, "first.txt", path)
+	require.Error(t, value.Set("second.txt"))
+	require.Equal(t, "first.txt", path)
+}

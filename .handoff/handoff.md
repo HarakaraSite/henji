@@ -1,0 +1,9 @@
+- 2026-07-11 16:47 [codex] Removed interactive prompt/model selection, --editor, --settings, and --list selection UI; Bubble Tea synchronous replacement remains next.
+- 2026-07-11 16:55 [codex] Replaced the Bubble Tea event loop with synchronous execution, removed Bubble Tea/Bubbles dependencies and anim.go, and verified go test ./... plus go vet ./....
+- 2026-07-11 16:59 [codex] Added a dependency-free stderr braille spinner during model generation; it is hidden by --quiet and whenever stdout is not a TTY; tests and vet pass.
+- 2026-07-11 17:08 [codex] Review fixes: start spinner before synchronous provider requests (including Google TTFB) and add synchronous fallback/context/cache tests; re-review found no remaining actionable issues.
+- 2026-07-11 17:12 [codex] Ran scripts/e2e-gateway-test.sh against the local mlx OpenAI-compatible gateway; all four JSON/output regression checks passed.
+- 2026-07-11 17:21 [codex] Updated README, embedded manual, cookbook, feature lists, and config template for the non-interactive CLI, stderr spinner, plain --list flow, real config/env behavior, and E2E verification; tests and vet pass.
+- 2026-07-11 21:18 [codex] Made Ctrl-C cancel the root context and unblock stdin EOF waits by closing the reader; added cancellation regression test and documented the behavior; tests and vet pass.
+- 2026-07-11 21:23 [codex] Added README bulk conversation cleanup recipe that selects old IDs from SQLite and invokes henji --delete to remove both metadata and .gob bodies.
+- 2026-07-11 21:33 [codex] Reassigned -f to new single UTF-8 --file attachment, made --format long-only, added binary/repeat guards and prompt-file warning, updated docs/examples, and passed all tests plus 5-case local gateway E2E.

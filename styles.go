@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 type styles struct {
@@ -82,4 +83,30 @@ func printConfirmation(action, content string) {
 		MarginRight(1).
 		SetString(strings.ToUpper(action))
 	fmt.Println(lipgloss.JoinHorizontal(lipgloss.Center, outputHeader.String(), content))
+}
+
+func makeGradientRamp(length int) []color.Color {
+	const startColor = "#F967DC"
+	const endColor = "#6B50FF"
+	colors := make([]color.Color, length)
+	start, _ := colorful.Hex(startColor)
+	end, _ := colorful.Hex(endColor)
+	for i := 0; i < length; i++ {
+		step := start.BlendLuv(end, float64(i)/float64(length))
+		colors[i] = lipgloss.Color(step.Hex())
+	}
+	return colors
+}
+
+func makeGradientText(baseStyle lipgloss.Style, str string) string {
+	const minSize = 3
+	if len(str) < minSize {
+		return str
+	}
+	var b strings.Builder
+	runes := []rune(str)
+	for i, c := range makeGradientRamp(len(runes)) {
+		b.WriteString(baseStyle.Foreground(c).Render(string(runes[i])))
+	}
+	return b.String()
 }

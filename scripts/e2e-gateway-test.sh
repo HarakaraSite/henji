@@ -109,5 +109,14 @@ echo "$out"
 echo "$out" | jq -e '.content[0].text | length > 0' >/dev/null || fail "prompt was truncated to empty (PR#18 regression)"
 echo "PASS"
 
+echo "== test 5: --file attaches UTF-8 text input =="
+attachment="$CONFIG_HOME/attachment.txt"
+attachment_token="HENJI_FILE_E2E_TOKEN_4829"
+printf 'Attachment token: %s\n' "$attachment_token" >"$attachment"
+out="$(run --output json -f "$attachment" "Reply with the attachment token exactly.")"
+echo "$out"
+echo "$out" | jq -e --arg token "$attachment_token" '.content[0].text | contains($token)' >/dev/null || fail "file content was not reflected in the response"
+echo "PASS"
+
 echo
 echo "All e2e checks passed."

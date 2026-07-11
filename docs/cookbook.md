@@ -11,6 +11,24 @@ For the full flag reference see `henji -h`; for the design rationale behind
 - Conversation history/cache: `$XDG_DATA_HOME/henji/`, or
   `~/.local/share/henji/` if unset
 
+## Invocation and terminal behavior
+
+henji is non-interactive: pass the instruction as arguments and bulk input on
+stdin. With neither, it exits with an error instead of opening a prompt.
+If an upstream command accidentally opens an interactive program or otherwise
+never closes its pipe, `Ctrl-C` cancels henji instead of leaving it waiting for
+EOF.
+
+```sh
+henji "explain this error" < error.log
+git diff | henji --api local --model llama "suggest a commit message"
+henji -f report.txt "summarize this report"
+```
+
+Model responses always use stdout. A small progress spinner and cache-status
+messages use stderr only when stdout is a TTY; `--quiet` hides them. This keeps
+`henji --output json ... | jq ...` safe for scripts.
+
 ## Setting up a new provider
 
 Every provider is just an entry under `apis:` in `henji.yml`. The pattern is
@@ -133,6 +151,34 @@ henji --output json "summarize" < large_file.txt
 data to do it to" is exactly this: instruction as an argument, bulk content
 via stdin.
 
+## Attaching one text file with `-f`
+
+Use `-f` / `--file` when a single file must accompany an instruction while
+stdin carries separate pipeline data. henji accepts one UTF-8 text file and
+combines the inputs as instruction, file content, then stdin.
+
+```sh
+git diff | henji -f requirements.txt "check whether this diff satisfies the requirements"
+```
+
+Repeated `--file` flags and binary-looking files fail explicitly. For a bundle
+of files, let the shell concatenate them and pass the result over stdin:
+
+```sh
+cat docs/*.md | henji "find contradictions across these documents"
+```
+
+## Listing and reopening conversations
+
+`--list` is plain output, not a picker. Copy an ID or title into the next
+command:
+
+```sh
+henji --list
+henji --show a1b2c3d
+henji --continue a1b2c3d "now propose the smallest fix"
+```
+
 ## `--output json` for scripting and AI agents
 
 ```sh
@@ -160,7 +206,7 @@ henji --output json "..." | jq -e '.error == null'      # assert success
 
 ## Structured output with `--json-schema`
 
-`--format json` only asks nicely; `--json-schema` uses the provider's native
+`--format --format-as json` only asks nicely; `--json-schema` uses the provider's native
 structured-output feature and validates the response client-side, so
 downstream tooling can trust the shape without defensive parsing.
 

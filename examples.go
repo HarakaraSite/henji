@@ -17,7 +17,7 @@ type example struct {
 var helpExamples = []example{
 	{
 		title:   "Editorialize your video files",
-		command: `ls ~/vids | henji -f "summarize each of these titles, group them by decade"`,
+		command: `ls ~/vids | henji --format "summarize each of these titles, group them by decade"`,
 	},
 	{
 		title:   "Draft your commit message for you",

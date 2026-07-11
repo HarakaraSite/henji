@@ -51,7 +51,7 @@ max-input-chars: 12250
 max-completion-tokens: 100
 # {{ index .Help "apis" }}
 # API key priority (highest to lowest):
-#   1. api-key-cmd  — stdout of a shell command; recommended (keys never touch disk)
+#   1. api-key-cmd  — stdout of a directly executed command; recommended (keys never touch disk)
 #                     e.g. api-key-cmd: op read "op://vault/openai/key"
 #                          api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
 #                          api-key-cmd: security find-generic-password -s OPENAI-API -w

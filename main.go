@@ -2,27 +2,23 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/debug"
 	"runtime/pprof"
 	"slices"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
-	glamour "charm.land/glamour/v2/styles"
-	"charm.land/huh/v2"
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	manualdocs "forge.harakara.site/littleisland/henji/v2/internal/docs"
-	"github.com/atotto/clipboard"
 	timeago "github.com/caarlos0/timea.go"
-	"github.com/charmbracelet/x/editor"
 	mcobra "github.com/muesli/mango-cobra"
 	"github.com/muesli/roff"
-	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 )
 
@@ -49,14 +45,6 @@ func buildVersion() {
 }
 
 func init() {
-	// XXX: unset error styles in Glamour dark and light styles.
-	// On the glamour side, we should probably add constructors for generating
-	// default styles so they can be essentially copied and altered without
-	// mutating the definitions in Glamour itself (or relying on any deep
-	// copying).
-	glamour.DarkStyleConfig.CodeBlock.Chroma.Error.BackgroundColor = new(string)
-	glamour.LightStyleConfig.CodeBlock.Chroma.Error.BackgroundColor = new(string)
-
 	buildVersion()
 	rootCmd.SetUsageFunc(usageFunc)
 	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
@@ -110,6 +98,7 @@ var (
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config.Prefix = removeWhitespace(strings.Join(args, " "))
+			warnFileArguments(args, config.file)
 
 			switch config.Output {
 			case "text", "json":
@@ -128,95 +117,6 @@ var (
 				}
 				config.jsonSchemaDoc = doc
 				config.jsonSchemaValidator = validator
-			}
-
-			opts := []tea.ProgramOption{}
-
-			if !isInputTTY() || config.Raw || config.Output == "json" {
-				opts = append(opts, tea.WithInput(nil))
-			}
-			if isOutputTTY() && !config.Raw && config.Output != "json" && config.jsonSchemaValidator == nil {
-				opts = append(opts, tea.WithOutput(os.Stderr))
-			} else {
-				opts = append(opts, tea.WithoutRenderer())
-			}
-			if os.Getenv("VIMRUNTIME") != "" {
-				config.Quiet = true
-			}
-
-			if isNoArgs() && isInputTTY() && config.openEditor {
-				prompt, err := prefixFromEditor()
-				if err != nil {
-					return err
-				}
-				config.Prefix = prompt
-			}
-
-			if isNoArgs() && isInputTTY() {
-				if err := askInfo(); err != nil && err == huh.ErrUserAborted {
-					return modsError{
-						err:    err,
-						reason: "User canceled.",
-					}
-				} else if err != nil {
-					return modsError{
-						err:    err,
-						reason: "Prompt failed.",
-					}
-				}
-			}
-
-			cache, err := cache.NewConversations(config.CachePath)
-			if err != nil {
-				return modsError{err, "Couldn't start Bubble Tea program."}
-			}
-			mods := newMods(cmd.Context(), &config, db, cache)
-			p := tea.NewProgram(mods, opts...)
-			m, err := p.Run()
-			if err != nil {
-				return modsError{err, "Couldn't start Bubble Tea program."}
-			}
-
-			mods = m.(*Mods)
-			if mods.Error != nil {
-				if config.Output == "json" {
-					printJSONError(mods, *mods.Error)
-				}
-				return *mods.Error
-			}
-
-			if config.Settings {
-				c, err := editor.Cmd("henji", config.SettingsPath)
-				if err != nil {
-					return modsError{
-						err:    err,
-						reason: "Could not edit your settings file.",
-					}
-				}
-				c.Stdin = os.Stdin
-				c.Stdout = os.Stdout
-				c.Stderr = os.Stderr
-				if err := c.Run(); err != nil {
-					return modsError{err, fmt.Sprintf(
-						"Missing %s.",
-						stderrStyles().InlineCode.Render("$EDITOR"),
-					)}
-				}
-
-				if !config.Quiet {
-					fmt.Fprintln(os.Stderr, "Wrote config file to:", config.SettingsPath)
-				}
-				return nil
-			}
-
-			if mods.Input == "" && isNoArgs() {
-				return modsError{
-					reason: "You haven't provided any prompt input.",
-					err: newUserErrorf(
-						"You can give your prompt as arguments and/or pipe it from STDIN.\nExample: %s",
-						stdoutStyles().InlineCode.Render("henji [prompt]"),
-					),
-				}
 			}
 
 			if config.ShowHelp {
@@ -239,6 +139,31 @@ var (
 				return deleteConversations()
 			}
 
+			cache, err := cache.NewConversations(config.CachePath)
+			if err != nil {
+				return modsError{err, "Couldn't initialize conversation cache."}
+			}
+			mods := newMods(cmd.Context(), &config, db, cache)
+			if err := mods.run(); err != nil {
+				if config.Output == "json" {
+					var merr modsError
+					if errors.As(err, &merr) {
+						printJSONError(mods, merr)
+					}
+				}
+				return err
+			}
+
+			if mods.Input == "" && isNoArgs() {
+				return modsError{
+					reason: "You haven't provided any prompt input.",
+					err: newUserErrorf(
+						"You can give your prompt as arguments and/or pipe it from STDIN.\nExample: %s",
+						stdoutStyles().InlineCode.Render("henji [prompt]"),
+					),
+				}
+			}
+
 			switch {
 			case config.Output == "json":
 				printJSONOutput(mods)
@@ -246,16 +171,8 @@ var (
 			// appendToOutput) so a validated response is only ever shown
 			// here, once, after the model has produced something that
 			// actually matches the schema.
-			case config.jsonSchemaValidator != nil:
-				fmt.Println(mods.Output)
-			// raw mode already prints the output, no need to print it again
-			case isOutputTTY() && !config.Raw:
-				switch {
-				case mods.glamOutput != "":
-					fmt.Print(mods.glamOutput)
-				case mods.Output != "":
-					fmt.Print(mods.Output)
-				}
+			default:
+				mods.printTextOutput()
 			}
 
 			if config.Show != "" {
@@ -281,7 +198,8 @@ func initFlags() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&config.Model, "model", "m", config.Model, stdoutStyles().FlagDesc.Render(help["model"]))
 	flags.StringVarP(&config.API, "api", "a", config.API, stdoutStyles().FlagDesc.Render(help["api"]))
-	flags.BoolVarP(&config.Format, "format", "f", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
+	flags.BoolVar(&config.Format, "format", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
+	flags.VarP(&singleFileValue{path: &config.file}, "file", "f", stdoutStyles().FlagDesc.Render(help["file"]))
 	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, stdoutStyles().FlagDesc.Render(help["format-as"]))
 	flags.StringVar(&config.JSONSchemaPath, "json-schema", config.JSONSchemaPath, stdoutStyles().FlagDesc.Render(help["json-schema"]))
 	flags.IntVar(&config.JSONSchemaRetries, "json-schema-retries", config.JSONSchemaRetries, stdoutStyles().FlagDesc.Render(help["json-schema-retries"]))
@@ -299,11 +217,9 @@ func initFlags() {
 	flags.BoolVar(&config.NoLimit, "no-limit", config.NoLimit, stdoutStyles().FlagDesc.Render(help["no-limit"]))
 	flags.Int64Var(&config.MaxTokens, "max-tokens", config.MaxTokens, stdoutStyles().FlagDesc.Render(help["max-tokens"]))
 	flags.BoolVar(&config.NoCache, "no-cache", config.NoCache, stdoutStyles().FlagDesc.Render(help["no-cache"]))
-	flags.BoolVar(&config.Settings, "settings", false, stdoutStyles().FlagDesc.Render(help["settings"]))
 	flags.StringVarP(&config.Role, "role", "R", config.Role, stdoutStyles().FlagDesc.Render(help["role"]))
 	flags.BoolVar(&config.ListRoles, "list-roles", config.ListRoles, stdoutStyles().FlagDesc.Render(help["list-roles"]))
 	flags.BoolVar(&config.ListModels, "list-models", config.ListModels, stdoutStyles().FlagDesc.Render(help["list-models"]))
-	flags.BoolVarP(&config.openEditor, "editor", "e", false, stdoutStyles().FlagDesc.Render(help["editor"]))
 	flags.SortFlags = false
 
 	flags.BoolVar(&memprofile, "memprofile", false, "Write memory profiles to CWD")
@@ -336,7 +252,6 @@ func initFlags() {
 	}
 
 	rootCmd.MarkFlagsMutuallyExclusive(
-		"settings",
 		"show",
 		"delete",
 		"list",
@@ -348,6 +263,9 @@ func initFlags() {
 
 func main() {
 	defer maybeWriteMemProfile()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	rootCmd.SetContext(ctx)
 	// The embedded manual must remain available even when the user's config or
 	// conversation database is missing or invalid.
 	if isDocsCmd(os.Args) {
@@ -362,11 +280,7 @@ func main() {
 	config, err = ensureConfig()
 	if err != nil {
 		handleError(modsError{err, "Could not load your configuration file."})
-		// if user is editing the settings, only print out the error, but do
-		// not exit.
-		if !slices.Contains(os.Args, "--settings") {
-			os.Exit(1)
-		}
+		os.Exit(1)
 	}
 
 	// XXX: this must come after creating the config.
@@ -497,11 +411,8 @@ func handleError(err error) {
 			stderrStyles().ErrPadding.Render(stderrStyles().ErrorHeader.String(), merr.reason),
 		}
 
-		// Skip the error details if the user simply canceled out of huh.
-		if merr.err != huh.ErrUserAborted {
-			format += "%s\n\n"
-			args = append(args, stderrStyles().ErrPadding.Render(stderrStyles().ErrorDetails.Render(err.Error())))
-		}
+		format += "%s\n\n"
+		args = append(args, stderrStyles().ErrPadding.Render(stderrStyles().ErrorDetails.Render(err.Error())))
 	} else {
 		args = []any{
 			stderrStyles().ErrPadding.Render(stderrStyles().ErrorDetails.Render(err.Error())),
@@ -543,7 +454,7 @@ func deleteConversation(convo *Conversation) error {
 	return nil
 }
 
-func listConversations(raw bool) error {
+func listConversations(_ bool) error {
 	conversations, err := db.List()
 	if err != nil {
 		return modsError{err, "Couldn't list saves."}
@@ -554,10 +465,6 @@ func listConversations(raw bool) error {
 		return nil
 	}
 
-	if isInputTTY() && isOutputTTY() && !raw {
-		selectFromList(conversations)
-		return nil
-	}
 	printList(conversations)
 	return nil
 }
@@ -606,56 +513,6 @@ func listModels() {
 			}
 			fmt.Println(line)
 		}
-	}
-}
-
-func makeOptions(conversations []Conversation) []huh.Option[string] {
-	opts := make([]huh.Option[string], 0, len(conversations))
-	for _, c := range conversations {
-		timea := stdoutStyles().Timeago.Render(timeago.Of(c.UpdatedAt))
-		left := stdoutStyles().SHA1.Render(c.ID[:sha1short])
-		right := stdoutStyles().ConversationList.Render(c.Title, timea)
-		if c.Model != nil {
-			right += stdoutStyles().Comment.Render(*c.Model)
-		}
-		if c.API != nil {
-			right += stdoutStyles().Comment.Render(" (" + *c.API + ")")
-		}
-		opts = append(opts, huh.NewOption(left+" "+right, c.ID))
-	}
-	return opts
-}
-
-func selectFromList(conversations []Conversation) {
-	var selected string
-	if err := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Conversations").
-				Value(&selected).
-				Options(makeOptions(conversations)...),
-		),
-	).Run(); err != nil {
-		if !errors.Is(err, huh.ErrUserAborted) {
-			fmt.Fprintln(os.Stderr, err.Error())
-		}
-		return
-	}
-
-	_ = clipboard.WriteAll(selected)
-	termenv.Copy(selected)
-	printConfirmation("COPIED", selected)
-	// suggest actions to use this conversation ID
-	fmt.Println(stdoutStyles().Comment.Render(
-		"You can use this conversation ID with the following commands:",
-	))
-	suggestions := []string{"show", "continue", "delete"}
-	for _, flag := range suggestions {
-		fmt.Printf(
-			"  %-44s %s\n",
-			stdoutStyles().Flag.Render("--"+flag),
-			stdoutStyles().FlagDesc.Render(help[flag]),
-		)
 	}
 }
 
@@ -724,72 +581,20 @@ func isNoArgs() bool {
 		!config.ShowHelp &&
 		!config.List &&
 		!config.ListRoles &&
-		!config.ListModels &&
-		!config.Settings
+		!config.ListModels
 }
 
-func askInfo() error {
-	var foundModel bool
-	apis := make([]huh.Option[string], 0, len(config.APIs))
-	opts := map[string][]huh.Option[string]{}
-	for _, api := range config.APIs {
-		apis = append(apis, huh.NewOption(api.Name, api.Name))
-		for name, model := range api.Models {
-			opts[api.Name] = append(opts[api.Name], huh.NewOption(name, name))
-
-			// checks if this is the model we intend to use:
-			if (config.API == "" || config.API == api.Name) &&
-				(config.Model == name || slices.Contains(model.Aliases, config.Model)) {
-				// if it is, adjusts api and model so its cheaper later on.
-				config.API = api.Name
-				config.Model = name
-				foundModel = true
-			}
-		}
+func warnFileArguments(args []string, attachedFile string) {
+	if attachedFile != "" {
+		return
 	}
-
-	if config.ContinueLast {
-		found, err := db.FindHEAD()
-		if err == nil && found != nil && found.Model != nil && found.API != nil {
-			config.Model = *found.Model
-			config.API = *found.API
-			foundModel = true
+	for _, arg := range args {
+		info, err := os.Stat(arg)
+		if err != nil || info.IsDir() {
+			continue
 		}
+		fmt.Fprintf(os.Stderr, "warning: prompt argument %q is an existing file — did you mean -f %q?\n", arg, arg)
 	}
-
-	// wrapping is done by the caller
-	//nolint:wrapcheck
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Choose the API:").
-				Options(apis...).
-				Value(&config.API),
-			huh.NewSelect[string]().
-				TitleFunc(func() string {
-					return fmt.Sprintf("Choose the model for '%s':", config.API)
-				}, &config.API).
-				OptionsFunc(func() []huh.Option[string] {
-					return opts[config.API]
-				}, &config.API).
-				Value(&config.Model),
-		).WithHideFunc(func() bool {
-			// foundModel is true if a model is found for whatever config the
-			// user has (either --api/--model or default-api and
-			// default-model in settings), so the API/model selection is only
-			// shown when the configuration doesn't yield a valid model.
-			return foundModel
-		}),
-		huh.NewGroup(
-			huh.NewText().
-				TitleFunc(func() string {
-					return fmt.Sprintf("Enter a prompt for %s/%s:", config.API, config.Model)
-				}, &config.Model).
-				Value(&config.Prefix),
-		).WithHideFunc(func() bool {
-			return config.Prefix != ""
-		}),
-	).Run()
 }
 
 //nolint:mnd
@@ -851,32 +656,4 @@ func isVersionOrHelpCmd(args []string) bool {
 		}
 	}
 	return false
-}
-
-// creates a temp file, opens it in user's editor, and then returns its contents.
-func prefixFromEditor() (string, error) {
-	f, err := os.CreateTemp("", "prompt")
-	if err != nil {
-		return "", fmt.Errorf("could not create temporary file: %w", err)
-	}
-	_ = f.Close()
-	defer func() { _ = os.Remove(f.Name()) }()
-	cmd, err := editor.Cmd(
-		"henji",
-		f.Name(),
-	)
-	if err != nil {
-		return "", fmt.Errorf("could not open editor: %w", err)
-	}
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("could not open editor: %w", err)
-	}
-	prompt, err := os.ReadFile(f.Name())
-	if err != nil {
-		return "", fmt.Errorf("could not read file: %w", err)
-	}
-	return string(prompt), nil
 }

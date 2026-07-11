@@ -4,9 +4,11 @@
 
 By default:
 
-- all messages go to `STDERR`
-- all prompts are saved with the first line of the prompt as the title
+- model responses go to `STDOUT`; progress and status messages go to `STDERR`
+- successful model conversations are saved with the first prompt line as the
+  title, unless `--no-cache` is set
 - glamour is used by default if `STDOUT` is a TTY
+- a small `Generating` spinner is shown on `STDERR` while a TTY request waits
 
 ### Basic
 
@@ -35,8 +37,8 @@ be a TTY:
 echo 'as json' | henji 'first 2 primes' | jq .
 ```
 
-In this case, the "Generating" animation will go to `STDERR`, but the response
-will be streamed to `STDOUT`.
+In this case the response is streamed to `STDOUT`; the spinner is suppressed
+because stdout is not a TTY.
 
 ### Custom title
 
@@ -46,14 +48,13 @@ You can set a custom title:
 henji --title='title' 'first 2 primes'
 ```
 
-### Continue latest
+### Continue a specific conversation
 
-You can continue the latest conversation and save it with a new title using
-`--continue=title`:
+You can continue a named conversation and save the new turn with a new title:
 
 ```bash
-henji 'first 2 primes'
-henji --continue='primes as json' 'format as json'
+henji --title='primes' 'first 2 primes'
+henji --continue='primes' --title='primes as json' 'format as json'
 ```
 
 ### Untitled continue latest
@@ -93,6 +94,10 @@ henji --list
 # or
 henji -l
 ```
+
+The command always prints a tab-separated list. Pick an ID or title from that
+output and pass it to `--show`, `--continue`, or `--delete`; there is no
+interactive selector.
 
 ## Show a previous conversation
 
