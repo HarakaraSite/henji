@@ -127,8 +127,9 @@ Structured-output pitfalls:
 Successful model conversations are saved automatically (metadata in SQLite,
 message bodies on disk) unless `--no-cache` is set.
 
-- `-l` prints a tab-separated list of saved conversations; `-t <title>` names
-  one at save time. It never opens an interactive selector.
+- `-l` prints a tab-separated list of saved conversations with their last save
+  time in local time (`YYYY-MM-DD HH:MM:SS TZ`); `-t <title>` names one at save
+  time. It never opens an interactive selector.
 - `-C` continues the most recent conversation; `-c <id-or-title>` continues a
   specific one. IDs may be abbreviated to a unique SHA-1 prefix.
 - `-s <id-or-title>` prints a saved conversation without calling a model.

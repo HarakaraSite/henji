@@ -13,10 +13,10 @@ import (
 	"runtime/pprof"
 	"slices"
 	"strings"
+	"time"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	manualdocs "forge.harakara.site/littleisland/henji/v2/internal/docs"
-	timeago "github.com/caarlos0/timea.go"
 	mcobra "github.com/muesli/mango-cobra"
 	"github.com/muesli/roff"
 	"github.com/spf13/cobra"
@@ -523,9 +523,15 @@ func printList(conversations []Conversation) {
 			"%s\t%s\t%s\n",
 			stdoutStyles().SHA1.Render(conversation.ID[:sha1short]),
 			conversation.Title,
-			stdoutStyles().Timeago.Render(timeago.Of(conversation.UpdatedAt)),
+			stdoutStyles().Timeago.Render(conversationUpdatedAt(conversation.UpdatedAt)),
 		)
 	}
+}
+
+// conversationUpdatedAt returns the save time in the user's local time zone.
+// SQLite stores timestamps in UTC, so convert before presenting them to people.
+func conversationUpdatedAt(updatedAt time.Time) string {
+	return updatedAt.Local().Format("2006-01-02 15:04:05 MST")
 }
 
 func saveConversation(mods *Mods) error {

@@ -6,9 +6,21 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	manualdocs "forge.harakara.site/littleisland/henji/v2/internal/docs"
 )
+
+func TestConversationUpdatedAtUsesLocalTime(t *testing.T) {
+	original := time.Local
+	time.Local = time.FixedZone("JST", 9*60*60)
+	t.Cleanup(func() { time.Local = original })
+
+	updatedAt := time.Date(2026, time.July, 11, 12, 34, 56, 0, time.UTC)
+	if got, want := conversationUpdatedAt(updatedAt), "2026-07-11 21:34:56 JST"; got != want {
+		t.Fatalf("conversationUpdatedAt() = %q, want %q", got, want)
+	}
+}
 
 // initFlags registers its flags on the shared rootCmd, so tests must only
 // call it once per process or pflag panics on redefinition.

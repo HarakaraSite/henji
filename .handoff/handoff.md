@@ -8,3 +8,4 @@
 - 2026-07-11 21:23 [codex] Added README bulk conversation cleanup recipe that selects old IDs from SQLite and invokes henji --delete to remove both metadata and .gob bodies.
 - 2026-07-11 21:33 [codex] Reassigned -f to new single UTF-8 --file attachment, made --format long-only, added binary/repeat guards and prompt-file warning, updated docs/examples, and passed all tests plus 5-case local gateway E2E.
 - 2026-07-11 21:41 [codex] Tagged and pushed v2.1.0 at 6146eae, built the arm64 macOS binary with the version embedded, and installed it at ~/bin/henji.
+- 2026-07-11 21:50 [codex] Changed henji --list to display each conversation's updated time in local YYYY-MM-DD HH:MM:SS TZ; no DB migration required; tests and vet pass.
