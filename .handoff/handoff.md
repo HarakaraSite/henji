@@ -10,3 +10,5 @@
 - 2026-07-11 21:41 [codex] Tagged and pushed v2.1.0 at 6146eae, built the arm64 macOS binary with the version embedded, and installed it at ~/bin/henji.
 - 2026-07-11 21:50 [codex] Changed henji --list to display each conversation's updated time in local YYYY-MM-DD HH:MM:SS TZ; no DB migration required; tests and vet pass.
 - 2026-07-11 21:53 [codex] Released v2.1.1 at c5c89e6 with verified five-platform builds; main and tag pushed, release CI run 21 started.
+- 2026-07-12 17:55 [codex] Discussed prospective OpenAI-only henji --web design (Responses API, streamed text plus citations); no implementation requested, and a future-work memory note was saved.
+- 2026-07-15 23:38 [codex] Recorded the agreed --text/--image implementation plan: JPEG/PNG/WebP (3 MiB), cache-free images, explicit vision config, and isolated real-image E2E settings; implementation is next.
