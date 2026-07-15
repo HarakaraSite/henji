@@ -15,3 +15,4 @@
 - 2026-07-15 23:47 [codex] Implemented --text/--image: JPEG/PNG/WebP magic-byte validation with 3 MiB cap, vision:true fail-closed config, provider image payloads, cache-safe image markers, docs, and regression tests; go test ./... and go vet ./... pass.
 - 2026-07-15 23:58 [codex] Applied the same fixed 3 MiB safety cap to --text (not bypassed by --no-limit), with pre/post-read guards, docs, and regression coverage; tests and vet pass.
 - 2026-07-16 00:05 [codex] Review fix: context-length retry now preserves text/image/stdin ordering; added tests for retry ordering, raw gob image-byte exclusion, and cached-image omission on continued OpenAI requests; tests and vet pass.
+- 2026-07-16 00:09 [codex] Added docs/notes/image-input-manual-test.md with isolated real-gateway verification steps; it remains uncommitted for review/run after rest.
