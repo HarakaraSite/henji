@@ -8,7 +8,7 @@ This is an actively maintained fork of [charmbracelet/mods](https://github.com/c
 which was archived on March 9, 2026. The fork focuses on local LLM usage and
 treating henji as a Unix filter: `stdin → LLM → stdout`, composable with the
 rest of your shell pipeline rather than acting on your behalf. henji does not
-open an input form or a model picker: provide a prompt as arguments, `--file`,
+open an input form or a model picker: provide a prompt as arguments, `--text`,
 and/or stdin, and select a configured model with `--model` / `--api` when
 needed.
 
@@ -163,7 +163,7 @@ henji "write a haiku about Go"
 henji --api local --model llama3.2 "explain this error"
 
 # Attach one text file while keeping stdin available for a pipeline
-henji -f report.txt "summarize this report"
+henji --text report.txt "summarize this report"
 
 # Continue a conversation
 henji -C "now make it funnier"
@@ -180,7 +180,8 @@ for provider setup and scripting/agent patterns.
 |---|---|
 | `-m`, `--model` | Select a configured model ID or alias |
 | `-a`, `--api` | Select a configured API endpoint; pair it with `--model` |
-| `-f`, `--file` | Attach one UTF-8 text file to the prompt |
+| `--text` | Attach one UTF-8 text file to the prompt |
+| `--image` | Attach one JPEG, PNG, or WebP image to the prompt (max 3 MiB; requires `vision: true`) |
 | `--format` | Ask the LLM to format the response (e.g. markdown, json) |
 | `--format-as` | Specify output format (used with `--format`) |
 | `--json-schema` | Path to a JSON Schema file; constrains and validates the response (see [Structured Output](#structured-output)) |
@@ -201,9 +202,24 @@ Tuning knobs that rarely change between runs — sampling parameters (`temp`,
 no dedicated flags; set them in `henji.yml` or override per run with the
 corresponding `HENJI_*` environment variable (e.g. `HENJI_TEMP=0.2`).
 
-`--file` accepts exactly one text file. henji combines inputs in this order:
-prompt arguments, file contents, then stdin. It rejects binary or invalid
-UTF-8 files; use stdin for deliberate multi-file concatenation:
+`--text` accepts exactly one UTF-8 text file up to 3 MiB. `--image` accepts
+exactly one JPEG, PNG, or WebP image up to 3 MiB and requires `vision: true`
+on the selected model. The attachment limit remains in force with `--no-limit`.
+henji combines inputs in this order: prompt arguments, text, image, then stdin.
+It rejects binary or invalid UTF-8 text files; use stdin for deliberate
+multi-file concatenation:
+
+```yaml
+# henji.yml: enable image input only for a model you have verified supports it
+apis:
+  local:
+    models:
+      vision-model:
+        vision: true
+```
+
+Images are not stored in saved conversations. Attach the image again when a
+continued conversation needs to see it.
 
 ```sh
 cat chapter-*.txt | henji "compare these chapters"
@@ -380,7 +396,7 @@ go vet ./...
 
 For a real OpenAI-compatible gateway (mlx-lm, Ollama, or LM Studio), run the
 manual E2E check. It validates JSON success and error paths, the
-`max-input-chars` regression, and `--file` attachment; it is intentionally
+`max-input-chars` regression, and `--text` attachment; it is intentionally
 not part of CI because a Forgejo runner has no local model gateway.
 
 ```sh

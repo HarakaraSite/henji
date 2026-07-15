@@ -98,7 +98,7 @@ var (
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config.Prefix = removeWhitespace(strings.Join(args, " "))
-			warnFileArguments(args, config.file)
+			warnFileArguments(args, config.textPath != "" || config.imagePath != "")
 
 			switch config.Output {
 			case "text", "json":
@@ -154,7 +154,7 @@ var (
 				return err
 			}
 
-			if mods.Input == "" && isNoArgs() {
+			if mods.Input == "" && !mods.HasImage() && isNoArgs() {
 				return modsError{
 					reason: "You haven't provided any prompt input.",
 					err: newUserErrorf(
@@ -199,7 +199,8 @@ func initFlags() {
 	flags.StringVarP(&config.Model, "model", "m", config.Model, stdoutStyles().FlagDesc.Render(help["model"]))
 	flags.StringVarP(&config.API, "api", "a", config.API, stdoutStyles().FlagDesc.Render(help["api"]))
 	flags.BoolVar(&config.Format, "format", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
-	flags.VarP(&singleFileValue{path: &config.file}, "file", "f", stdoutStyles().FlagDesc.Render(help["file"]))
+	flags.Var(&singlePathValue{path: &config.textPath, name: "text"}, "text", stdoutStyles().FlagDesc.Render(help["text"]))
+	flags.Var(&singlePathValue{path: &config.imagePath, name: "image"}, "image", stdoutStyles().FlagDesc.Render(help["image"]))
 	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, stdoutStyles().FlagDesc.Render(help["format-as"]))
 	flags.StringVar(&config.JSONSchemaPath, "json-schema", config.JSONSchemaPath, stdoutStyles().FlagDesc.Render(help["json-schema"]))
 	flags.IntVar(&config.JSONSchemaRetries, "json-schema-retries", config.JSONSchemaRetries, stdoutStyles().FlagDesc.Render(help["json-schema-retries"]))
@@ -590,8 +591,8 @@ func isNoArgs() bool {
 		!config.ListModels
 }
 
-func warnFileArguments(args []string, attachedFile string) {
-	if attachedFile != "" {
+func warnFileArguments(args []string, hasAttachment bool) {
+	if hasAttachment {
 		return
 	}
 	for _, arg := range args {
@@ -599,7 +600,7 @@ func warnFileArguments(args []string, attachedFile string) {
 		if err != nil || info.IsDir() {
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "warning: prompt argument %q is an existing file — did you mean -f %q?\n", arg, arg)
+		fmt.Fprintf(os.Stderr, "warning: prompt argument %q is an existing file — did you mean --text %q or --image %q?\n", arg, arg, arg)
 	}
 }
 

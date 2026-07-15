@@ -79,7 +79,8 @@ var help = map[string]string{
 	"format":                "Ask for a formatted response (default: markdown; see --format-as)",
 	"format-as":             "Format to request when --format is set (markdown, json, or a format-text key)",
 	"format-text":           "Text to append when using --format",
-	"file":                  "Attach one UTF-8 text file to the prompt",
+	"text":                  "Attach one UTF-8 text file to the prompt (max 3 MiB)",
+	"image":                 "Attach one JPEG, PNG, or WebP image to the prompt (max 3 MiB)",
 	"json-schema":           "Constrain and validate the response with a JSON Schema file (raw JSON on stdout, no envelope unless combined with --output json)",
 	"json-schema-retries":   "Max correction attempts when the response fails schema validation",
 	"role":                  "System role to use",
@@ -118,6 +119,7 @@ type Model struct {
 	Fallback            string   `yaml:"fallback"`
 	ThinkingBudget      int      `yaml:"thinking-budget,omitempty"`
 	MaxCompletionTokens int64    `yaml:"max-completion-tokens,omitempty"`
+	Vision              bool     `yaml:"vision,omitempty"`
 }
 
 // API represents an API endpoint and its models.
@@ -199,7 +201,8 @@ type Config struct {
 	Roles               map[string][]string
 	ShowHelp            bool
 	Prefix              string
-	file                string
+	textPath            string
+	imagePath           string
 	Version             bool
 	SettingsPath        string
 	ContinueLast        bool

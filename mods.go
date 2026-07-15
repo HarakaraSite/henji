@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -38,6 +39,8 @@ type Mods struct {
 	retries       int
 	schemaRetries int
 	messages      []proto.Message
+	inputParts    []proto.ContentPart
+	rawInput      string
 
 	db     *convoDB
 	cache  *cache.Conversations
@@ -68,7 +71,11 @@ func (m *Mods) run() error {
 	m.Config.API = details.API
 	m.Config.Model = details.Model
 
-	fileInput, err := readFileInput(m.Config.file)
+	textInput, err := readTextInput(m.Config.textPath)
+	if err != nil {
+		return err
+	}
+	imageInput, err := readImageInput(m.Config.imagePath)
 	if err != nil {
 		return err
 	}
@@ -76,16 +83,28 @@ func (m *Mods) run() error {
 	if err != nil {
 		return err
 	}
-	input := joinInputParts(fileInput, stdinInput)
+	input := joinInputParts(textInput, stdinInput)
 	m.Input = removeWhitespace(input)
+	m.rawInput = input
+	m.inputParts = buildInputParts(textInput, imageInput, stdinInput)
 
 	if m.Config.Show != "" {
 		return m.readFromCache()
 	}
-	if m.Input == "" && m.Config.Prefix == "" {
+	if m.Input == "" && !m.HasImage() && m.Config.Prefix == "" {
 		return nil
 	}
 	return m.complete(input)
+}
+
+// HasImage reports whether the current request has an image attachment.
+func (m *Mods) HasImage() bool {
+	for _, part := range m.inputParts {
+		if part.Image != nil {
+			return true
+		}
+	}
+	return false
 }
 
 type completionStarter func(string) (stream.Stream, func(string) stream.Stream, Model, error)
@@ -144,6 +163,12 @@ func (m *Mods) startCompletion(content string) (stream.Stream, func(string) stre
 		return nil, nil, Model{}, modsError{
 			err:    newUserErrorf("Your configured API endpoints are: %s", eps),
 			reason: fmt.Sprintf("The API endpoint %s is not configured.", m.Styles.InlineCode.Render(cfg.API)),
+		}
+	}
+	if m.HasImage() && !mod.Vision {
+		return nil, nil, Model{}, modsError{
+			err:    newUserErrorf("model %q is not configured for vision input", mod.Name),
+			reason: "Image input requires a model with vision: true in henji.yml.",
 		}
 	}
 
@@ -364,25 +389,99 @@ func (m *Mods) readStdin() (string, error) {
 	return increaseIndent(string(stdinBytes)), nil
 }
 
-func readFileInput(path string) (string, error) {
+const maxAttachmentBytes = 3 * 1024 * 1024
+
+func readTextInput(path string) (string, error) {
 	if path == "" {
 		return "", nil
 	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", modsError{err, "Could not read text input."}
+	}
+	if info.Size() > maxAttachmentBytes {
+		return "", attachmentTooLargeError(path, info.Size())
+	}
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return "", modsError{err, "Could not read file input."}
+		return "", modsError{err, "Could not read text input."}
+	}
+	if len(content) > maxAttachmentBytes {
+		return "", attachmentTooLargeError(path, int64(len(content)))
 	}
 	if strings.IndexByte(string(content), 0) >= 0 || !utf8.Valid(content) {
 		return "", modsError{
 			err:    fmt.Errorf("%q is not valid UTF-8 text", path),
-			reason: "File input appears to be binary; --file only accepts text.",
+			reason: "Text input appears to be binary; --text only accepts UTF-8 text.",
 		}
 	}
 	return string(content), nil
 }
 
+func attachmentTooLargeError(path string, size int64) modsError {
+	return modsError{
+		err:    fmt.Errorf("%q is %d bytes", path, size),
+		reason: "Attachment exceeds the 3 MiB limit.",
+	}
+}
+
+func readImageInput(path string) (*proto.Image, error) {
+	if path == "" {
+		return nil, nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, modsError{err, "Could not read image input."}
+	}
+	if info.Size() > maxAttachmentBytes {
+		return nil, attachmentTooLargeError(path, info.Size())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, modsError{err, "Could not read image input."}
+	}
+	if len(data) > maxAttachmentBytes {
+		return nil, attachmentTooLargeError(path, int64(len(data)))
+	}
+	mediaType := imageMediaType(data)
+	if mediaType == "" {
+		return nil, modsError{
+			err:    fmt.Errorf("%q is not a supported image format", path),
+			reason: "--image accepts JPEG, PNG, or WebP files.",
+		}
+	}
+	return &proto.Image{MediaType: mediaType, Data: data}, nil
+}
+
+func imageMediaType(data []byte) string {
+	switch {
+	case bytes.HasPrefix(data, []byte{0xff, 0xd8, 0xff}):
+		return "image/jpeg"
+	case bytes.HasPrefix(data, []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}):
+		return "image/png"
+	case len(data) >= 12 && bytes.Equal(data[:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")):
+		return "image/webp"
+	default:
+		return ""
+	}
+}
+
+func buildInputParts(text string, image *proto.Image, stdin string) []proto.ContentPart {
+	parts := make([]proto.ContentPart, 0, 3)
+	if removeWhitespace(text) != "" {
+		parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: text})
+	}
+	if image != nil {
+		parts = append(parts, proto.ContentPart{Type: proto.ContentPartImage, Image: image})
+	}
+	if removeWhitespace(stdin) != "" {
+		parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: stdin})
+	}
+	return parts
+}
+
 // joinInputParts preserves the deterministic input order documented for
-// --file: attached file content precedes stdin content, and both follow the
+// --text: attached text content precedes stdin content, and both follow the
 // instruction passed as command arguments in setupStreamContext.
 func joinInputParts(parts ...string) string {
 	nonEmpty := make([]string, 0, len(parts))

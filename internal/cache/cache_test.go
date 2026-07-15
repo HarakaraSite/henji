@@ -3,6 +3,7 @@ package cache
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -37,6 +38,28 @@ func TestCache(t *testing.T) {
 		require.NoError(t, cache.Read("fake", &result))
 
 		require.ElementsMatch(t, messages, result)
+	})
+
+	t.Run("write omits image bytes", func(t *testing.T) {
+		cache, err := NewConversations(t.TempDir())
+		require.NoError(t, err)
+		messages := []proto.Message{{
+			Role:    proto.RoleUser,
+			Content: "describe this",
+			Parts:   []proto.ContentPart{{Type: proto.ContentPartImage, Image: &proto.Image{MediaType: "image/png", Data: []byte("secret-image")}}},
+		}}
+		require.NoError(t, cache.Write("image", &messages))
+
+		var result []proto.Message
+		require.NoError(t, cache.Read("image", &result))
+		require.Len(t, result, 1)
+		require.Len(t, result[0].Parts, 1)
+		require.True(t, result[0].Parts[0].ImageOmitted)
+		require.Nil(t, result[0].Parts[0].Image)
+		require.NotContains(t, proto.Conversation(result).String(), "secret-image")
+		encoded, err := os.ReadFile(filepath.Join(cache.cache.dir(), "image.gob"))
+		require.NoError(t, err)
+		require.NotContains(t, string(encoded), "secret-image")
 	})
 
 	t.Run("delete", func(t *testing.T) {

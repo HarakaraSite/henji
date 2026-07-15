@@ -40,14 +40,6 @@ func (m *Mods) setupStreamContext(content string, mod Model) error {
 		}
 	}
 
-	if prefix := cfg.Prefix; prefix != "" {
-		content = strings.TrimSpace(prefix + "\n\n" + content)
-	}
-
-	if !cfg.NoLimit && mod.MaxChars > 0 && int64(len(content)) > mod.MaxChars {
-		content = content[:mod.MaxChars]
-	}
-
 	if !cfg.NoCache && cfg.cacheReadFromID != "" {
 		if err := m.cache.Read(cfg.cacheReadFromID, &m.messages); err != nil {
 			return modsError{
@@ -61,10 +53,115 @@ func (m *Mods) setupStreamContext(content string, mod Model) error {
 		}
 	}
 
-	m.messages = append(m.messages, proto.Message{
-		Role:    proto.RoleUser,
-		Content: content,
-	})
+	if !m.HasImage() {
+		if prefix := cfg.Prefix; prefix != "" {
+			content = strings.TrimSpace(prefix + "\n\n" + content)
+		}
+		if !cfg.NoLimit && mod.MaxChars > 0 && int64(len(content)) > mod.MaxChars {
+			content = content[:mod.MaxChars]
+		}
+		m.messages = append(m.messages, proto.Message{Role: proto.RoleUser, Content: content})
+		return nil
+	}
+
+	parts := m.userInputParts(content)
+	if prefix := cfg.Prefix; prefix != "" {
+		parts = append([]proto.ContentPart{{Type: proto.ContentPartText, Text: prefix}}, parts...)
+	}
+	if !cfg.NoLimit && mod.MaxChars > 0 {
+		parts = limitTextParts(parts, mod.MaxChars)
+	}
+	m.messages = append(m.messages, proto.Message{Role: proto.RoleUser, Content: textFromParts(parts), Parts: parts})
 
 	return nil
+}
+
+func (m *Mods) userInputParts(content string) []proto.ContentPart {
+	if content != m.rawInput {
+		if strings.HasPrefix(m.rawInput, content) {
+			return inputPartsForContent(m.inputParts, len(content))
+		}
+		// Retries produced by cutPrompt always preserve a prefix. Keep this
+		// fallback defensive for any future retry source that does not.
+		parts := make([]proto.ContentPart, 0, 2)
+		if content != "" {
+			parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: content})
+		}
+		for _, part := range m.inputParts {
+			if part.Image != nil {
+				parts = append(parts, part)
+			}
+		}
+		return parts
+	}
+	return append([]proto.ContentPart(nil), m.inputParts...)
+}
+
+// inputPartsForContent keeps image positions while shortening the flattened
+// text input. The flattened form joins text parts with blank lines, matching
+// joinInputParts. Image data is never part of that text budget.
+func inputPartsForContent(parts []proto.ContentPart, contentBytes int) []proto.ContentPart {
+	result := make([]proto.ContentPart, 0, len(parts))
+	remaining := contentBytes
+	seenText := false
+	for _, part := range parts {
+		if part.Type != proto.ContentPartText {
+			result = append(result, part)
+			continue
+		}
+		if remaining <= 0 {
+			continue
+		}
+		if seenText {
+			const separator = "\n\n"
+			if remaining <= len(separator) {
+				for i := len(result) - 1; i >= 0; i-- {
+					if result[i].Type == proto.ContentPartText {
+						result[i].Text += separator[:remaining]
+						break
+					}
+				}
+				remaining = 0
+				continue
+			}
+			remaining -= len(separator)
+		}
+		seenText = true
+		if len(part.Text) > remaining {
+			part.Text = part.Text[:remaining]
+		}
+		remaining -= len(part.Text)
+		result = append(result, part)
+	}
+	return result
+}
+
+func limitTextParts(parts []proto.ContentPart, limit int64) []proto.ContentPart {
+	result := make([]proto.ContentPart, 0, len(parts))
+	remaining := limit
+	for _, part := range parts {
+		if part.Type != proto.ContentPartText {
+			result = append(result, part)
+			continue
+		}
+		if remaining <= 0 {
+			continue
+		}
+		if int64(len(part.Text)) > remaining {
+			part.Text = part.Text[:remaining]
+		}
+		remaining -= int64(len(part.Text))
+		result = append(result, part)
+	}
+	return result
+}
+
+func textFromParts(parts []proto.ContentPart) string {
+	text := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part.Type == proto.ContentPartText && part.Text != "" {
+			text = append(text, part.Text)
+		}
+	}
+	return strings.Join(text, "\n\n")
 }

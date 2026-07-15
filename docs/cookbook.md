@@ -22,7 +22,7 @@ EOF.
 ```sh
 henji "explain this error" < error.log
 git diff | henji --api local --model llama "suggest a commit message"
-henji -f report.txt "summarize this report"
+henji --text report.txt "summarize this report"
 ```
 
 Model responses always use stdout. A small progress spinner and cache-status
@@ -151,22 +151,38 @@ henji --output json "summarize" < large_file.txt
 data to do it to" is exactly this: instruction as an argument, bulk content
 via stdin.
 
-## Attaching one text file with `-f`
+## Attaching one text file with `--text`
 
-Use `-f` / `--file` when a single file must accompany an instruction while
-stdin carries separate pipeline data. henji accepts one UTF-8 text file and
-combines the inputs as instruction, file content, then stdin.
+Use `--text` when a single text file must accompany an instruction while
+stdin carries separate pipeline data. henji accepts one UTF-8 text file up to
+3 MiB and combines the inputs as instruction, file content, then stdin.
 
 ```sh
-git diff | henji -f requirements.txt "check whether this diff satisfies the requirements"
+git diff | henji --text requirements.txt "check whether this diff satisfies the requirements"
 ```
 
-Repeated `--file` flags and binary-looking files fail explicitly. For a bundle
+Repeated `--text` flags and binary-looking files fail explicitly. For a bundle
 of files, let the shell concatenate them and pass the result over stdin:
 
 ```sh
 cat docs/*.md | henji "find contradictions across these documents"
 ```
+
+## Attaching one image with `--image`
+
+`--image` accepts one JPEG, PNG, or WebP file up to 3 MiB. Enable it only for
+a model whose vision support you have verified:
+
+```yaml
+apis:
+  local:
+    models:
+      vision-model:
+        vision: true
+```
+
+The image is sent with the current request but is not saved in conversation
+history. Reattach it when continuing a conversation that needs it.
 
 ## Listing and reopening conversations
 

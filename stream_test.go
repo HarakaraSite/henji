@@ -114,6 +114,43 @@ func TestSetupStreamContext(t *testing.T) {
 		}, mods.messages)
 	})
 
+	t.Run("keeps image between text attachment and stdin", func(t *testing.T) {
+		image := &proto.Image{MediaType: "image/png", Data: []byte("png")}
+		mods := &Mods{
+			inputParts: buildInputParts("requirements", image, "diff"),
+			rawInput:   "requirements\n\ndiff",
+			Config:     &Config{Prefix: "review"},
+		}
+
+		err := mods.setupStreamContext(mods.rawInput, Model{MaxChars: 100})
+		require.NoError(t, err)
+		message := mods.messages[0]
+		require.Equal(t, "review\n\nrequirements\n\ndiff", message.Content)
+		require.Len(t, message.Parts, 4)
+		require.Equal(t, "review", message.Parts[0].Text)
+		require.Equal(t, "requirements", message.Parts[1].Text)
+		require.Same(t, image, message.Parts[2].Image)
+		require.Equal(t, "diff", message.Parts[3].Text)
+	})
+
+	t.Run("keeps image between text attachment and shortened stdin on retry", func(t *testing.T) {
+		image := &proto.Image{MediaType: "image/png", Data: []byte("png")}
+		mods := &Mods{
+			inputParts: buildInputParts("requirements", image, "diff output"),
+			rawInput:   "requirements\n\ndiff output",
+			Config:     &Config{},
+		}
+
+		err := mods.setupStreamContext("requirements\n\ndif", Model{MaxChars: 100})
+		require.NoError(t, err)
+		message := mods.messages[0]
+		require.Equal(t, "requirements\n\ndif", message.Content)
+		require.Len(t, message.Parts, 3)
+		require.Equal(t, "requirements", message.Parts[0].Text)
+		require.Same(t, image, message.Parts[1].Image)
+		require.Equal(t, "dif", message.Parts[2].Text)
+	})
+
 	t.Run("returns error for missing role", func(t *testing.T) {
 		mods := &Mods{
 			Config: &Config{

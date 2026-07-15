@@ -63,11 +63,11 @@ func TestReadAllContextStopsWhenCanceled(t *testing.T) {
 	require.ErrorIs(t, <-result, context.Canceled)
 }
 
-func TestReadFileInput(t *testing.T) {
+func TestReadTextInput(t *testing.T) {
 	t.Run("reads valid UTF-8 text", func(t *testing.T) {
 		path := t.TempDir() + "/input.txt"
 		require.NoError(t, os.WriteFile(path, []byte("attached text"), 0o600))
-		content, err := readFileInput(path)
+		content, err := readTextInput(path)
 		require.NoError(t, err)
 		require.Equal(t, "attached text", content)
 	})
@@ -75,12 +75,87 @@ func TestReadFileInput(t *testing.T) {
 	t.Run("rejects binary input", func(t *testing.T) {
 		path := t.TempDir() + "/input.bin"
 		require.NoError(t, os.WriteFile(path, []byte{'a', 0, 'b'}, 0o600))
-		_, err := readFileInput(path)
+		_, err := readTextInput(path)
 		require.Error(t, err)
 		var merr modsError
 		require.ErrorAs(t, err, &merr)
 		require.Contains(t, merr.Reason(), "binary")
 	})
+
+	t.Run("rejects oversized input", func(t *testing.T) {
+		path := t.TempDir() + "/large.txt"
+		require.NoError(t, os.WriteFile(path, make([]byte, maxAttachmentBytes+1), 0o600))
+		_, err := readTextInput(path)
+		require.Error(t, err)
+		var merr modsError
+		require.ErrorAs(t, err, &merr)
+		require.Contains(t, merr.Reason(), "3 MiB")
+	})
+}
+
+func TestReadImageInput(t *testing.T) {
+	t.Run("detects JPEG PNG and WebP by magic bytes", func(t *testing.T) {
+		cases := map[string][]byte{
+			"jpeg": {0xff, 0xd8, 0xff, 0xdb},
+			"png":  {0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a},
+			"webp": append([]byte("RIFF\x00\x00\x00\x00WEBP"), 0),
+		}
+		for name, data := range cases {
+			t.Run(name, func(t *testing.T) {
+				path := t.TempDir() + "/input.bin"
+				require.NoError(t, os.WriteFile(path, data, 0o600))
+				image, err := readImageInput(path)
+				require.NoError(t, err)
+				require.NotEmpty(t, image.MediaType)
+			})
+		}
+	})
+
+	t.Run("rejects unsupported and oversized files", func(t *testing.T) {
+		path := t.TempDir() + "/input.gif"
+		require.NoError(t, os.WriteFile(path, []byte("GIF89a"), 0o600))
+		_, err := readImageInput(path)
+		require.Error(t, err)
+
+		path = t.TempDir() + "/large.jpg"
+		require.NoError(t, os.WriteFile(path, append([]byte{0xff, 0xd8, 0xff}, make([]byte, maxAttachmentBytes)...), 0o600))
+		_, err = readImageInput(path)
+		require.Error(t, err)
+		var merr modsError
+		require.ErrorAs(t, err, &merr)
+		require.Contains(t, merr.Reason(), "3 MiB")
+	})
+}
+
+func TestBuildInputPartsPreservesTextImageStdinOrder(t *testing.T) {
+	image := &proto.Image{MediaType: "image/png", Data: []byte("png")}
+	parts := buildInputParts("text", image, "stdin")
+	require.Len(t, parts, 3)
+	require.Equal(t, proto.ContentPartText, parts[0].Type)
+	require.Same(t, image, parts[1].Image)
+	require.Equal(t, "stdin", parts[2].Text)
+}
+
+func TestStartCompletionRejectsImageWithoutVisionCapability(t *testing.T) {
+	m := &Mods{
+		Config: &Config{
+			API:   "local",
+			Model: "text-model",
+			APIs: APIs{{
+				Name: "local",
+				Models: map[string]Model{
+					"text-model": {Name: "text-model", API: "local"},
+				},
+			}},
+		},
+		inputParts: []proto.ContentPart{{Type: proto.ContentPartImage, Image: &proto.Image{MediaType: "image/png", Data: []byte("png")}}},
+	}
+
+	_, _, _, err := m.startCompletion("")
+	require.Error(t, err)
+	var merr modsError
+	require.ErrorAs(t, err, &merr)
+	require.Contains(t, merr.Reason(), "vision: true")
 }
 
 func TestJoinInputParts(t *testing.T) {

@@ -121,14 +121,15 @@ func TestInteractiveFlagsAreRemoved(t *testing.T) {
 	}
 }
 
-func TestFileUsesShortFAndFormatIsLongOnly(t *testing.T) {
+func TestTextAndImageFlagsReplaceFile(t *testing.T) {
 	ensureFlagsInitialized()
-	file := rootCmd.Flags().Lookup("file")
-	if file == nil {
-		t.Fatal("--file is not registered")
+	if rootCmd.Flags().Lookup("file") != nil || rootCmd.Flags().ShorthandLookup("f") != nil {
+		t.Fatal("--file and -f must not be registered")
 	}
-	if file.Shorthand != "f" {
-		t.Fatalf("--file shorthand = %q, want f", file.Shorthand)
+	for _, name := range []string{"text", "image"} {
+		if rootCmd.Flags().Lookup(name) == nil {
+			t.Fatalf("--%s is not registered", name)
+		}
 	}
 	format := rootCmd.Flags().Lookup("format")
 	if format == nil {

@@ -12,6 +12,12 @@ import (
 )
 
 func TestConfig(t *testing.T) {
+	t.Run("model vision capability", func(t *testing.T) {
+		var cfg Config
+		require.NoError(t, yaml.Unmarshal([]byte("apis:\n  local:\n    models:\n      vision-model:\n        vision: true\n      text-model: {}\n"), &cfg))
+		require.True(t, cfg.APIs[0].Models["vision-model"].Vision)
+		require.False(t, cfg.APIs[0].Models["text-model"].Vision)
+	})
 	t.Run("old format text", func(t *testing.T) {
 		var cfg Config
 		require.NoError(t, yaml.Unmarshal([]byte("format-text: as markdown"), &cfg))

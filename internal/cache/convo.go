@@ -34,7 +34,8 @@ func (c *Conversations) Read(id string, messages *[]proto.Message) error {
 
 func (c *Conversations) Write(id string, messages *[]proto.Message) error {
 	return c.cache.Write(id, func(w io.Writer) error {
-		return encode(w, messages)
+		sanitized := proto.MessagesForCache(*messages)
+		return encode(w, &sanitized)
 	})
 }
 

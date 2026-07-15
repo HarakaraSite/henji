@@ -4,21 +4,27 @@ one-line flag reference, run `henji -h`.
 
 ## Invocation basics
 
-The prompt is assembled from arguments, an optional file, and stdin, in that
+The prompt is assembled from arguments, optional text and image attachments,
+and stdin, in that
 order:
 
     henji "explain this error"                # args only
     cat error.log | henji                     # stdin only
     cat error.log | henji "what went wrong?"  # args first, then stdin,
                                               # joined by a blank line
-    henji -f report.txt "summarize this"       # args first, then file content
+    henji --text report.txt "summarize this"  # args first, then text content
 
 Piped input is indented before it is appended, so it remains visually distinct
 from the instruction supplied as arguments.
 
-`-f` / `--file` accepts one UTF-8 text file. A second `--file` is an error,
-and binary-looking files are rejected rather than silently being mangled. For
-multiple files, concatenate them with the shell and pipe the result to stdin.
+`--text` accepts one UTF-8 text file up to 3 MiB. A second `--text` is an
+error, and binary-looking files are rejected rather than silently being
+mangled.
+`--image` accepts one JPEG, PNG, or WebP image up to 3 MiB; the selected model
+must set `vision: true` in configuration. The 3 MiB attachment limit remains
+in force with `--no-limit`. Inputs are ordered as arguments, text, image, then
+stdin. For multiple text files, concatenate them with the shell and pipe the
+result to stdin.
 
 Output contract for model invocations:
 

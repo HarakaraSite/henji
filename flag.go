@@ -6,33 +6,34 @@ import (
 	"strings"
 )
 
-// singleFileValue rejects repeated --file flags instead of silently keeping
-// only the last path, which makes shell glob mistakes visible immediately.
-type singleFileValue struct {
+// singlePathValue rejects repeated attachment flags instead of silently
+// keeping only the last path, which makes shell glob mistakes visible.
+type singlePathValue struct {
 	path *string
+	name string
 	set  bool
 }
 
-func (v *singleFileValue) Set(path string) error {
+func (v *singlePathValue) Set(path string) error {
 	if v.set {
-		return fmt.Errorf("--file may be specified only once")
+		return fmt.Errorf("--%s may be specified only once", v.name)
 	}
 	if path == "" {
-		return fmt.Errorf("--file requires a non-empty path")
+		return fmt.Errorf("--%s requires a non-empty path", v.name)
 	}
 	*v.path = path
 	v.set = true
 	return nil
 }
 
-func (v *singleFileValue) String() string {
+func (v *singlePathValue) String() string {
 	if v == nil || v.path == nil {
 		return ""
 	}
 	return *v.path
 }
 
-func (*singleFileValue) Type() string { return "path" }
+func (*singlePathValue) Type() string { return "path" }
 
 func newFlagParseError(err error) flagParseError {
 	var reason, flag string

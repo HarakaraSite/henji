@@ -21,6 +21,42 @@ type Chunk struct {
 type Message struct {
 	Role    string
 	Content string
+	Parts   []ContentPart
+}
+
+// ContentPart is one ordered piece of a user message.
+type ContentPart struct {
+	Type         string
+	Text         string
+	Image        *Image
+	ImageOmitted bool
+}
+
+const (
+	ContentPartText  = "text"
+	ContentPartImage = "image"
+)
+
+// Image is an in-memory image attachment. Paths are intentionally never kept.
+type Image struct {
+	MediaType string
+	Data      []byte
+}
+
+// MessagesForCache returns a copy that never persists image data.
+func MessagesForCache(messages []Message) []Message {
+	result := make([]Message, len(messages))
+	for i, msg := range messages {
+		result[i] = msg
+		var markers []ContentPart
+		for _, part := range msg.Parts {
+			if part.Type == ContentPartImage || part.Image != nil || part.ImageOmitted {
+				markers = append(markers, ContentPart{Type: ContentPartImage, ImageOmitted: true})
+			}
+		}
+		result[i].Parts = markers
+	}
+	return result
 }
 
 // Request is a chat request.
@@ -47,7 +83,7 @@ type Conversation []Message
 func (cc Conversation) String() string {
 	var sb strings.Builder
 	for _, msg := range cc {
-		if msg.Content == "" {
+		if msg.Content == "" && len(msg.Parts) == 0 {
 			continue
 		}
 		switch msg.Role {
@@ -66,6 +102,11 @@ func (cc Conversation) String() string {
 			continue
 		}
 		sb.WriteString(msg.Content)
+		for _, part := range msg.Parts {
+			if part.ImageOmitted {
+				sb.WriteString("\n[image omitted from saved conversation]")
+			}
+		}
 		sb.WriteString("\n\n")
 	}
 	return sb.String()
