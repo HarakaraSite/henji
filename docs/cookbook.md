@@ -168,6 +168,10 @@ of files, let the shell concatenate them and pass the result over stdin:
 cat docs/*.md | henji "find contradictions across these documents"
 ```
 
+The attached file is sent only for the current request and is not saved in
+conversation history. Reattach it with `--text` when a continued conversation
+needs it.
+
 ## Attaching one image with `--image`
 
 `--image` accepts one JPEG, PNG, or WebP file up to 3 MiB. Enable it only for
@@ -181,8 +185,8 @@ apis:
         vision: true
 ```
 
-The image is sent with the current request but is not saved in conversation
-history. Reattach it when continuing a conversation that needs it.
+The image is sent only for the current request and is not saved in conversation
+history. Reattach it with `--image` when a continued conversation needs it.
 
 ## Listing and reopening conversations
 

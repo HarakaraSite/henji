@@ -133,6 +133,23 @@ func TestSetupStreamContext(t *testing.T) {
 		require.Equal(t, "diff", message.Parts[3].Text)
 	})
 
+	t.Run("uses parts for a text attachment without an image", func(t *testing.T) {
+		mods := &Mods{
+			inputParts: buildInputParts("requirements", nil, "diff"),
+			rawInput:   "requirements\n\ndiff",
+			Config:     &Config{Prefix: "review"},
+		}
+
+		err := mods.setupStreamContext(mods.rawInput, Model{MaxChars: 100})
+		require.NoError(t, err)
+		message := mods.messages[0]
+		require.Equal(t, "review\n\nrequirements\n\ndiff", message.Content)
+		require.Len(t, message.Parts, 3)
+		require.Equal(t, "review", message.Parts[0].Text)
+		require.True(t, message.Parts[1].OmitFromCache)
+		require.Equal(t, "diff", message.Parts[2].Text)
+	})
+
 	t.Run("keeps image between text attachment and shortened stdin on retry", func(t *testing.T) {
 		image := &proto.Image{MediaType: "image/png", Data: []byte("png")}
 		mods := &Mods{

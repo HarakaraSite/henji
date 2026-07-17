@@ -218,8 +218,8 @@ apis:
         vision: true
 ```
 
-Images are not stored in saved conversations. Attach the image again when a
-continued conversation needs to see it.
+`--text` and `--image` attachments are not stored in saved conversations.
+Attach the file or image again when a continued conversation needs it.
 
 ```sh
 cat chapter-*.txt | henji "compare these chapters"

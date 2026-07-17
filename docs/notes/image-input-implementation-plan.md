@@ -54,9 +54,10 @@ git diff | henji \
 - 既存の `Content string` は残し、text / image を順序付きで表す `Parts` を追加する。
 - 画像付きの user message では、`Content` に画像を除くテキスト結合値を残す。既存のタイトル生成、表示、テキスト専用経路との互換性を保つ。
 - provider formatter は `Parts` がある場合にそれを使い、ない場合は従来の `Content` を使う。
-- 画像バイト列・ローカルパスは会話キャッシュに保存しない。
-- 保存前に画像partを `[image omitted from saved conversation]` 相当の表示マーカーへ置換する。`--show` はそのマーカーを表示する。
-- `--continue` / `-C` は過去画像をAPIへ再送しない。画像を再び参照させる利用者は、その実行で `--image` を再指定する。
+- `--text` の本文および画像バイト列・ローカルパスは会話キャッシュに保存しない。
+- 保存前に添付partを `[text attachment omitted from saved conversation]` または
+  `[image omitted from saved conversation]` の表示マーカーへ置換する。`--show` はそのマーカーを表示する。
+- `--continue` / `-C` は過去添付をAPIへ再送しない。添付を再び参照させる利用者は、その実行で `--text` または `--image` を再指定する。
 - 既存 gob を読めることを回帰テストで固定する。DB migration やキャッシュ全消去は行わない。
 
 ## プロバイダー変換

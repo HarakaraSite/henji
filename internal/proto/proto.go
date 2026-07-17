@@ -26,10 +26,12 @@ type Message struct {
 
 // ContentPart is one ordered piece of a user message.
 type ContentPart struct {
-	Type         string
-	Text         string
-	Image        *Image
-	ImageOmitted bool
+	Type          string
+	Text          string
+	Image         *Image
+	OmitFromCache bool
+	ImageOmitted  bool
+	TextOmitted   bool
 }
 
 const (
@@ -43,16 +45,35 @@ type Image struct {
 	Data      []byte
 }
 
-// MessagesForCache returns a copy that never persists image data.
+// MessagesForCache returns a copy that never persists attachment data.
 func MessagesForCache(messages []Message) []Message {
 	result := make([]Message, len(messages))
 	for i, msg := range messages {
 		result[i] = msg
 		var markers []ContentPart
+		var savedText []string
+		rebuildContent := false
+		hasTextParts := false
 		for _, part := range msg.Parts {
-			if part.Type == ContentPartImage || part.Image != nil || part.ImageOmitted {
+			switch {
+			case part.Image != nil || (part.Type == ContentPartImage && !part.ImageOmitted):
 				markers = append(markers, ContentPart{Type: ContentPartImage, ImageOmitted: true})
+				rebuildContent = true
+			case part.OmitFromCache:
+				markers = append(markers, ContentPart{Type: ContentPartText, TextOmitted: true})
+				rebuildContent = true
+				hasTextParts = true
+			case part.ImageOmitted:
+				markers = append(markers, ContentPart{Type: ContentPartImage, ImageOmitted: true})
+			case part.TextOmitted:
+				markers = append(markers, ContentPart{Type: ContentPartText, TextOmitted: true})
+			case part.Type == ContentPartText && part.Text != "":
+				savedText = append(savedText, part.Text)
+				hasTextParts = true
 			}
+		}
+		if rebuildContent && hasTextParts {
+			result[i].Content = strings.Join(savedText, "\n\n")
 		}
 		result[i].Parts = markers
 	}
@@ -103,7 +124,10 @@ func (cc Conversation) String() string {
 		}
 		sb.WriteString(msg.Content)
 		for _, part := range msg.Parts {
-			if part.ImageOmitted {
+			switch {
+			case part.TextOmitted:
+				sb.WriteString("\n[text attachment omitted from saved conversation]")
+			case part.ImageOmitted:
 				sb.WriteString("\n[image omitted from saved conversation]")
 			}
 		}

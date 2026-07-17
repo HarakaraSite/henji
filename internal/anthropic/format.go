@@ -35,7 +35,7 @@ func anthropicContentParts(parts []proto.ContentPart) []anthropic.ContentBlockPa
 	result := make([]anthropic.ContentBlockParamUnion, 0, len(parts))
 	for _, part := range parts {
 		switch {
-		case part.Type == proto.ContentPartText:
+		case part.Type == proto.ContentPartText && !part.TextOmitted:
 			result = append(result, anthropic.NewTextBlock(part.Text))
 		case part.Image != nil:
 			result = append(result, anthropic.NewImageBlockBase64(part.Image.MediaType, base64.StdEncoding.EncodeToString(part.Image.Data)))

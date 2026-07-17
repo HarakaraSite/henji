@@ -29,7 +29,7 @@ func googleParts(in proto.Message) []Part {
 	result := make([]Part, 0, len(in.Parts))
 	for _, part := range in.Parts {
 		switch {
-		case part.Type == proto.ContentPartText:
+		case part.Type == proto.ContentPartText && !part.TextOmitted:
 			result = append(result, Part{Text: part.Text})
 		case part.Image != nil:
 			result = append(result, Part{InlineData: &InlineData{

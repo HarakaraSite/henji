@@ -92,3 +92,26 @@ func TestConversationTitle(t *testing.T) {
 		}))
 	})
 }
+
+func TestConversationTitleForCacheOmitsTextAttachment(t *testing.T) {
+	t.Run("does not derive a title from a text-only attachment", func(t *testing.T) {
+		messages := []proto.Message{{
+			Role:    proto.RoleUser,
+			Content: "secret attachment first line\nsecond line",
+			Parts:   []proto.ContentPart{{Type: proto.ContentPartText, Text: "secret attachment first line\nsecond line", OmitFromCache: true}},
+		}}
+		require.Equal(t, defaultConversationTitle, conversationTitleForCache("", messages))
+	})
+
+	t.Run("keeps the prompt as the title when a text attachment follows it", func(t *testing.T) {
+		messages := []proto.Message{{
+			Role:    proto.RoleUser,
+			Content: "review this\n\nsecret attachment",
+			Parts: []proto.ContentPart{
+				{Type: proto.ContentPartText, Text: "review this"},
+				{Type: proto.ContentPartText, Text: "secret attachment", OmitFromCache: true},
+			},
+		}}
+		require.Equal(t, "review this", conversationTitleForCache("", messages))
+	})
+}

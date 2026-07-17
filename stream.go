@@ -53,7 +53,7 @@ func (m *Mods) setupStreamContext(content string, mod Model) error {
 		}
 	}
 
-	if !m.HasImage() {
+	if !m.HasOmittedAttachment() {
 		if prefix := cfg.Prefix; prefix != "" {
 			content = strings.TrimSpace(prefix + "\n\n" + content)
 		}

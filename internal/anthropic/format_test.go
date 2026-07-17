@@ -22,3 +22,14 @@ func TestFromProtoMessagesEncodesImageBlock(t *testing.T) {
 	require.Contains(t, string(body), `"media_type":"image/png"`)
 	require.Contains(t, string(body), `"data":"cG5n"`)
 }
+
+func TestFromProtoMessagesSkipsCachedTextAttachmentMarker(t *testing.T) {
+	_, messages := fromProtoMessages([]proto.Message{{
+		Role:    proto.RoleUser,
+		Content: "previous prompt",
+		Parts:   []proto.ContentPart{{Type: proto.ContentPartText, TextOmitted: true}},
+	}})
+	body, err := json.Marshal(messages[0])
+	require.NoError(t, err)
+	require.JSONEq(t, `{"role":"user","content":[{"type":"text","text":"previous prompt"}]}`, string(body))
+}

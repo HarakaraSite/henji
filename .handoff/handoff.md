@@ -16,3 +16,8 @@
 - 2026-07-15 23:58 [codex] Applied the same fixed 3 MiB safety cap to --text (not bypassed by --no-limit), with pre/post-read guards, docs, and regression coverage; tests and vet pass.
 - 2026-07-16 00:05 [codex] Review fix: context-length retry now preserves text/image/stdin ordering; added tests for retry ordering, raw gob image-byte exclusion, and cached-image omission on continued OpenAI requests; tests and vet pass.
 - 2026-07-16 00:09 [codex] Added docs/notes/image-input-manual-test.md with isolated real-gateway verification steps; it remains uncommitted for review/run after rest.
+- 2026-07-17 13:31 [codex] Rechecked image-input implementation: go test ./..., go vet ./..., and diff check pass; real image E2E remains pending a running vision gateway and a test image.
+- 2026-07-17 13:59 [codex] Completed real OpenAI gpt-5.6-luna image test: vision opt-in rejection, combined --text/--image/stdin input, continuation with reattachment, and image-byte omission from saved conversations all passed.
+- 2026-07-17 14:06 [codex] Changed --text to the same cache-free attachment model as --image: saved conversations omit text/image attachments with markers, continuations require reattachment, provider formatters skip markers; docs and tests updated, go test ./... and go vet ./... pass.
+- 2026-07-17 14:10 [codex] Focused review found auto-titles could retain --text content in SQLite; titles now derive from sanitized messages, regression tests added, and all tests/vet pass again.
+- 2026-07-17 14:15 [codex] Manually verified fresh --text conversations against gpt-5.6-luna: response uses README, --show omits its body with the text marker, and a text-only request saves as Untitled conversation rather than leaking attachment content into SQLite title.

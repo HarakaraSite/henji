@@ -550,7 +550,7 @@ func saveConversation(mods *Mods) error {
 
 	// if message is a sha1, use the last prompt instead.
 	id := config.cacheWriteToID
-	title := conversationTitle(config.cacheWriteToTitle, mods.messages)
+	title := conversationTitleForCache(config.cacheWriteToTitle, mods.messages)
 
 	errReason := fmt.Sprintf(
 		"There was a problem writing %s to the cache. Use %s / %s to disable it.",

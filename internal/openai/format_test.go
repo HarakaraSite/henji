@@ -34,6 +34,17 @@ func TestFromProtoMessagesSkipsCachedImageMarker(t *testing.T) {
 	require.JSONEq(t, `{"role":"user","content":"previous image"}`, string(body))
 }
 
+func TestFromProtoMessagesSkipsCachedTextAttachmentMarker(t *testing.T) {
+	messages := fromProtoMessages([]proto.Message{{
+		Role:    proto.RoleUser,
+		Content: "previous prompt",
+		Parts:   []proto.ContentPart{{Type: proto.ContentPartText, TextOmitted: true}},
+	}})
+	body, err := json.Marshal(messages[0])
+	require.NoError(t, err)
+	require.JSONEq(t, `{"role":"user","content":"previous prompt"}`, string(body))
+}
+
 func TestFromProtoMessagesContinueOmitsPastImageAndSendsNewImage(t *testing.T) {
 	messages := fromProtoMessages([]proto.Message{
 		{

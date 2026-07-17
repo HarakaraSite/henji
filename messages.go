@@ -38,3 +38,9 @@ func conversationTitle(title string, messages []proto.Message) string {
 	}
 	return title
 }
+
+// conversationTitleForCache derives an automatic title from the same
+// attachment-free representation that is persisted for a conversation.
+func conversationTitleForCache(title string, messages []proto.Message) string {
+	return conversationTitle(title, proto.MessagesForCache(messages))
+}

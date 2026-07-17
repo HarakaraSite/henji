@@ -469,7 +469,7 @@ func imageMediaType(data []byte) string {
 func buildInputParts(text string, image *proto.Image, stdin string) []proto.ContentPart {
 	parts := make([]proto.ContentPart, 0, 3)
 	if removeWhitespace(text) != "" {
-		parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: text})
+		parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: text, OmitFromCache: true})
 	}
 	if image != nil {
 		parts = append(parts, proto.ContentPart{Type: proto.ContentPartImage, Image: image})
@@ -478,6 +478,17 @@ func buildInputParts(text string, image *proto.Image, stdin string) []proto.Cont
 		parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: stdin})
 	}
 	return parts
+}
+
+// HasOmittedAttachment reports whether the current request has an attachment
+// that must be represented as structured content and removed before caching.
+func (m *Mods) HasOmittedAttachment() bool {
+	for _, part := range m.inputParts {
+		if part.Image != nil || part.OmitFromCache {
+			return true
+		}
+	}
+	return false
 }
 
 // joinInputParts preserves the deterministic input order documented for

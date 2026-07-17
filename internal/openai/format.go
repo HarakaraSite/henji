@@ -36,7 +36,7 @@ func openAIContentParts(parts []proto.ContentPart) []openai.ChatCompletionConten
 	result := make([]openai.ChatCompletionContentPartUnionParam, 0, len(parts))
 	for _, part := range parts {
 		switch {
-		case part.Type == proto.ContentPartText:
+		case part.Type == proto.ContentPartText && !part.TextOmitted:
 			result = append(result, openai.ChatCompletionContentPartUnionParam{
 				OfText: &openai.ChatCompletionContentPartTextParam{Text: part.Text},
 			})

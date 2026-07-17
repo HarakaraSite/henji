@@ -40,25 +40,34 @@ func TestCache(t *testing.T) {
 		require.ElementsMatch(t, messages, result)
 	})
 
-	t.Run("write omits image bytes", func(t *testing.T) {
+	t.Run("write omits attachment content", func(t *testing.T) {
 		cache, err := NewConversations(t.TempDir())
 		require.NoError(t, err)
 		messages := []proto.Message{{
 			Role:    proto.RoleUser,
-			Content: "describe this",
-			Parts:   []proto.ContentPart{{Type: proto.ContentPartImage, Image: &proto.Image{MediaType: "image/png", Data: []byte("secret-image")}}},
+			Content: "describe this\n\nsecret-text\n\nstdin",
+			Parts: []proto.ContentPart{
+				{Type: proto.ContentPartText, Text: "describe this"},
+				{Type: proto.ContentPartText, Text: "secret-text", OmitFromCache: true},
+				{Type: proto.ContentPartImage, Image: &proto.Image{MediaType: "image/png", Data: []byte("secret-image")}},
+				{Type: proto.ContentPartText, Text: "stdin"},
+			},
 		}}
 		require.NoError(t, cache.Write("image", &messages))
 
 		var result []proto.Message
 		require.NoError(t, cache.Read("image", &result))
 		require.Len(t, result, 1)
-		require.Len(t, result[0].Parts, 1)
-		require.True(t, result[0].Parts[0].ImageOmitted)
-		require.Nil(t, result[0].Parts[0].Image)
+		require.Equal(t, "describe this\n\nstdin", result[0].Content)
+		require.Len(t, result[0].Parts, 2)
+		require.True(t, result[0].Parts[0].TextOmitted)
+		require.True(t, result[0].Parts[1].ImageOmitted)
+		require.Nil(t, result[0].Parts[1].Image)
+		require.NotContains(t, proto.Conversation(result).String(), "secret-text")
 		require.NotContains(t, proto.Conversation(result).String(), "secret-image")
 		encoded, err := os.ReadFile(filepath.Join(cache.cache.dir(), "image.gob"))
 		require.NoError(t, err)
+		require.NotContains(t, string(encoded), "secret-text")
 		require.NotContains(t, string(encoded), "secret-image")
 	})
 

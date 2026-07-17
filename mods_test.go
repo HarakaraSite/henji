@@ -132,6 +132,7 @@ func TestBuildInputPartsPreservesTextImageStdinOrder(t *testing.T) {
 	parts := buildInputParts("text", image, "stdin")
 	require.Len(t, parts, 3)
 	require.Equal(t, proto.ContentPartText, parts[0].Type)
+	require.True(t, parts[0].OmitFromCache)
 	require.Same(t, image, parts[1].Image)
 	require.Equal(t, "stdin", parts[2].Text)
 }

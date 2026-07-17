@@ -24,7 +24,9 @@ mangled.
 must set `vision: true` in configuration. The 3 MiB attachment limit remains
 in force with `--no-limit`. Inputs are ordered as arguments, text, image, then
 stdin. For multiple text files, concatenate them with the shell and pipe the
-result to stdin.
+result to stdin. Text and image attachments are not stored in saved
+conversations; reattach them with `--text` or `--image` when continuing a
+conversation that needs them.
 
 Output contract for model invocations:
 
