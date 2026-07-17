@@ -23,3 +23,4 @@
 - 2026-07-17 14:15 [codex] Manually verified fresh --text conversations against gpt-5.6-luna: response uses README, --show omits its body with the text marker, and a text-only request saves as Untitled conversation rather than leaking attachment content into SQLite title.
 - 2026-07-17 14:31 [codex] Confirmed saved config now includes local Gemma vision and OpenRouter Qwen 3.7 Plus vision entries; preparing the verified attachment-cache changes for v2.1.2 release.
 - 2026-07-17 14:47 [codex] Standardized the Forgejo Go release profile and switched the uploader token to FORGEJO_TOKEN after v2.1.2's upload API returned 401; v2.1.3 will carry the workflow fix.
+- 2026-07-17 14:48 [codex] Pushed v2.1.3 (f4d9593); Forgejo Actions run 23 failed in about 30 seconds and exposed no ci-failure-summary asset, so the Actions UI log is needed before another release attempt.
