@@ -1,0 +1,36 @@
+version: 1
+
+runner_label: ubuntu-latest
+
+actions:
+  checkout: actions/checkout@v4
+  setup_go: actions/setup-go@v5
+  release: actions/forgejo-release@v2
+
+release:
+  uploader_kind: forgejo-release-v2-public
+  url_expression: ${{ vars.FORGE_URL }}
+  repository_expression: ${{ github.repository }}
+  token_expression: ${{ env.FORGEJO_TOKEN }}
+  notes_expression: ${{ format('Release {0}', github.ref_name) }}
+
+build:
+  product: henji
+  package: .
+  cgo_enabled: false
+  ldflags: -s -w -X main.Version=${{ github.ref_name }}
+  targets:
+    - linux/amd64
+    - linux/arm64
+    - darwin/amd64
+    - darwin/arm64
+    - windows/amd64
+
+quality:
+  test_command: go test ./...
+  vet_command: go vet ./...
+  checksums: false
+
+failure_summary:
+  mode: log-tail
+  log_tail_bytes: 4000

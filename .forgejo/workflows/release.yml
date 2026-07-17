@@ -8,8 +8,6 @@ on:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -19,11 +17,17 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Verify
-        id: verify
+      - name: Test
+        id: test
         run: |
           set -euo pipefail
-          { go test ./... && go vet ./...; } 2>&1 | tee verify.log
+          go test ./... 2>&1 | tee test.log
+
+      - name: Vet
+        id: vet
+        run: |
+          set -euo pipefail
+          go vet ./... 2>&1 | tee vet.log
 
       - name: Build binaries
         id: build
@@ -33,19 +37,13 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           {
-            CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64   .
-            CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64   .
-            CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64  .
-            CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64  .
+            CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64 .
+            CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64 .
+            CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64 .
+            CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64 .
             CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-windows-amd64.exe .
           } 2>&1 | tee build.log
 
-      # Forgejo has no public API for job/step logs, so a failure here would
-      # otherwise be invisible except by downloading the raw workflow log
-      # from the Actions UI by hand. Package a compact failure summary
-      # (which step failed, plus a tail of its captured output) as a release
-      # asset instead, so it can be fetched through the Releases API like
-      # any other asset (e.g. via `fja`, or plain curl).
       - name: Write CI failure summary
         if: failure()
         env:
@@ -55,18 +53,22 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
           FORGE_URL: ${{ vars.FORGE_URL }}
           REPO: ${{ github.repository }}
-          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          VET_OUTCOME: ${{ steps.vet.outcome }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
-          set -euo pipefail
-          rm -rf dist
+          set -uo pipefail
           mkdir -p dist
+          rm -f dist/henji-* dist/SHA256SUMS
 
           FAILED_STEP="unknown"
           LOG_FILE=""
-          if [ "$VERIFY_OUTCOME" = "failure" ]; then
-            FAILED_STEP="verify"
-            LOG_FILE="verify.log"
+          if [ "$TEST_OUTCOME" = "failure" ]; then
+            FAILED_STEP="test"
+            LOG_FILE="test.log"
+          elif [ "$VET_OUTCOME" = "failure" ]; then
+            FAILED_STEP="vet"
+            LOG_FILE="vet.log"
           elif [ "$BUILD_OUTCOME" = "failure" ]; then
             FAILED_STEP="build"
             LOG_FILE="build.log"
@@ -82,32 +84,34 @@ jobs:
           package main
 
           import (
-          	"encoding/json"
-          	"fmt"
-          	"os"
-          	"time"
+            "encoding/json"
+            "fmt"
+            "os"
+            "time"
           )
 
           func main() {
-          	logTail, _ := os.ReadFile("/tmp/log_tail.txt")
-          	out := map[string]any{
-          		"tag":            os.Getenv("TAG"),
-          		"sha":            os.Getenv("SHA"),
-          		"run_id":         os.Getenv("RUN_ID"),
-          		"run_number":     os.Getenv("RUN_NUMBER"),
-          		"run_url":        fmt.Sprintf("%s/%s/actions/runs/%s", os.Getenv("FORGE_URL"), os.Getenv("REPO"), os.Getenv("RUN_NUMBER")),
-          		"failed_step":    os.Getenv("FAILED_STEP"),
-          		"verify_outcome": os.Getenv("VERIFY_OUTCOME"),
-          		"build_outcome":  os.Getenv("BUILD_OUTCOME"),
-          		"log_tail":       string(logTail),
-          		"generated_at":   time.Now().UTC().Format(time.RFC3339),
-          	}
-          	enc := json.NewEncoder(os.Stdout)
-          	enc.SetIndent("", "  ")
-          	if err := enc.Encode(out); err != nil {
-          		fmt.Fprintln(os.Stderr, err)
-          		os.Exit(1)
-          	}
+            logTail, _ := os.ReadFile("/tmp/log_tail.txt")
+            out := map[string]any{
+              "schema_version": 1,
+              "tag":            os.Getenv("TAG"),
+              "sha":            os.Getenv("SHA"),
+              "run_id":         os.Getenv("RUN_ID"),
+              "run_number":     os.Getenv("RUN_NUMBER"),
+              "run_url":        fmt.Sprintf("%s/%s/actions/runs/%s", os.Getenv("FORGE_URL"), os.Getenv("REPO"), os.Getenv("RUN_NUMBER")),
+              "failed_step":    os.Getenv("FAILED_STEP"),
+              "test_outcome":   os.Getenv("TEST_OUTCOME"),
+              "vet_outcome":    os.Getenv("VET_OUTCOME"),
+              "build_outcome":  os.Getenv("BUILD_OUTCOME"),
+              "log_tail":       string(logTail),
+              "generated_at":   time.Now().UTC().Format(time.RFC3339),
+            }
+            enc := json.NewEncoder(os.Stdout)
+            enc.SetIndent("", "  ")
+            if err := enc.Encode(out); err != nil {
+              fmt.Fprintln(os.Stderr, err)
+              os.Exit(1)
+            }
           }
           GOEOF
           go run /tmp/ci-failure-summary.go > dist/ci-failure-summary.json
@@ -119,7 +123,7 @@ jobs:
           direction: upload
           url: ${{ vars.FORGE_URL }}
           repo: ${{ github.repository }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.FORGEJO_TOKEN }}
           tag: ${{ github.ref_name }}
           release-dir: dist
-          release-notes: ${{ (steps.verify.outcome == 'failure' || steps.build.outcome == 'failure') && 'CI failure summary' || format('Release {0}', github.ref_name) }}
+          release-notes: ${{ format('Release {0}', github.ref_name) }}
