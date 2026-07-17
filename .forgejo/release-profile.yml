@@ -9,9 +9,9 @@ actions:
 
 release:
   uploader_kind: forgejo-release-v2-public
-  url_expression: ${{ vars.FORGE_URL }}
-  repository_expression: ${{ github.repository }}
-  token_expression: ${{ env.FORGEJO_TOKEN }}
+  url_expression: ${{ env.FORGEJO_SERVER_URL }}
+  repository_expression: ${{ forge.repository }}
+  token_expression: ${{ secrets.RELEASE_TOKEN }}
   notes_expression: ${{ format('Release {0}', github.ref_name) }}
 
 build:

@@ -121,9 +121,9 @@ jobs:
         uses: actions/forgejo-release@v2
         with:
           direction: upload
-          url: ${{ vars.FORGE_URL }}
-          repo: ${{ github.repository }}
-          token: ${{ env.FORGEJO_TOKEN }}
+          url: ${{ env.FORGEJO_SERVER_URL }}
+          repo: ${{ forge.repository }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag: ${{ github.ref_name }}
           release-dir: dist
           release-notes: ${{ format('Release {0}', github.ref_name) }}
