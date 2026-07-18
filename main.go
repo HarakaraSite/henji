@@ -287,7 +287,7 @@ func main() {
 	// XXX: this must come after creating the config.
 	initFlags()
 
-	if !isCompletionCmd(os.Args) && !isManCmd(os.Args) && !isVersionOrHelpCmd(os.Args) {
+	if needsConversationDB(os.Args) {
 		db, err = openDB(filepath.Join(config.CachePath, "conversations", "henji.db"))
 		if err != nil {
 			handleError(modsError{err, "Could not open database."})
@@ -328,6 +328,16 @@ func main() {
 		closeDB()
 		os.Exit(1)
 	}
+}
+
+// needsConversationDB reports whether an invocation needs conversation data.
+// Generating a shell completion script does not, but the shell's internal
+// __complete invocation does when completing --continue, --show, or --delete.
+func needsConversationDB(args []string) bool {
+	if len(args) > 1 && args[1] == "__complete" {
+		return true
+	}
+	return !isCompletionCmd(args) && !isManCmd(args) && !isVersionOrHelpCmd(args)
 }
 
 // closeDB closes the conversation database if it was opened. db stays nil

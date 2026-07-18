@@ -27,3 +27,5 @@
 - 2026-07-17 15:05 [codex] API inspection found no repo/user Actions variables or repo secrets; switched the release profile to the runner URL/repository contexts and a required RELEASE_TOKEN secret, pending user-side PAT registration before v2.1.4.
 - 2026-07-17 15:09 [codex] Compared the successful hayami workflow and corrected henji to use Forgejo's automatic contexts (forgejo.server_url, forgejo.repository, forgejo.token, forgejo.ref_name); YAML, tests, vet, and diff checks pass before v2.1.4.
 - 2026-07-17 15:10 [codex] Released v2.1.4 successfully: Forgejo Actions run 24 passed and the public release contains five cross-platform henji binaries; no user-defined Actions secret is required.
+- 2026-07-18 10:04 [codex] Added the public Codeberg mirror link to README and pushed commit 9a8f8cb to main.
+- 2026-07-18 10:12 [codex] Fixed shell completion conversation candidates: __complete now opens the conversation DB; regression test, full tests, vet, and isolated candidate check pass.

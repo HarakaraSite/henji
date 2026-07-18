@@ -182,6 +182,25 @@ func TestIsCompletionCmd(t *testing.T) {
 	}
 }
 
+func TestNeedsConversationDB(t *testing.T) {
+	for args, want := range map[string]bool{
+		"":                          true,
+		"completion bash":           false,
+		"completion fish --help":    false,
+		"__complete --continue foo": true,
+		"__complete --show foo":     true,
+		"--continue foo":            true,
+		"--help":                    false,
+	} {
+		t.Run(args, func(t *testing.T) {
+			vargs := append([]string{"henji"}, strings.Fields(args)...)
+			if got := needsConversationDB(vargs); got != want {
+				t.Errorf("needsConversationDB(%v) = %v, want %v", vargs, got, want)
+			}
+		})
+	}
+}
+
 func TestExecuteFlagErrorDoesNotPanicWithNilDB(t *testing.T) {
 	origDB := db
 	db = nil
