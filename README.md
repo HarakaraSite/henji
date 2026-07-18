@@ -12,6 +12,8 @@ open an input form or a model picker: provide a prompt as arguments, `--text`,
 and/or stdin, and select a configured model with `--model` / `--api` when
 needed.
 
+A public mirror is available on [Codeberg](https://codeberg.org/littleisland/henji).
+
 ## What Changed from Upstream
 
 ### Bug fixes
