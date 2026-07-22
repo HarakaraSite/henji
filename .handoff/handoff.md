@@ -110,3 +110,20 @@
 
 ### 連絡・注意事項
 - 今回の生SSEにはMLX-LM由来の空応答・空dataイベントは見つからなかった。以前の出力欠落はHenji/MLX-LMの空応答とは断定できない。
+
+## 2026-07-22 16:00 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: Henji v2.1.6 release and installation
+
+### 実施したこと
+- `b6b34d3 fix: tolerate SSE comment keepalives` を注釈付きタグ `v2.1.6` として push し、Forgejo Actions run 26 が成功して5プラットフォームアセットを公開した。
+- 公開 `henji-darwin-arm64`（SHA-256 `6b0724fa166a0e5c3b66bd94102d092ec869d8241d80b61b0431edc4c7aa6c91`）を `/Users/masat/bin/henji` に配置し、`henji --version` が v2.1.6 を返すことを確認した。
+- 配置済みバイナリで OpenAI `gpt-5.6-luna` と OpenRouter `deepseek/deepseek-v4-flash` の `--no-cache --output json` 回帰を実行し、どちらも応答 `2` を確認した。
+
+### 次のタスク候補
+- MLX-LM モデル復旧後、必要なら配置済みv2.1.6で同じ実ストリーム確認を再実行する。
+
+### 連絡・注意事項
+- 旧v2.1.4バイナリは `/tmp/henji-v2.1.4-backup` に退避済み。未関連の `docs/notes/pipeline-executor-ecosystem-idea.md` は意図して未コミットのまま残している。
