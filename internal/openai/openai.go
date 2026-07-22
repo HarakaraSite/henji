@@ -42,7 +42,7 @@ func DefaultConfig(authToken string) Config {
 
 // New creates a new [Client] with the given [Config].
 func New(config Config) *Client {
-	opts := []option.RequestOption{}
+	opts := []option.RequestOption{option.WithMiddleware(ignoreEmptySSEEvents)}
 
 	if config.HTTPClient != nil {
 		opts = append(opts, option.WithHTTPClient(config.HTTPClient))

@@ -29,3 +29,84 @@
 - 2026-07-17 15:10 [codex] Released v2.1.4 successfully: Forgejo Actions run 24 passed and the public release contains five cross-platform henji binaries; no user-defined Actions secret is required.
 - 2026-07-18 10:04 [codex] Added the public Codeberg mirror link to README and pushed commit 9a8f8cb to main.
 - 2026-07-18 10:12 [codex] Fixed shell completion conversation candidates: __complete now opens the conversation DB; regression test, full tests, vet, and isolated candidate check pass.
+- 2026-07-18 13:47 [codex] User withdrew the future henji --web request; use the configured OpenRouter perplexity alias for search-capable prompts unless --web is explicitly requested again.
+
+## 2026-07-22 15:16 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: OpenAI-compatible SSE keepalive and future v3 migration
+
+### 実施したこと
+- MLX-LM のコメントのみの SSE keepalive で openai-go v1.12.0 が空 JSON をデコードする原因を確認し、v1 を維持する判断と将来の v3 移行条件を `docs/notes/henji-openai-sse-compatibility-design.md` に記録した。
+- OpenAI 共通クライアントへコメントのみの SSE ブロックを除去する狭い互換フィルターと回帰テストを追加した（検証は未完了）。
+
+### 次のタスク候補
+- sandbox 外で `GOCACHE=/tmp/mods-gocache go test ./internal/openai`、全体テスト、実 MLX-LM コマンドを実行し、問題なければレビュー・コミット・インストールを判断する。
+
+### 連絡・注意事項
+- v3.44.0 への移行は別のメジャー更新で再評価する。Azure / Azure AD は現時点で維持し、将来の v3 移行時にサポート継続を決定する。
+
+## 2026-07-22 15:21 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: OpenAI-compatible SSE keepalive verification
+
+### 実施したこと
+- コメントのみの SSE ブロックを SDK 前段で無害化し、LF/CRLF keepalive、通常チャンク、`[DONE]`、API error payload の回帰テストを追加した。
+- `GOCACHE=/tmp/mods-gocache go test ./...`、`go vet ./...`、および `/tmp/henji-sse-compat` へのソースビルドが成功した。
+
+### 次のタスク候補
+- MLX-LM を `127.0.0.1:8081` で起動後、`henji -a mlxlm -m e4b --no-cache "1+1は？答えだけで。"` を実行する。成功後にレビュー、コミット、インストールを判断する。
+
+### 連絡・注意事項
+- 検証時点で 8081 は未待受、PATH の `/Users/masat/bin/henji` は v2.1.4 のまま。ユーザー承認なしにインストール済みバイナリを更新していない。
+
+## 2026-07-22 15:24 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: MLX-LM SSE keepalive real-gateway acceptance
+
+### 実施したこと
+- sandbox 外で `http://127.0.0.1:8081/v1/models` を確認し、MLX-LM の Gemma 4 e4b/e2b モデルが稼働していることを確認した。
+- 未インストールの `/tmp/henji-sse-compat` から `-a mlxlm -m e4b --no-cache --output json` を実行し、ストリーム完走と応答 `2` を確認した。会話は保存されていない。
+
+### 次のタスク候補
+- 差分をレビューし、ユーザーが求めれば対象ファイルだけをコミットしてからインストール済み Henji を更新する。
+
+### 連絡・注意事項
+- PATH の `/Users/masat/bin/henji` は引き続き v2.1.4。インストール済みバイナリの更新は未実施。
+
+## 2026-07-22 15:31 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: MLX-LM e4b/e2b response-time sampling
+
+### 実施したこと
+- 修正版の未インストールHenjiで、`--no-cache --output json` と `/usr/bin/time -p` を用い、e4b 2回、e2b 2回、e4b 2回を実行した。
+- 取得できた実時間は e4b: 21.06秒、4.18秒、1.17秒、20.04秒、e2b: 1.48秒、1.61秒。全取得結果はストリームを完走した。
+
+### 次のタスク候補
+- 必要なら、同一プロンプト・ウォームアップ明示・複数反復でロード時間と生成時間を分けるベンチマークを行う。
+
+### 連絡・注意事項
+- e4b は単発値の揺れが大きいため、この6回だけで e2b との性能差を断定しない。途中で結果本文または計測値を返さなかった試行は集計から除外した。
+
+## 2026-07-22 15:38 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: MLX-LM model-switch and raw-SSE diagnosis
+
+### 実施したこと
+- 生の `/v1/chat/completions` SSE を e4b -> e2b -> e4b -> e4b で採取した。全4件で keepalive コメント、`content: "2"` のJSONチャンク、終端チャンク、`[DONE]` を確認し、空の `data:` は無かった。
+- e2bへの切替は36.07秒、e4bへの切替は43.21秒、同一e4bの継続呼出しは15.78秒だった。
+
+### 次のタスク候補
+- 必要なら同一HTTPリクエストを各モデルで複数回連続・交互に行い、モデルロードと定常生成を統計的に分けて測る。
+
+### 連絡・注意事項
+- 今回の生SSEにはMLX-LM由来の空応答・空dataイベントは見つからなかった。以前の出力欠落はHenji/MLX-LMの空応答とは断定できない。

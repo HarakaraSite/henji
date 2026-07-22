@@ -197,3 +197,43 @@ func TestNextStaysFalseAfterStreamEnds(t *testing.T) {
 	require.False(t, s.Next(), "Next() must keep returning false on repeated calls")
 	require.Equal(t, 1, requests, "Next() must not issue another request after the stream is done")
 }
+
+func TestStreamIgnoresCommentOnlySSEEvents(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+		fmt.Fprint(w, ": keepalive 1/2\r\n\r\n")
+		fmt.Fprint(w, ": keepalive 2/2\r\n\r\n")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"2\"}}]}\r\n\r\n")
+		fmt.Fprint(w, "data: [DONE]\r\n\r\n")
+	}))
+	t.Cleanup(srv.Close)
+
+	cfg := DefaultConfig("test-key")
+	cfg.BaseURL = srv.URL
+	s := New(cfg).Request(context.Background(), proto.Request{Model: "test"})
+	t.Cleanup(func() { _ = s.Close() })
+
+	require.True(t, s.Next())
+	chunk, err := s.Current()
+	require.NoError(t, err)
+	require.Equal(t, "2", chunk.Content)
+	require.False(t, s.Next())
+	require.NoError(t, s.Err())
+}
+
+func TestStreamKeepsAPIErrorAfterComment(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, ": keepalive\n\n")
+		fmt.Fprint(w, "data: {\"error\":{\"message\":\"upstream failed\"}}\n\n")
+	}))
+	t.Cleanup(srv.Close)
+
+	cfg := DefaultConfig("test-key")
+	cfg.BaseURL = srv.URL
+	s := New(cfg).Request(context.Background(), proto.Request{Model: "test"})
+	t.Cleanup(func() { _ = s.Close() })
+
+	require.False(t, s.Next())
+	require.ErrorContains(t, s.Err(), "upstream failed")
+}
