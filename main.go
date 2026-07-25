@@ -57,6 +57,7 @@ func init() {
 }
 
 func newDocsCmd() *cobra.Command {
+	var language string
 	cmd := &cobra.Command{
 		Use:   "docs",
 		Short: "Print the full task-oriented manual as Markdown",
@@ -75,12 +76,20 @@ func newDocsCmd() *cobra.Command {
 		},
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprint(cmd.OutOrStdout(), manualdocs.Manual(Version))
+			if language != "en" && language != "ja" {
+				return newUserErrorf("invalid --lang value %q, must be en or ja", language)
+			}
+			manual := manualdocs.Manual(Version)
+			if language == "ja" {
+				manual = manualdocs.ManualJapanese(Version)
+			}
+			_, err := fmt.Fprint(cmd.OutOrStdout(), manual)
 			return err //nolint:wrapcheck
 		},
 	}
+	cmd.Flags().StringVar(&language, "lang", "en", "manual language: en or ja")
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  henji docs\n")
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  henji docs [--lang en|ja]\n")
 		return err //nolint:wrapcheck
 	})
 	return cmd

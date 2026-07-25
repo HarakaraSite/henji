@@ -63,6 +63,17 @@ func TestDocsCommandPrintsPlainMarkdown(t *testing.T) {
 	}
 }
 
+func TestDocsCommandPrintsJapaneseManual(t *testing.T) {
+	cmd := newDocsCmd()
+	cmd.SetArgs([]string{"--lang", "ja"})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	requireNoError(t, cmd.Execute())
+	if !strings.HasPrefix(out.String(), "# henji ") || !strings.Contains(out.String(), "マニュアル") {
+		t.Fatalf("Japanese docs output has unexpected heading: %q", out.String()[:min(out.Len(), 80)])
+	}
+}
+
 // TestDocsCommandRejectsArgsWithHelpfulError is a C-2 regression test: a
 // prompt starting with the word "docs" (e.g. "docs って何") is parsed as
 // this subcommand with trailing arguments. The error must tell the user to

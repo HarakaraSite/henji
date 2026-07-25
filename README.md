@@ -12,8 +12,6 @@ open an input form or a model picker: provide a prompt as arguments, `--text`,
 and/or stdin, and select a configured model with `--model` / `--api` when
 needed.
 
-A public mirror is available on [Codeberg](https://codeberg.org/littleisland/henji).
-
 ## What Changed from Upstream
 
 ### Bug fixes
@@ -85,7 +83,7 @@ henji completion powershell -h
 
 > For more setup patterns and copy-pasteable examples (adding new providers,
 > keychain-based API keys, `--output json` for scripting/agents, reasoning
-> model quirks), see the [cookbook](docs/cookbook.md).
+> model quirks), see the [cookbook](docs/cookbook.md) ([日本語](docs/cookbook.ja.md)).
 
 ### Local LLM (Ollama / mlx-lm)
 
@@ -173,8 +171,9 @@ henji -C "now make it funnier"
 
 For more worked examples, see [`examples.md`](examples.md)
 ([日本語](examples.ja.md)) and [`features.md`](features.md)
-([日本語](features.ja.md)). See also the [cookbook](docs/cookbook.md) above
-for provider setup and scripting/agent patterns.
+([日本語](features.ja.md)). See also the [cookbook](docs/cookbook.md)
+([日本語](docs/cookbook.ja.md)) above for provider setup and scripting/agent
+patterns. A Japanese version of this README is [README.ja.md](README.ja.md).
 
 ### Flags
 

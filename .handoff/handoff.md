@@ -127,3 +127,20 @@
 
 ### 連絡・注意事項
 - 旧v2.1.4バイナリは `/tmp/henji-v2.1.4-backup` に退避済み。未関連の `docs/notes/pipeline-executor-ecosystem-idea.md` は意図して未コミットのまま残している。
+
+## 2026-07-25 19:38 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: 日本語ユーザー向けドキュメント
+
+### 実施したこと
+- README、Cookbook、内蔵マニュアルに `.ja.md` の対となる日本語版を追加し、README から各言語版へ相互に辿れるようにした。
+- `henji docs --lang ja` で日本語の内蔵マニュアルを出力できるようにし、回帰テストを追加した。
+- README の Codeberg 公開ミラー文を削除し、`go test ./...` と実行確認を完了した。
+
+### 次のタスク候補
+- 必要なら日本語文面のレビュー後、このドキュメント変更だけをコミットする。
+
+### 連絡・注意事項
+- 既存の未関連変更 `docs/notes/pipeline-executor-ecosystem-idea.md` はそのまま残している。
