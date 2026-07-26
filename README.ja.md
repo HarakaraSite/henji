@@ -163,9 +163,8 @@ henji --delete <id-or-title>
 
 ## クラウドプロバイダーと構造化出力
 
-`openai`、`anthropic`、`google`、`groq`、Azure OpenAI、および任意の OpenAI 互換 API を
-設定できます。Anthropic と Google はネイティブプロトコルを使い、それ以外は OpenAI 互換
-プロトコルを使います。
+`openai`、`anthropic`、`google`、`groq`、および任意の OpenAI 互換 API を設定できます。
+Anthropic と Google はネイティブプロトコルを使い、それ以外は OpenAI 互換プロトコルを使います。
 
 `--output json` は成功時・失敗時を一行 JSON で包むため、スクリプトで安全に扱えます。
 `--json-schema <file>` はプロバイダーの構造化出力を使い、クライアント側でも検証します。

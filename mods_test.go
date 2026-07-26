@@ -159,6 +159,26 @@ func TestStartCompletionRejectsImageWithoutVisionCapability(t *testing.T) {
 	require.Contains(t, merr.Reason(), "vision: true")
 }
 
+func TestStartCompletionRejectsRemovedAzureAPI(t *testing.T) {
+	m := &Mods{Config: &Config{
+		API:   "azure",
+		Model: "deployment",
+		APIs: APIs{{
+			Name: "azure",
+			Models: map[string]Model{
+				"deployment": {Name: "deployment", API: "azure"},
+			},
+		}},
+	}}
+
+	_, _, _, err := m.startCompletion("")
+	require.Error(t, err)
+	var merr modsError
+	require.ErrorAs(t, err, &merr)
+	require.Equal(t, "Unsupported API endpoint", merr.Reason())
+	require.Contains(t, err.Error(), "no longer supported")
+}
+
 func TestJoinInputParts(t *testing.T) {
 	require.Equal(t, "file content\n\n\tstdin", joinInputParts("file content", "\tstdin"))
 	require.Equal(t, "file content", joinInputParts("file content", " \n"))

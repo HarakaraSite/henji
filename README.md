@@ -312,15 +312,6 @@ For Groq (and other OpenAI-compatible providers whose API entry is not named
 `openai`), reference that variable explicitly with `api-key-env: GROQ_API_KEY`
 in the provider's API entry.
 
-### Azure OpenAI
-
-```sh
-export AZURE_OPENAI_KEY=...
-```
-
-Configure an `azure` or `azure-ad` API entry with its `base-url` and model
-entries in `henji.yml` as well.
-
 ## Structured Output
 
 `--format --format-as json` only asks the model to *try* to respond as JSON; it doesn't
@@ -342,8 +333,8 @@ of silently resending the same prompt.
 Notes:
 
 - Real OpenAI enforces `strict: true` reliably; other OpenAI-compatible
-  dialects (Groq models outside the `gpt-oss-*` family, local gateways like
-  Ollama/mlx-lm, Azure) get the schema without `strict`, since they may
+  dialects (Groq models outside the `gpt-oss-*` family and local gateways like
+  Ollama/mlx-lm) get the schema without `strict`, since they may
   reject or ignore it — the client-side validation step still catches
   anything that slips through.
 - Google's schema support is an OpenAPI 3.0 subset and doesn't accept every

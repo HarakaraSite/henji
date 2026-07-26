@@ -16,6 +16,7 @@
 - `json-output-plan.md` — `--output json` 設計メモ
 - `multimodal-and-file-input-plan.md` — `-f/--file`・`--image` 設計メモ
 - `pipeline-executor-ecosystem-idea.md` — 計画→実行→分析パイプラインの周辺エコシステム構想（別リポ前提・アイデア段階）
+- `henji-mini.md` — 会話・設定・組み込み描画を持たない小型 CLI の検討メモ（未決定）
 - `ai-docs-plan.md` / `henji-docs-draft.md` — 内蔵ドキュメント関連メモ
 - `dependency-compatibility.md` — 依存の互換性メモ
 - `model-eval-plan.md` / `model-eval-results-2026-07.md` / `model-eval-raw-2026-07/` — モデル別利用能力テストの計画・結果・生データ

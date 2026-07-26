@@ -9,7 +9,6 @@ import (
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"forge.harakara.site/littleisland/henji/v2/internal/stream"
 	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/azure"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/packages/ssestream"
@@ -30,7 +29,6 @@ type Config struct {
 	HTTPClient interface {
 		Do(*http.Request) (*http.Response, error)
 	}
-	APIType string
 }
 
 // DefaultConfig returns the default configuration for the OpenAI API client.
@@ -48,16 +46,9 @@ func New(config Config) *Client {
 		opts = append(opts, option.WithHTTPClient(config.HTTPClient))
 	}
 
-	if config.APIType == "azure-ad" {
-		opts = append(opts, azure.WithAPIKey(config.AuthToken))
-		if config.BaseURL != "" {
-			opts = append(opts, azure.WithEndpoint(config.BaseURL, "v1"))
-		}
-	} else {
-		opts = append(opts, option.WithAPIKey(config.AuthToken))
-		if config.BaseURL != "" {
-			opts = append(opts, option.WithBaseURL(config.BaseURL))
-		}
+	opts = append(opts, option.WithAPIKey(config.AuthToken))
+	if config.BaseURL != "" {
+		opts = append(opts, option.WithBaseURL(config.BaseURL))
 	}
 	client := openai.NewClient(opts...)
 	return &Client{
@@ -68,8 +59,8 @@ func New(config Config) *Client {
 // strictParam returns the response_format.json_schema.strict default for
 // the given dialect. Real OpenAI enforces strict-mode constraints (e.g.
 // additionalProperties:false, all fields required) reliably; other
-// OpenAI-compatible dialects (Groq's non gpt-oss-* models, local gateways,
-// Azure, ...) may reject or ignore strict mode, so leave it unset there and
+// OpenAI-compatible dialects (Groq's non gpt-oss-* models and local gateways,
+// for example) may reject or ignore strict mode, so leave it unset there and
 // let the server fall back to its own default/best-effort behavior.
 func strictParam(api string) param.Opt[bool] {
 	if api == "openai" {

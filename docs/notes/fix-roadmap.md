@@ -483,6 +483,40 @@ MCP ツール名を `{サーバ名}_{ツール名}` 形式で広告・逆引き�
 仕組み（`cache_read_input_tokens`等の可視化）なしに実装しても「効いているか」を確認できない
 ため、検証・設計を伴わないミニマル実装は見送り、保留のまま次バージョン候補に残す。
 
+### R-G. Azure OpenAI / Azure AD サポートの廃止（2026-07-26 実施）
+
+henji 本体を整理する一環として、Azure OpenAI と Azure AD 専用サポートを廃止した。
+現在の利用設定に Azure 系 API は存在せず、実装は `mods.go` の認証分岐と
+`internal/openai/openai.go` の `openai-go/azure` 用 endpoint・認証特例に限定されていた。
+
+- `azure` / `azure-ad` の認証分岐、`APIType`、`openai-go/azure` import を削除した
+- Azure SDK 系の間接依存を `go.mod` / `go.sum` から除去した
+- README と README.ja の Azure 説明、Azure を含む構造化出力の注意書きを更新した
+- 既存の `azure` / `azure-ad` 設定は、通常の OpenAI 互換 API として誤送信せず、
+  明示的な不支持エラーで停止する
+
+これは設定互換性を壊す変更である。実施時にはリリースノートに移行不可であることを明記し、
+OpenAI 互換 endpoint 一般への対応を削除するかどうかは、この項目とは別に判断する。
+
+### R-H. 組み込み Markdown レンダリングの廃止（2026-07-26 記録、未着手）
+
+henji はモデル応答をプレーンな Markdown のまま stdout に出す Unix フィルターとし、TTY 接続時の
+`glamour` による組み込みレンダリングを廃止候補にする。整形表示が必要な利用者は、パイプで
+外部のビューア（例: `glow`）へ渡す。
+
+```sh
+henji "explain this error" < error.log | glow -
+```
+
+- `charm.land/glamour/v2` と `Mods.printTextOutput` のレンダリング分岐を削除し、TTY と
+  非 TTY で同じプレーン出力にする
+- レンダリングを無効化するだけの `-r` / `--raw`、`raw` 設定、`word-wrap` 設定とその既定値を削除する
+- README、README.ja、features、内蔵マニュアル、設定テンプレートから該当説明を更新する
+- `lipgloss` 等の help・エラー表示スタイルは別項目であり、この変更だけでは削除しない
+
+`glow` の自動起動や外部コマンド実行は henji に追加しない。出力先の選択と実行はシェル利用者が
+明示的に行い、henji がファイル・ネットワーク・子プロセス操作を引き受けない境界を保つ。
+
 ---
 
 ## 6. 廃止・後回しの根拠（旧Tier）

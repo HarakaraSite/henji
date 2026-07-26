@@ -165,6 +165,12 @@ func (m *Mods) startCompletion(content string) (stream.Stream, func(string) stre
 			reason: fmt.Sprintf("The API endpoint %s is not configured.", m.Styles.InlineCode.Render(cfg.API)),
 		}
 	}
+	if mod.API == "azure" || mod.API == "azure-ad" {
+		return nil, nil, Model{}, modsError{
+			err:    newUserErrorf("Azure OpenAI and Azure AD are no longer supported"),
+			reason: "Unsupported API endpoint",
+		}
+	}
 	if m.HasImage() && !mod.Vision {
 		return nil, nil, Model{}, modsError{
 			err:    newUserErrorf("model %q is not configured for vision input", mod.Name),
@@ -189,18 +195,6 @@ func (m *Mods) startCompletion(content string) (stream.Stream, func(string) stre
 		}
 		gccfg = google.DefaultConfig(mod.Name, key)
 		gccfg.ThinkingBudget = mod.ThinkingBudget
-	case "azure", "azure-ad":
-		key, err := m.ensureKey(api, "AZURE_OPENAI_KEY", "https://aka.ms/oai/access")
-		if err != nil {
-			return nil, nil, Model{}, modsError{err, "Azure authentication failed"}
-		}
-		ccfg = openai.Config{AuthToken: key, BaseURL: api.BaseURL}
-		if mod.API == "azure-ad" {
-			ccfg.APIType = "azure-ad"
-		}
-		if api.User != "" {
-			cfg.User = api.User
-		}
 	default:
 		key, err := m.ensureKey(api, "OPENAI_API_KEY", "https://platform.openai.com/account/api-keys")
 		if err != nil {

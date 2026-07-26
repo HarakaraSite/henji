@@ -144,3 +144,20 @@
 
 ### 連絡・注意事項
 - 既存の未関連変更 `docs/notes/pipeline-executor-ecosystem-idea.md` はそのまま残している。
+
+## 2026-07-26 12:43 JST
+
+- 実行エージェント: Codex
+- モデル: 不明
+- 作業トピック: Azure OpenAI / Azure AD 対応の廃止
+
+### 実施したこと
+- Azure 専用の認証・endpoint 分岐、SDK import、依存記録、英日 README の案内を削除し、旧設定名は明示的な不支持エラーにした。
+- Azure 削除の回帰テスト、実 OpenAI API 回帰、独立 read-only レビューを完了した。レビューの checksum 残存指摘は修正し、`azure-ad` の追加テストと SDK 上流の残余モジュールグラフは受容した。
+- `henji-mini` と組み込み Markdown 描画廃止の検討メモを追加した。
+
+### 次のタスク候補
+- v2.1.7 のタグ release CI と公開 asset を確認する。
+
+### 連絡・注意事項
+- 未関連の `docs/notes/pipeline-executor-ecosystem-idea.md` はコミットに含めない。
