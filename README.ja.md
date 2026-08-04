@@ -1,11 +1,11 @@
-# henji（mods フォーク）
+# henji CLI（mods フォーク）
 
 パイプラインのために作られた、コマンドラインの AI。
 
-*henji* は日本語の「返事」に由来する名前です。これは 2026 年 3 月 9 日にアーカイブされた
+*henji CLI* は日本語の「返事」に由来する名前です。これは 2026 年 3 月 9 日にアーカイブされた
 [charmbracelet/mods](https://github.com/charmbracelet/mods) の、現在も保守しているフォークです。
-ローカル LLM の利用と、henji を Unix フィルターとして扱うことを重視します。すなわち
-`stdin → LLM → stdout` として、シェルの他のパイプラインと組み合わせます。henji 自身は
+ローカル LLM の利用と、henji CLI を Unix フィルターとして扱うことを重視します。すなわち
+`stdin → LLM → stdout` として、シェルの他のパイプラインと組み合わせます。henji CLI 自身は
 入力フォームやモデル選択 UI を開きません。プロンプトは引数、`--text`、stdin で渡し、必要に
 応じて `--model` / `--api` で設定済みモデルを選択します。
 
@@ -40,7 +40,7 @@
 
 MCP（Model Context Protocol）対応も完全に削除しました。信頼できない文章を処理した際に、
 モデルが外部ツールを承認・読み書きの区別なく呼び出せる設計には実害のあるリスクがありました。
-henji は通常の Unix フィルターに戻し、ファイルやネットワークへのアクセスは周囲の `cat`、
+henji CLI は通常の Unix フィルターに戻し、ファイルやネットワークへのアクセスは周囲の `cat`、
 `curl`、`find` などのシェルコマンドが担います。
 
 ## インストール
@@ -72,7 +72,7 @@ henji completion powershell -h
 
 ### ローカル LLM（Ollama / mlx-lm）
 
-ローカルの OpenAI 互換エンドポイントを指定します。henji は常に API キーを送るため、サーバーが
+ローカルの OpenAI 互換エンドポイントを指定します。henji CLI は常に API キーを送るため、サーバーが
 検証しない場合も任意のプレースホルダーを設定してください。
 
 ```yaml
@@ -179,7 +179,7 @@ henji --output json "explain this error" < error.log | jq -r '.content[0].text'
 
 ## 生成、確認、実行
 
-henji にコマンドを提案させることはできますが、出力をそのまま `sh` に接続しないでください。
+henji CLI にコマンドを提案させることはできますが、出力をそのまま `sh` に接続しないでください。
 人が内容を確認してから自分で実行するのが、想定する安全な使い方です。
 
 ```sh

@@ -1,13 +1,13 @@
-# henji (mods fork)
+# henji CLI (mods fork)
 
 AI for the command line, built for pipelines.
 
-*henji* is named after the Japanese word for “reply” (返事).
+*henji CLI* is named after the Japanese word for “reply” (返事).
 
 This is an actively maintained fork of [charmbracelet/mods](https://github.com/charmbracelet/mods),
 which was archived on March 9, 2026. The fork focuses on local LLM usage and
-treating henji as a Unix filter: `stdin → LLM → stdout`, composable with the
-rest of your shell pipeline rather than acting on your behalf. henji does not
+treating henji CLI as a Unix filter: `stdin → LLM → stdout`, composable with the
+rest of your shell pipeline rather than acting on your behalf. henji CLI does not
 open an input form or a model picker: provide a prompt as arguments, `--text`,
 and/or stdin, and select a configured model with `--model` / `--api` when
 needed.
@@ -49,12 +49,12 @@ All dependencies updated to current versions, including security patches for `x/
   `--mcp-list`, `--mcp-list-tools`, `--mcp-disable`, `--max-tool-calls`, and
   the `mcp-servers`/`mcp-timeout` config keys. MCP let a model call external
   tools with no per-tool approval or read/write distinction, which a security
-  review flagged as a real risk when henji processes untrusted content
+  review flagged as a real risk when henji CLI processes untrusted content
   (a webpage, log, or issue containing text aimed at the model rather than
   the user). Rather than build the allowlisting/sandboxing/audit machinery a
-  safe agentic tool loop needs, this fork returns henji to a plain Unix
+  safe agentic tool loop needs, this fork returns henji CLI to a plain Unix
   filter: file and network access stay in the hands of `cat`, `curl`, `find`,
-  and the rest of the shell pipeline around henji. See "Generate, review,
+  and the rest of the shell pipeline around henji CLI. See "Generate, review,
   then run" below for the intended pattern when a task needs those.
 
 ## Installation
@@ -87,7 +87,7 @@ henji completion powershell -h
 
 ### Local LLM (Ollama / mlx-lm)
 
-Point henji at your local OpenAI-compatible endpoint. Local servers don't check the key, but henji's OpenAI-compatible request path always sends one, so set `api-key` to any placeholder value:
+Point henji CLI at your local OpenAI-compatible endpoint. Local servers don't check the key, but henji CLI's OpenAI-compatible request path always sends one, so set `api-key` to any placeholder value:
 
 ```yaml
 # ~/.config/henji/henji.yml
@@ -122,7 +122,7 @@ Preferred order (most secure first):
    ```
 
    The command must write only the key to stdout. If it fails or exits
-   non-zero, henji reports an error rather than silently falling back to a
+   non-zero, henji CLI reports an error rather than silently falling back to a
    lower-priority source.
 
 2. **`api-key-env`** — read from a named environment variable
@@ -326,7 +326,7 @@ response against the schema client-side before printing it.
 henji --json-schema review-schema.json "review this diff for security issues" < diff.patch
 ```
 
-If the response fails validation, henji tells the model what was wrong and
+If the response fails validation, henji CLI tells the model what was wrong and
 asks it to try again (up to `--json-schema-retries` times, default 2) instead
 of silently resending the same prompt.
 
@@ -343,14 +343,14 @@ Notes:
   `oneOf`-heavy schemas are also likely to be rejected. Keep schemas simple,
   and drop `additionalProperties` when targeting the Google dialect.
 - `--json-schema` suppresses live streaming output — since a failed response
-  gets discarded and retried, henji only prints once the answer has actually
+  gets discarded and retried, henji CLI only prints once the answer has actually
   passed validation.
 
 ## Generate, review, then run
 
-henji doesn't call tools or touch your filesystem on its own — it reads
+henji CLI doesn't call tools or touch your filesystem on its own — it reads
 stdin and writes stdout, nothing else. When a task needs file access, a
-network request, or a shell command, ask henji to generate that command and
+network request, or a shell command, ask henji CLI to generate that command and
 run it yourself:
 
 ```sh
@@ -359,10 +359,10 @@ henji -R shell "find the 10 largest files under the current directory"
 
 Read what came back before running it — `less`/`bat`, not `cat`, so long or
 adversarial output doesn't scroll straight past you — and never pipe
-henji's output directly into a shell:
+henji CLI's output directly into a shell:
 
 ```sh
-# Don't: skips the review step entirely, executes whatever henji wrote
+# Don't: skips the review step entirely, executes whatever henji CLI wrote
 henji -R shell "..." | sh
 
 # Do: look at it first, then run it yourself
