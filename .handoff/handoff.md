@@ -161,3 +161,11 @@
 
 ### 連絡・注意事項
 - 未関連の `docs/notes/pipeline-executor-ecosystem-idea.md` はコミットに含めない。
+
+## 2026-08-04 18:27 JST
+
+- 実行エージェント: Codex
+- 作業トピック: README 表記更新の push
+- 実施: README.md と README.ja.md の henji CLI 表記更新を `b48b281` としてコミットし、`main` から `origin/main` へ push した。`go test ./...` と `go vet ./...` は成功。
+- 次: なし
+- 注意: なし
