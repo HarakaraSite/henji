@@ -5,26 +5,25 @@ go 1.26.0
 require (
 	charm.land/glamour/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.0.5
-	github.com/anthropics/anthropic-sdk-go v1.56.0
+	github.com/anthropics/anthropic-sdk-go v1.62.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/caarlos0/go-shellwords v1.0.12
-	github.com/caarlos0/timea.go v1.2.0
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/exp/golden v0.0.0-20260629091435-9c70f75e26a4
 	github.com/charmbracelet/x/exp/ordered v0.1.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/lucasb-eyer/go-colorful v1.4.0
-	github.com/mattn/go-isatty v0.0.22
+	github.com/lucasb-eyer/go-colorful v1.4.1
+	github.com/mattn/go-isatty v0.0.24
 	github.com/muesli/mango-cobra v1.3.0
 	github.com/muesli/roff v0.1.0
 	github.com/muesli/termenv v0.16.0
 	github.com/openai/openai-go v1.12.0
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.53.0
+	modernc.org/sqlite v1.56.0
 )
 
 require (
@@ -60,7 +59,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -73,9 +71,9 @@ require (
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
-	modernc.org/libc v1.73.4 // indirect
+	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
