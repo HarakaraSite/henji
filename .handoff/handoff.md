@@ -169,3 +169,11 @@
 - 実施: README.md と README.ja.md の henji CLI 表記更新を `b48b281` としてコミットし、`main` から `origin/main` へ push した。`go test ./...` と `go vet ./...` は成功。
 - 次: なし
 - 注意: なし
+
+## 2026-08-12 15:44 JST
+
+- 実行エージェント: Codex
+- 作業トピック: strict continuation
+- 実施: `b682505deb744230b11e4047cfe231dc7371a095` で明示 `--continue <ID>` のHEADフォールバックを除去し、unknown/ambiguous、`--continue-last`、保存済みAPI/model復元の回帰を追加。`go test -count=1 ./...`、`go vet ./...`、`go build -o /tmp/henji-strict-continuation .` が成功。
+- 次: なし
+- 注意: `/home/masat.guest/.local/bin/henji` は上記source commitから導入済み（SHA-256 `a57ee0ad8c96c2db0baba2f818b064d62af158bb4be5a7752dac3165a94c2053`）。隔離fake provider smokeでvalid指定ID、unknown/ambiguousの非0・一覧不変、`--continue-last`の最新ID継続を確認。
