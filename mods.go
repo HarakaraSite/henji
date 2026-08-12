@@ -319,24 +319,32 @@ func (m *Mods) checkJSONSchema() (string, error) {
 }
 
 func (m *Mods) findCacheOpsDetails() (cacheDetailsMsg, error) {
-	continueLast := m.Config.ContinueLast || (m.Config.Continue != "" && m.Config.Title == "")
+	continueLast := m.Config.ContinueLast
 	readID := ordered.First(m.Config.Continue, m.Config.Show)
 	writeID := ordered.First(m.Config.Title, m.Config.Continue)
 	title := writeID
 	model := m.Config.Model
 	api := m.Config.API
 
-	if readID != "" || continueLast {
+	if readID != "" {
 		found, err := m.findReadID(readID)
 		if err != nil {
 			return cacheDetailsMsg{}, modsError{err: err, reason: "Could not find the conversation."}
 		}
-		if found != nil {
-			readID = found.ID
-			if found.Model != nil && found.API != nil {
-				model = *found.Model
-				api = *found.API
-			}
+		readID = found.ID
+		if found.Model != nil && found.API != nil {
+			model = *found.Model
+			api = *found.API
+		}
+	} else if continueLast {
+		found, err := m.db.FindHEAD()
+		if err != nil {
+			return cacheDetailsMsg{}, modsError{err: err, reason: "Could not find the conversation."}
+		}
+		readID = found.ID
+		if found.Model != nil && found.API != nil {
+			model = *found.Model
+			api = *found.API
 		}
 	}
 	if continueLast {
@@ -359,14 +367,7 @@ func (m *Mods) findCacheOpsDetails() (cacheDetailsMsg, error) {
 type cacheDetailsMsg struct{ WriteID, Title, ReadID, API, Model string }
 
 func (m *Mods) findReadID(in string) (*Conversation, error) {
-	convo, err := m.db.Find(in)
-	if err == nil {
-		return convo, nil
-	}
-	if errors.Is(err, errNoMatches) && m.Config.Show == "" {
-		return m.db.FindHEAD()
-	}
-	return nil, err
+	return m.db.Find(in)
 }
 
 func (m *Mods) readStdin() (string, error) {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
@@ -314,6 +315,53 @@ func TestFindCacheOpsDetails(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, id, details.ReadID)
 		require.Equal(t, id, details.WriteID)
+		require.Equal(t, "openai", details.API)
+		require.Equal(t, "gpt-4", details.Model)
+	})
+	t.Run("unknown continue fails before a request or conversation write", func(t *testing.T) {
+		m := newTestMods(t)
+		headID := newConversationID()
+		require.NoError(t, m.db.Save(headID, "latest", "openai", "gpt-4"))
+		m.Config.Continue = "missing"
+		m.Config.Prefix = "prompt"
+
+		err := m.run()
+		require.Error(t, err)
+		require.Empty(t, m.Config.cacheReadFromID)
+		require.Empty(t, m.Config.cacheWriteToID)
+		head, err := m.db.FindHEAD()
+		require.NoError(t, err)
+		require.Equal(t, headID, head.ID)
+	})
+	t.Run("ambiguous continue fails without selecting either conversation", func(t *testing.T) {
+		m := newTestMods(t)
+		firstID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		secondID := "aaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		require.NoError(t, m.db.Save(firstID, "first", "openai", "gpt-4"))
+		require.NoError(t, m.db.Save(secondID, "second", "openai", "gpt-4"))
+		m.Config.Continue = "aaaaaaa"
+		m.Config.Prefix = "prompt"
+
+		err := m.run()
+		require.Error(t, err)
+		require.Empty(t, m.Config.cacheReadFromID)
+		require.Empty(t, m.Config.cacheWriteToID)
+	})
+	t.Run("continue last resolves the latest conversation", func(t *testing.T) {
+		m := newTestMods(t)
+		firstID := newConversationID()
+		secondID := newConversationID()
+		require.NoError(t, m.db.Save(firstID, "first", "openai", "gpt-4"))
+		time.Sleep(100 * time.Millisecond)
+		require.NoError(t, m.db.Save(secondID, "second", "anthropic", "claude"))
+		m.Config.ContinueLast = true
+
+		details, err := m.findCacheOpsDetails()
+		require.NoError(t, err)
+		require.Equal(t, secondID, details.ReadID)
+		require.Equal(t, secondID, details.WriteID)
+		require.Equal(t, "anthropic", details.API)
+		require.Equal(t, "claude", details.Model)
 	})
 	t.Run("unknown show reports a user error", func(t *testing.T) {
 		m := newTestMods(t)
