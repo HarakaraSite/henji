@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"strings"
 
@@ -64,25 +63,6 @@ func makeStyles(profile colorprofile.Profile, darkBackground bool) (s styles) {
 	s.SHA1 = s.Flag
 	s.Timeago = lipgloss.NewStyle().Foreground(adaptiveColor("#999", "#555"))
 	return s
-}
-
-// action messages
-
-const defaultAction = "WROTE"
-
-func printConfirmation(action, content string) {
-	if action == "" {
-		action = defaultAction
-	}
-	profile := stdoutStyles().profile
-	outputHeader := lipgloss.NewStyle().
-		Foreground(profile.Convert(lipgloss.Color("#F1F1F1"))).
-		Background(profile.Convert(lipgloss.Color("#6C50FF"))).
-		Bold(profile > colorprofile.ASCII).
-		Padding(0, 1).
-		MarginRight(1).
-		SetString(strings.ToUpper(action))
-	fmt.Println(lipgloss.JoinHorizontal(lipgloss.Center, outputHeader.String(), content))
 }
 
 func makeGradientRamp(length int) []color.Color {
