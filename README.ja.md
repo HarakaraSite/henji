@@ -189,5 +189,9 @@ henji -R shell "find large files under the current directory" | less
 
 ## 検証とライセンス
 
-開発時の基本検証は `go test ./...`、`go vet ./...`、必要に応じて
-`scripts/e2e-gateway-test.sh` です。ライセンスは MIT License です。
+CI のリリースゲートは `go test ./...` と `go vet ./...` です。
+`go test -race ./...` と `scripts/e2e-gateway-test.sh` はタグ付け前の参照チェックで、
+C ツールチェーンとローカルの OpenAI 互換ゲートウェイ（mlx-lm / Ollama / LM Studio）が
+必要なためリリース workflow では実行しません。参照環境で実行し、結果は
+[release checkpoints](docs/release-checkpoints.md) に記録します。
+ライセンスは MIT License です。

@@ -1,3 +1,5 @@
+# Generated from .forgejo/release-profile.yml (version: 2).
+# Render every placeholder from a confirmed profile; do not edit by hand.
 name: release
 
 on:
@@ -17,107 +19,35 @@ jobs:
           go-version-file: go.mod
           cache: false
 
+      # Portable, non-interactive release-runner gates only. Race, PTY/TTY, and
+      # real-gateway checks are pre-tag evidence (see .forgejo/release-profile.yml
+      # and docs/release-checkpoints.md).
       - name: Test
-        id: test
         run: |
           set -euo pipefail
-          go test ./... 2>&1 | tee test.log
+          go test ./...
 
       - name: Vet
-        id: vet
         run: |
           set -euo pipefail
-          go vet ./... 2>&1 | tee vet.log
+          go vet ./...
 
       - name: Build binaries
         id: build
         env:
-          LDFLAGS: -s -w -X main.Version=${{ github.ref_name }}
+          LDFLAGS: -s -w -X main.Version=${{ forgejo.ref_name }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          {
-            CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64 .
-            CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64 .
-            CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64 .
-            CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64 .
-            CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-windows-amd64.exe .
-          } 2>&1 | tee build.log
-
-      - name: Write CI failure summary
-        if: failure()
-        env:
-          TAG: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_NUMBER: ${{ github.run_number }}
-          FORGE_URL: ${{ vars.FORGE_URL }}
-          REPO: ${{ github.repository }}
-          TEST_OUTCOME: ${{ steps.test.outcome }}
-          VET_OUTCOME: ${{ steps.vet.outcome }}
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-        run: |
-          set -uo pipefail
-          mkdir -p dist
-          rm -f dist/henji-* dist/SHA256SUMS
-
-          FAILED_STEP="unknown"
-          LOG_FILE=""
-          if [ "$TEST_OUTCOME" = "failure" ]; then
-            FAILED_STEP="test"
-            LOG_FILE="test.log"
-          elif [ "$VET_OUTCOME" = "failure" ]; then
-            FAILED_STEP="vet"
-            LOG_FILE="vet.log"
-          elif [ "$BUILD_OUTCOME" = "failure" ]; then
-            FAILED_STEP="build"
-            LOG_FILE="build.log"
-          fi
-          export FAILED_STEP
-
-          : > /tmp/log_tail.txt
-          if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
-            tail -c 4000 "$LOG_FILE" > /tmp/log_tail.txt
-          fi
-
-          cat > /tmp/ci-failure-summary.go <<'GOEOF'
-          package main
-
-          import (
-            "encoding/json"
-            "fmt"
-            "os"
-            "time"
-          )
-
-          func main() {
-            logTail, _ := os.ReadFile("/tmp/log_tail.txt")
-            out := map[string]any{
-              "schema_version": 1,
-              "tag":            os.Getenv("TAG"),
-              "sha":            os.Getenv("SHA"),
-              "run_id":         os.Getenv("RUN_ID"),
-              "run_number":     os.Getenv("RUN_NUMBER"),
-              "run_url":        fmt.Sprintf("%s/%s/actions/runs/%s", os.Getenv("FORGE_URL"), os.Getenv("REPO"), os.Getenv("RUN_NUMBER")),
-              "failed_step":    os.Getenv("FAILED_STEP"),
-              "test_outcome":   os.Getenv("TEST_OUTCOME"),
-              "vet_outcome":    os.Getenv("VET_OUTCOME"),
-              "build_outcome":  os.Getenv("BUILD_OUTCOME"),
-              "log_tail":       string(logTail),
-              "generated_at":   time.Now().UTC().Format(time.RFC3339),
-            }
-            enc := json.NewEncoder(os.Stdout)
-            enc.SetIndent("", "  ")
-            if err := enc.Encode(out); err != nil {
-              fmt.Fprintln(os.Stderr, err)
-              os.Exit(1)
-            }
-          }
-          GOEOF
-          go run /tmp/ci-failure-summary.go > dist/ci-failure-summary.json
+          CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-amd64 .
+          CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-linux-arm64 .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-amd64 .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-darwin-arm64 .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o dist/henji-windows-amd64.exe .
+          sha256sum dist/henji-* > dist/SHA256SUMS
 
       - name: Upload release
-        if: always()
+        if: success()
         uses: actions/forgejo-release@v2
         with:
           direction: upload

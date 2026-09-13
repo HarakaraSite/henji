@@ -379,17 +379,22 @@ random webpage.
 
 ## Verification
 
-Run the unit and provider mock tests before changing behavior:
+The portable release gate is the unit and provider mock test suite:
 
 ```sh
 go test ./...
 go vet ./...
 ```
 
-For a real OpenAI-compatible gateway (mlx-lm, Ollama, or LM Studio), run the
-manual E2E check. It validates JSON success and error paths, the
-`max-input-chars` regression, and `--text` attachment; it is intentionally
-not part of CI because a Forgejo runner has no local model gateway.
+`go test -race ./...` and the local-gateway E2E check
+(`scripts/e2e-gateway-test.sh`) are pre-tag reference checks. They need a C
+toolchain and a running OpenAI-compatible gateway (mlx-lm, Ollama, or LM
+Studio), so they are intentionally not part of the CI release workflow. Run
+them in the reference environment before tagging; recorded results live in
+[release checkpoints](docs/release-checkpoints.md).
+
+The E2E check validates JSON success and error paths, the `max-input-chars`
+regression, and `--text` attachment:
 
 ```sh
 GATEWAY_URL=http://localhost:8080/v1 \

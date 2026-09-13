@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 runner_label: ubuntu-latest
 
@@ -12,13 +12,14 @@ release:
   url_expression: ${{ forgejo.server_url }}
   repository_expression: ${{ forgejo.repository }}
   token_expression: ${{ forgejo.token }}
+  tag_expression: ${{ forgejo.ref_name }}
   notes_expression: ${{ format('Release {0}', forgejo.ref_name) }}
 
 build:
   product: henji
   package: .
   cgo_enabled: false
-  ldflags: -s -w -X main.Version=${{ github.ref_name }}
+  ldflags: "-s -w -X main.Version=${{ forgejo.ref_name }}"
   targets:
     - linux/amd64
     - linux/arm64
@@ -29,8 +30,19 @@ build:
 quality:
   test_command: go test ./...
   vet_command: go vet ./...
-  checksums: false
+  checksums: true
 
-failure_summary:
-  mode: log-tail
-  log_tail_bytes: 4000
+diagnostics:
+  mode: native-actions-logs
+
+pre_release:
+  reference_environment: >-
+    developer workstation with the Go toolchain from go.mod, a C toolchain so
+    go test -race can build (CGO_ENABLED=1), and a local OpenAI-compatible
+    gateway (mlx-lm, Ollama, or LM Studio) reachable for the E2E script
+  reference_checks:
+    - name: race
+      command: go test -race ./...
+    - name: gateway-e2e
+      command: ./scripts/e2e-gateway-test.sh
+  evidence_location: docs/release-checkpoints.md
