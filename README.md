@@ -386,20 +386,18 @@ go test ./...
 go vet ./...
 ```
 
-`go test -race ./...` and the local-gateway E2E check
-(`scripts/e2e-gateway-test.sh`) are pre-tag reference checks. They need a C
-toolchain and a running OpenAI-compatible gateway (mlx-lm, Ollama, or LM
-Studio), so they are intentionally not part of the CI release workflow. Run
-them in the reference environment before tagging; recorded results live in
+`go test -race ./...` and the OpenRouter E2E check
+(`scripts/e2e-openrouter-test.sh`) are pre-tag reference checks. They need a C
+toolchain and a funded `OPENROUTER_API_KEY`, so they are intentionally not part
+of the CI release workflow. Run them before tagging; recorded results live in
 [release checkpoints](docs/release-checkpoints.md).
 
-The E2E check validates JSON success and error paths, the `max-input-chars`
-regression, and `--text` attachment:
+The E2E check drives the OpenAI-compatible path against the real OpenRouter API
+and validates JSON success and error paths, the `max-input-chars` regression,
+and `--text` attachment:
 
 ```sh
-GATEWAY_URL=http://localhost:8080/v1 \
-MODEL=<configured-model-id> \
-./scripts/e2e-gateway-test.sh
+OPENROUTER_API_KEY=... ./scripts/e2e-openrouter-test.sh
 ```
 
 ## License

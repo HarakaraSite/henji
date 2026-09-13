@@ -190,8 +190,8 @@ henji -R shell "find large files under the current directory" | less
 ## 検証とライセンス
 
 CI のリリースゲートは `go test ./...` と `go vet ./...` です。
-`go test -race ./...` と `scripts/e2e-gateway-test.sh` はタグ付け前の参照チェックで、
-C ツールチェーンとローカルの OpenAI 互換ゲートウェイ（mlx-lm / Ollama / LM Studio）が
-必要なためリリース workflow では実行しません。参照環境で実行し、結果は
+`go test -race ./...` と `scripts/e2e-openrouter-test.sh` はタグ付け前の参照チェックで、
+C ツールチェーンと課金済みの `OPENROUTER_API_KEY` が必要なためリリース workflow では
+実行しません。参照環境で実行し、結果は
 [release checkpoints](docs/release-checkpoints.md) に記録します。
 ライセンスは MIT License です。

@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
-# E2E test against a real local OpenAI-compatible gateway.
+# E2E test against the real OpenRouter API (OpenAI-compatible path).
 #
-# This is NOT run in CI: it depends on a local gateway (e.g. mlx-lm, Ollama,
-# LM Studio) running on the developer's machine, so it can't be automated
-# on a Forgejo runner. Run it manually after touching --output json,
-# request building (stream.go), or provider request code.
+# This is NOT run in CI: it needs OPENROUTER_API_KEY and makes real, billed
+# requests. Run it manually before tagging a release, per
+# docs/release-checkpoints.md.
 #
 # Usage:
-#   GATEWAY_URL=http://localhost:8080/v1 MODEL=mlx-community/gemma-4-E2B-it-qat-4bit ./scripts/e2e-gateway-test.sh
+#   OPENROUTER_API_KEY=... ./scripts/e2e-openrouter-test.sh
 #
-# Defaults match the author's local mlx-lm gateway setup.
+# Optional overrides:
+#   MODEL     model id to test (default: deepseek/deepseek-v4.1-flash)
+#   BASE_URL  OpenRouter-compatible base URL (default: https://openrouter.ai/api/v1)
 
 set -euo pipefail
 
-GATEWAY_URL="${GATEWAY_URL:-http://localhost:8080/v1}"
-MODEL="${MODEL:-mlx-community/gemma-4-E2B-it-qat-4bit}"
+MODEL="${MODEL:-deepseek/deepseek-v4.1-flash}"
+BASE_URL="${BASE_URL:-https://openrouter.ai/api/v1}"
+
+if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+	echo "OPENROUTER_API_KEY is required" >&2
+	exit 1
+fi
 
 if ! command -v jq >/dev/null 2>&1; then
 	echo "jq is required to run this script" >&2
@@ -39,9 +45,9 @@ max-input-chars: 50000
 temp: 1.0
 topp: 1.0
 apis:
-  gateway:
-    base-url: ${GATEWAY_URL}
-    api-key: dummy
+  openrouter:
+    base-url: ${BASE_URL}
+    api-key-env: OPENROUTER_API_KEY
     models:
       ${MODEL}:
         max-input-chars: 50000
@@ -49,7 +55,7 @@ apis:
       nonexistent-model-xyz:
         max-input-chars: 50000
         aliases: []
-default-api: gateway
+default-api: openrouter
 default-model: ${MODEL}
 EOF
 
@@ -62,9 +68,9 @@ fail() {
 	exit 1
 }
 
-echo "== checking gateway reachability (${GATEWAY_URL}) =="
-if ! curl -s --max-time 3 "${GATEWAY_URL}/models" >/dev/null; then
-	fail "gateway at ${GATEWAY_URL} is not reachable; start it before running this script"
+echo "== checking OpenRouter reachability (${BASE_URL}) =="
+if ! curl -s --max-time 5 "${BASE_URL}/models" >/dev/null; then
+	fail "OpenRouter at ${BASE_URL} is not reachable; check network/API key"
 fi
 
 echo "== test 1: --output json success path (short prompt) =="
@@ -93,13 +99,13 @@ echo "PASS"
 echo "== test 4: no-truncation regression check (max-input-chars unset) =="
 cat >"$CONFIG_HOME/henji/henji.yml" <<EOF
 apis:
-  gateway:
-    base-url: ${GATEWAY_URL}
-    api-key: dummy
+  openrouter:
+    base-url: ${BASE_URL}
+    api-key-env: OPENROUTER_API_KEY
     models:
       ${MODEL}:
         aliases: []
-default-api: gateway
+default-api: openrouter
 default-model: ${MODEL}
 temp: 1.0
 topp: 1.0

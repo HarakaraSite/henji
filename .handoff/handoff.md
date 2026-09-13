@@ -189,3 +189,14 @@
   - E2E: OpenRouter（OpenAI互換パス）で JSON 成功・`--text` 添付・エラー経路が PASS。Anthropic は SDK 更新後も認証とリクエスト構築が通り、課金400（credit balance is too low）まで到達。成功応答はクレジット不足で未確認。
 - 次: なし
 - 注意: `go test -race` と `scripts/e2e-gateway-test.sh` は検証環境に C ツールチェーン／ローカル gateway が無く未実行。結果は `docs/release-checkpoints.md` に記録済み。
+
+## 2026-09-13 17:15 JST
+
+- 実行エージェント: Pi
+- 作業トピック: E2E 参照チェックの OpenRouter 化と actionlint 確認
+- 実施:
+  - `scripts/e2e-gateway-test.sh`（ローカル gateway 前提）を削除し、`scripts/e2e-openrouter-test.sh` を追加。OpenRouter 実 API（OpenAI 互換パス）を `deepseek/deepseek-v4.1-flash` で検証する5項目（JSON 成功 短/長、エラー経路、`max-input-chars` 回帰、`--text` 添付）を実行し、全 PASS。
+  - `.forgejo/release-profile.yml` の `pre_release.reference_checks` を `openrouter-e2e` に更新。`docs/release-checkpoints.md` と README.md / README.ja.md の検証節を追随。
+  - `actionlint` v1.7.12 を導入。Forgejo 独自の `forgejo.*` コンテキストのみ6件の false positive で、それ以外は clean。Forgejo 専用リンターは存在しないため、`actionlint -ignore 'undefined variable "forgejo"'` の使い方を記録した。
+- 次: なし
+- 注意: 実 API を叩くため OpenRouter E2E は CI には載せない。`race` は引き続き C ツールチェーン不足で未実行。

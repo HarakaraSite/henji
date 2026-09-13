@@ -38,11 +38,11 @@ diagnostics:
 pre_release:
   reference_environment: >-
     developer workstation with the Go toolchain from go.mod, a C toolchain so
-    go test -race can build (CGO_ENABLED=1), and a local OpenAI-compatible
-    gateway (mlx-lm, Ollama, or LM Studio) reachable for the E2E script
+    go test -race can build (CGO_ENABLED=1), and network access plus a funded
+    OPENROUTER_API_KEY for the OpenRouter E2E script
   reference_checks:
     - name: race
       command: go test -race ./...
-    - name: gateway-e2e
-      command: ./scripts/e2e-gateway-test.sh
+    - name: openrouter-e2e
+      command: ./scripts/e2e-openrouter-test.sh
   evidence_location: docs/release-checkpoints.md
