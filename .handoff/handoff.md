@@ -177,3 +177,15 @@
 - 実施: `b682505deb744230b11e4047cfe231dc7371a095` で明示 `--continue <ID>` のHEADフォールバックを除去し、unknown/ambiguous、`--continue-last`、保存済みAPI/model復元の回帰を追加。`go test -count=1 ./...`、`go vet ./...`、`go build -o /tmp/henji-strict-continuation .` が成功。
 - 次: なし
 - 注意: `/home/masat.guest/.local/bin/henji` は上記source commitから導入済み（SHA-256 `a57ee0ad8c96c2db0baba2f818b064d62af158bb4be5a7752dac3165a94c2053`）。隔離fake provider smokeでvalid指定ID、unknown/ambiguousの非0・一覧不変、`--continue-last`の最新ID継続を確認。
+
+## 2026-09-13 16:53 JST
+
+- 実行エージェント: Pi
+- 作業トピック: 依存更新と v2.1.9 リリース
+- 実施:
+  - `a0f7d69 chore: update dependencies` で直接・間接依存を最新化（anthropic-sdk-go v1.72.0、modernc.org/sqlite v1.58.0、go-isatty v0.0.24、testify v1.12.1、chroma/v2 v2.27.0、x/net v0.59.0 ほか）。未使用の `caarlos0/timea.go` を削除した。
+  - `main` と注釈付きタグ `v2.1.9` を origin へ push。Forgejo Actions run 29 が success（test / vet / 5プラットフォーム build）。
+  - Release v2.1.9 を公開（draft=false, prerelease=false、asset 5件）。`henji-linux-amd64 --version` は v2.1.9、SHA-256 `cf4c3d71a4dc3e15d0fb7f0c60a55d49d282b471f783fbae7973278627e67413`。
+  - E2E: OpenRouter（OpenAI互換パス）で JSON 成功・`--text` 添付・エラー経路が PASS。Anthropic は SDK 更新後も認証とリクエスト構築が通り、課金400（credit balance is too low）まで到達。成功応答はクレジット不足で未確認。
+- 次: なし
+- 注意: `go test -race` と `scripts/e2e-gateway-test.sh` は検証環境に C ツールチェーン／ローカル gateway が無く未実行。結果は `docs/release-checkpoints.md` に記録済み。
