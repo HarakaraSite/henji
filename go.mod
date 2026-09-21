@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	charm.land/glamour/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.0.6
-	github.com/anthropics/anthropic-sdk-go v1.72.0
+	github.com/anthropics/anthropic-sdk-go v1.73.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/caarlos0/go-shellwords v1.0.12
 	github.com/charmbracelet/colorprofile v0.4.3
@@ -23,7 +23,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.58.0
+	modernc.org/sqlite v1.59.0
 )
 
 require (
