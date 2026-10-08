@@ -48,6 +48,37 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
 
 ## Results
 
+### v2.1.10 — 2026-10-08 (pre-tag evidence)
+
+- Source changes: conversation persistence/locking, JSON error handling and
+  UTF-8 truncation, updated Anthropic/SQLite/golden dependencies, maintained
+  YAML v3 module, and OpenAI Go SDK v3 with legacy CLI/error/retry behavior.
+- race: passed `go test -race ./...` with Go 1.26.0 and `CGO_ENABLED=1`.
+  GCC 14.2 and its development dependencies were extracted into a temporary
+  directory and used through a compiler wrapper; no system packages were
+  installed and no CI package-installation steps were added.
+- openrouter-e2e: passed all five checks in `scripts/e2e-openrouter-test.sh`
+  with `MODEL=google/gemini-2.5-flash-lite` and Go 1.26.0: short/long JSON
+  success, invalid-model JSON error, unset-input-limit regression, and text
+  attachment. Settings and data were isolated; the user authorized the billed
+  checks. The invalid model returned HTTP 400 with the expected provider
+  details preserved in stderr and the JSON error envelope.
+- Caller compatibility: three additional real OpenRouter runs passed for
+  Hayari title translation/skipping and Shirushi summarization. Raw model
+  JSON, exit 0, empty stderr, caller limits and both configured Hayari token
+  fields were verified; see `notes/henji-openai-sse-compatibility-design.md`.
+- Profile review used `apply-forgejo-go-release-profile`: version 2, mandatory
+  checksums, native logs, five CGO-free targets, automatic Forgejo contexts,
+  and the current workflow remain appropriate. Rendering a temporary candidate
+  introduced only comments and equivalent ldflags placement, so neither the
+  profile nor the workflow needs regeneration.
+- Forgejo environment: version `16.0.3+gitea-1.22.0`; native logs for the
+  previous release's run 170/job 191 returned HTTP 200 through both run ZIP
+  and job text endpoints. Existing workflow and rendered candidate both passed
+  actionlint with only the documented `forgejo.*` exclusion.
+- Portable gate: Go 1.26.0 vet passed; the normal test/build/upload results
+  will be recorded after the release workflow completes.
+
 ### v2.1.9 — 2026-09-13
 
 - Portable gate: `go build ./...`, `go vet ./...`, and `go test ./...` passed
