@@ -75,7 +75,7 @@ var help = map[string]string{
 	"apis":                  "Aliases and endpoints for OpenAI compatible REST API",
 	"http-proxy":            "HTTP proxy to use for API requests",
 	"model":                 "Default model; see --list-models for configured models",
-	"max-input-chars":       "Default character limit on input to model",
+	"max-input-chars":       "Default byte limit on input to model (cut at UTF-8 boundaries)",
 	"format":                "Ask for a formatted response (default: markdown; see --format-as)",
 	"format-as":             "Format to request when --format is set (markdown, json, or a format-text key)",
 	"format-text":           "Text to append when using --format",

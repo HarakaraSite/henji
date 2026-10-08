@@ -106,8 +106,8 @@ ls -la | henji summarize these files
 
 最初の空でないキーを、`api-key-cmd`、`api-key-env`、`api-key`、プロバイダー既定の環境変数の
 順で採用します。`api-key-cmd` はシェルを介さず直接実行するため、`$USER` や `$(whoami)` は
-展開されません。コマンドの stdout と stderr はまとめて取得するため、stdout にはキーだけを
-出力し、stderr には診断を出さないでください。コマンドが失敗した場合はエラー終了します。
+展開されません。stdout をキーとして取得し、stderr はキーに含めません。
+コマンドが失敗した場合はエラー終了します。
 macOS では Keychain を使えます。
 
 ```sh
@@ -151,6 +151,8 @@ henji --continue <id-or-title> "now propose the smallest fix"
 選択）、`--text` / `--image`（現在のリクエストだけに添付）、`--continue`、`--list`、
 `--show`、`--delete`、`--no-cache`、`--output json`、`--json-schema` です。
 
+`max-input-chars` はバイト数の上限です。結合したプロンプトと区切りを数え、UTF-8 の文字境界で
+切り詰めます。画像はこの上限に含めません。
 `--no-limit` は `max-input-chars` による入力の切り詰めを無効にします。応答トークン数の上限は
 変わりません。OpenAI 互換の推論モデル向け `max-completion-tokens` は YAML（全体または
 モデルごと）、または `HENJI_MAX_COMPLETION_TOKENS` で設定し、専用 CLI フラグはありません。
@@ -187,6 +189,7 @@ henji --delete <id-or-title>
 Anthropic と Google はネイティブプロトコルを使い、それ以外は OpenAI 互換プロトコルを使います。
 
 `--output json` は成功時・失敗時を一行 JSON で包むため、スクリプトで安全に扱えます。
+準備・生成・保存の失敗は `error` に入り、保存失敗時も生成済みの `content` を保持します。
 `--json-schema <file>` はプロバイダーの構造化出力を使い、クライアント側でも検証します。
 小さなローカルモデルでは JSON をコードフェンスで囲むことがあるため、プロンプトに
 `raw JSON only, no code fences` と添えると役立ちます。Google 向けスキーマでは

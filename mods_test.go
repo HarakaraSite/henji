@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
@@ -396,4 +397,58 @@ func TestCutPrompt(t *testing.T) {
 	msg := fmt.Sprintf("This model's maximum context length is %d tokens. However, your messages resulted in %d tokens", 10, 10)
 	require.Equal(t, "abcdefghij", cutPrompt(msg, "abcdefghijklmnopqrst"))
 	require.Equal(t, "prompt", cutPrompt("other", "prompt"))
+}
+
+func TestAPIKeyCommandHelper(t *testing.T) {
+	mode := os.Getenv("HENJI_TEST_API_KEY_COMMAND")
+	if mode == "" {
+		return
+	}
+	fmt.Fprint(os.Stderr, "credential helper diagnostic")
+	if mode != "empty" {
+		fmt.Fprint(os.Stdout, "  fake-key \n")
+	}
+	if mode == "fail" {
+		os.Exit(7)
+	}
+	os.Exit(0)
+}
+
+func TestEnsureKeySeparatesCommandOutput(t *testing.T) {
+	for _, mode := range []string{"success", "empty", "fail"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Setenv("HENJI_TEST_API_KEY_COMMAND", mode)
+			t.Setenv("HENJI_TEST_FALLBACK_KEY", "env-key")
+			command := fmt.Sprintf("%q -test.run=^TestAPIKeyCommandHelper$", os.Args[0])
+			key, err := (Mods{}).ensureKey(API{APIKeyCmd: command, APIKeyEnv: "HENJI_TEST_FALLBACK_KEY", APIKey: "plain-key"}, "UNSET_TEST_DEFAULT_KEY", "https://example.com")
+			if mode == "fail" {
+				require.Error(t, err)
+				require.Empty(t, key)
+				require.Contains(t, err.Error(), "exit status 7")
+				require.NotContains(t, err.Error(), "fake-key")
+			} else {
+				require.NoError(t, err)
+				want := "fake-key"
+				if mode == "empty" {
+					want = "env-key"
+				}
+				require.Equal(t, want, key)
+			}
+		})
+	}
+	_, err := (Mods{}).ensureKey(API{APIKeyCmd: "   "}, "UNSET_TEST_DEFAULT_KEY", "https://example.com")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "command is empty")
+}
+
+func TestCutPromptPreservesUTF8(t *testing.T) {
+	message := "This model's maximum context length is 10 tokens. However, your messages resulted in 10 tokens"
+	for _, tc := range []struct{ prompt, want string }{
+		{prompt: "あいうえおか", want: "あい"},
+		{prompt: "a😀😀😀", want: "a"},
+	} {
+		got := cutPrompt(message, tc.prompt)
+		require.Equal(t, tc.want, got)
+		require.True(t, utf8.ValidString(got))
+	}
 }

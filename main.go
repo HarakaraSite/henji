@@ -104,7 +104,16 @@ var (
 		Args:          cobra.ArbitraryArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (runErr error) {
+			var mods *Mods
+			defer func() {
+				if runErr != nil && config.Output == "json" {
+					if mods == nil {
+						mods = &Mods{Config: &config}
+					}
+					runErr = jsonResponseError{err: runErr, mods: mods}
+				}
+			}()
 			config.Prefix = removeWhitespace(strings.Join(args, " "))
 			warnFileArguments(args, config.textPath != "" || config.imagePath != "")
 
@@ -151,15 +160,9 @@ var (
 			if err != nil {
 				return modsError{err, "Couldn't initialize conversation cache."}
 			}
-			mods := newMods(cmd.Context(), &config, db, cache)
+			mods = newMods(cmd.Context(), &config, db, cache)
 			defer mods.closeConversationLocks()
 			if err := mods.run(); err != nil {
-				if config.Output == "json" {
-					var merr modsError
-					if errors.As(err, &merr) {
-						printJSONError(mods, merr)
-					}
-				}
 				return err
 			}
 
@@ -173,23 +176,18 @@ var (
 				}
 			}
 
-			switch {
-			case config.Output == "json":
-				printJSONOutput(mods)
-			// --json-schema suppresses all live/streamed output (see
-			// appendToOutput) so a validated response is only ever shown
-			// here, once, after the model has produced something that
-			// actually matches the schema.
-			default:
+			// Text output keeps its streaming behavior. JSON is emitted only
+			// after saving, so a save error can retain the generated content.
+			if config.Output != "json" {
 				mods.printTextOutput()
 			}
-
-			if config.Show != "" {
-				return nil
+			if config.Show == "" && config.cacheWriteToID != "" {
+				if err := saveConversation(mods); err != nil {
+					return err
+				}
 			}
-
-			if config.cacheWriteToID != "" {
-				return saveConversation(mods)
+			if config.Output == "json" {
+				printJSONOutput(mods)
 			}
 
 			return nil
@@ -296,13 +294,27 @@ func main() {
 	// XXX: this must come after creating the config.
 	initFlags()
 
-	if needsConversationDB(os.Args) {
+	// Open the database after Cobra parses --output, so initialization errors
+	// use the selected output format as well as normal request errors.
+	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
+		if db != nil || !needsConversationDB(os.Args) {
+			return nil
+		}
+		var err error
 		db, err = openDB(filepath.Join(config.CachePath, "conversations", "henji.db"))
 		if err != nil {
-			handleError(modsError{err, "Could not open database."})
+			return modsError{err, "Could not open database."}
+		}
+		return nil
+	}
+	defer closeDB()
+	// Cobra completes flags without running the target command's pre-run
+	// hooks, so completion candidates still need the database opened here.
+	if isCompletionCmd(os.Args) && needsConversationDB(os.Args) {
+		if err := rootCmd.PersistentPreRunE(rootCmd, nil); err != nil {
+			handleError(err)
 			os.Exit(1)
 		}
-		defer db.Close() //nolint:errcheck
 	}
 
 	if isCompletionCmd(os.Args) {
@@ -403,6 +415,14 @@ func maybeWriteMemProfile() {
 
 func handleError(err error) {
 	maybeWriteMemProfile()
+	if config.Output == "json" {
+		mods := &Mods{Config: &config}
+		var responseErr jsonResponseError
+		if errors.As(err, &responseErr) {
+			mods = responseErr.mods
+		}
+		printJSONError(mods, err)
+	}
 
 	format := "\n%s\n\n"
 

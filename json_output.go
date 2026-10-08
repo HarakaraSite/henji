@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -59,12 +60,24 @@ func printJSONOutput(mods *Mods) {
 	fmt.Println(string(out))
 }
 
-func printJSONError(mods *Mods, err modsError) {
+// jsonResponseError carries the generated response to the common error handler.
+// Unwrap preserves the original error for diagnostics and callers.
+type jsonResponseError struct {
+	err  error
+	mods *Mods
+}
+
+func (e jsonResponseError) Error() string { return e.err.Error() }
+func (e jsonResponseError) Unwrap() error { return e.err }
+
+func printJSONError(mods *Mods, err error) {
 	out := buildJSONOutput(mods)
-	out.Error = &ErrorInfo{
-		Code:    "error",
-		Message: fmt.Sprintf("%s: %s", err.Reason(), err.Error()),
+	message := err.Error()
+	var merr modsError
+	if errors.As(err, &merr) && merr.Reason() != "" {
+		message = fmt.Sprintf("%s: %s", merr.Reason(), message)
 	}
+	out.Error = &ErrorInfo{Code: "error", Message: message}
 	marshaled, marshalErr := json.Marshal(out)
 	if marshalErr != nil {
 		fmt.Fprintln(os.Stderr, "could not marshal --output json error:", marshalErr)

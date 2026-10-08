@@ -37,9 +37,10 @@ Output contract for model invocations:
 - When stdout is not a terminal, the response is plain text with no ANSI
   codes. Markdown rendering only happens on a TTY (`-r` disables it there too).
 - Exit status is `0` on success and non-zero on failure.
-- With `--output json`, errors reached during model execution also produce an
-  error envelope on stdout. Startup errors such as an invalid flag, config, or
-  schema file are reported on stderr before a JSON session exists.
+- Once JSON output is selected, preparation, model execution, and save failures
+  produce one error envelope on stdout and a non-zero exit status. Save failures
+  retain the generated response in `content`. Configuration loading failures
+  before the output mode is selected are reported on stderr.
 - Prompts must be supplied as arguments and/or stdin. With no prompt, henji
   exits with an error instead of waiting for interactive input.
 - `Ctrl-C` cancels a model request or an upstream command that has not closed
@@ -196,13 +197,16 @@ be an `http(s)://` or `file://` URL whose contents become system prompt text.
 Some tuning knobs intentionally have no flag and are config/environment-only:
 `temp`, `topp`, `topk`, `stop`, `max-retries`, `word-wrap`, and `http-proxy`.
 
-`max-input-chars` (global or per-model) truncates the combined prompt before it
-is sent; the tail is dropped silently. `--no-limit` disables this truncation.
+`max-input-chars` (global or per-model) is a byte limit on the combined prompt,
+including separators between text parts. Truncation stops at a UTF-8 character
+boundary; the tail is dropped silently. Images do not use this text budget.
+`--no-limit` disables this truncation.
 
 API keys are resolved in this order, highest priority first:
 
 1. `api-key-cmd`: stdout of a directly executed command. It does not run
-   through a shell, so `$USER` and `$(...)` are not expanded.
+   through a shell, so `$USER` and `$(...)` are not expanded. Stderr is excluded
+   from the key; a non-zero command exit is an error, without fallback.
 2. `api-key-env`: a named environment variable.
 3. `api-key`: plaintext in the mode-0600 config file.
 4. Provider default environment variable (`OPENAI_API_KEY`,

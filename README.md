@@ -133,10 +133,9 @@ Resolution order (first non-empty key wins):
    api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
    ```
 
-   The command must write only the key to stdout and no diagnostics to stderr
-   (henji captures both together). It runs without a shell, so `$USER` and
-   `$(...)` are not expanded. If it fails or exits
-   non-zero, henji CLI reports an error rather than silently falling back to a
+   The command must write the key to stdout; stderr is excluded from the key.
+   It runs without a shell, so `$USER` and `$(...)` are not expanded. If it fails
+   or exits non-zero, henji CLI reports an error rather than silently falling back to a
    lower-priority source.
 
 2. **`api-key-env`** — read from a named environment variable
@@ -211,6 +210,10 @@ patterns. A Japanese version of this README is [README.ja.md](README.ja.md).
 | `--no-limit` | Disable client-side input truncation by `max-input-chars` |
 | `-h`, `--help` | Show help and exit |
 | `-v`, `--version` | Show version and exit |
+
+`max-input-chars` remains a byte limit. Truncation stops at a UTF-8 character
+boundary, counting the combined prompt and separators; images do not use this
+budget.
 
 Tuning knobs that rarely change between runs — sampling parameters (`temp`,
 `topp`, `topk`, `stop`), `max-retries`, `word-wrap`, and `http-proxy` — have
@@ -339,6 +342,10 @@ For Groq (and other OpenAI-compatible providers whose API entry is not named
 in the provider's API entry.
 
 ## Structured Output
+
+`--output json` wraps the result in one JSON envelope. Preparation, generation,
+and save failures include `error`; a save failure also retains the generated
+response in `content`. Success output is emitted after saving completes.
 
 `--format --format-as json` only asks the model to *try* to respond as JSON; it doesn't
 guarantee the response actually matches any particular shape. `--json-schema`

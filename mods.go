@@ -622,7 +622,10 @@ func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 		if err != nil {
 			return "", modsError{err, "Failed to parse api-key-cmd"}
 		}
-		out, err := exec.Command(args[0], args[1:]...).CombinedOutput() //nolint:gosec
+		if len(args) == 0 {
+			return "", modsError{errors.New("command is empty"), "Failed to parse api-key-cmd"}
+		}
+		out, err := exec.Command(args[0], args[1:]...).Output() //nolint:gosec
 		if err != nil {
 			return "", modsError{err, "Cannot exec api-key-cmd"}
 		}
@@ -674,7 +677,7 @@ func cutPrompt(msg, prompt string) string {
 	}
 	reduceBy := 10 + (current-maxt)*4 //nolint:mnd
 	if len(prompt) > reduceBy {
-		return prompt[:len(prompt)-reduceBy]
+		return truncateTextBytes(prompt, int64(len(prompt)-reduceBy))
 	}
 	return prompt
 }

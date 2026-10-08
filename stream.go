@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 )
@@ -57,8 +58,8 @@ func (m *Mods) setupStreamContext(content string, mod Model) error {
 		if prefix := cfg.Prefix; prefix != "" {
 			content = strings.TrimSpace(prefix + "\n\n" + content)
 		}
-		if !cfg.NoLimit && mod.MaxChars > 0 && int64(len(content)) > mod.MaxChars {
-			content = content[:mod.MaxChars]
+		if !cfg.NoLimit && mod.MaxChars > 0 {
+			content = truncateTextBytes(content, mod.MaxChars)
 		}
 		m.messages = append(m.messages, proto.Message{Role: proto.RoleUser, Content: content})
 		return nil
@@ -128,32 +129,36 @@ func inputPartsForContent(parts []proto.ContentPart, contentBytes int) []proto.C
 		}
 		seenText = true
 		if len(part.Text) > remaining {
-			part.Text = part.Text[:remaining]
+			part.Text = truncateTextBytes(part.Text, int64(remaining))
+			remaining = 0
+		} else {
+			remaining -= len(part.Text)
 		}
-		remaining -= len(part.Text)
 		result = append(result, part)
 	}
 	return result
 }
 
-func limitTextParts(parts []proto.ContentPart, limit int64) []proto.ContentPart {
-	result := make([]proto.ContentPart, 0, len(parts))
-	remaining := limit
-	for _, part := range parts {
-		if part.Type != proto.ContentPartText {
-			result = append(result, part)
-			continue
-		}
-		if remaining <= 0 {
-			continue
-		}
-		if int64(len(part.Text)) > remaining {
-			part.Text = part.Text[:remaining]
-		}
-		remaining -= int64(len(part.Text))
-		result = append(result, part)
+// truncateTextBytes preserves the existing byte budget without cutting a
+// valid UTF-8 character in half. It always returns a prefix of the input.
+func truncateTextBytes(text string, limit int64) string {
+	if limit >= int64(len(text)) {
+		return text
 	}
-	return result
+	if limit <= 0 {
+		return ""
+	}
+	end := int(limit)
+	for end > 0 && !utf8.RuneStart(text[end]) {
+		end--
+	}
+	return text[:end]
+}
+
+func limitTextParts(parts []proto.ContentPart, limit int64) []proto.ContentPart {
+	// Count the blank lines between text parts, just as for a plain prompt.
+	content := truncateTextBytes(textFromParts(parts), limit)
+	return inputPartsForContent(parts, len(content))
 }
 
 func textFromParts(parts []proto.ContentPart) string {
