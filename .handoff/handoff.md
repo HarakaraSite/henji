@@ -200,3 +200,17 @@
   - `actionlint` v1.7.12 を導入。Forgejo 独自の `forgejo.*` コンテキストのみ6件の false positive で、それ以外は clean。Forgejo 専用リンターは存在しないため、`actionlint -ignore 'undefined variable "forgejo"'` の使い方を記録した。
 - 次: なし
 - 注意: 実 API を叩くため OpenRouter E2E は CI には載せない。`race` は引き続き C ツールチェーン不足で未実行。
+
+## 2026-10-08 23:12 JST
+
+- 実行エージェント: Codex
+- 作業トピック: YAML/OpenAI SDK移行と v2.1.10 リリース
+- 実施:
+  - `892489a` で YAML を go.yaml.in/yaml/v3 v3.0.5、OpenAI Go SDK を v3.74.0 へ移行。Chat Completions、CLI出力・APIエラー詳細・旧retry待機を維持し、独立レビューと再レビューを完了。
+  - OpenRouter の google/gemini-2.5-flash-lite で Hayari/Shirushi 相当の3ケースと既存E2Eの5項目が成功。追加課金確認はユーザー承認済み。
+  - apply-forgejo-go-release-profile スキルで現行version 2 profileとworkflowを照合。再作成不要。Forgejo 16.0.3のnative run/job log APIを実確認。
+  - 一時領域のGCC 14.2とGo 1.26.0で `go test -race ./...` が成功。normal tests、vet、actionlintも成功。system packageのインストールは行っていない。
+  - `09081ee` に注釈付きタグ v2.1.10 を作成してmainと共にpush。Forgejo Actions run 30（API run 172/job 193）が成功し、5バイナリとSHA256SUMSを公開。
+  - 公開Linux/amd64 binaryのversionとchecksumを確認。SHA-256: `2302a0618ad5d2c03756ee17bacff2d0835a0ad2db9b40e4d196be6ba98ccf2a`。
+- 次: この版のリリース作業は完了。意思決定モデルとResponses APIへの対応は別段階。
+- 注意: インストール済みhenjiやCT上のHayari/Shirushiのbinary・設定は更新していない。OpenRouterキーはrepository外にあり記録へ含めていない。

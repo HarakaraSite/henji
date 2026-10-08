@@ -48,7 +48,7 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
 
 ## Results
 
-### v2.1.10 — 2026-10-08 (pre-tag evidence)
+### v2.1.10 — 2026-10-08
 
 - Source changes: conversation persistence/locking, JSON error handling and
   UTF-8 truncation, updated Anthropic/SQLite/golden dependencies, maintained
@@ -76,8 +76,15 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
   previous release's run 170/job 191 returned HTTP 200 through both run ZIP
   and job text endpoints. Existing workflow and rendered candidate both passed
   actionlint with only the documented `forgejo.*` exclusion.
-- Portable gate: Go 1.26.0 vet passed; the normal test/build/upload results
-  will be recorded after the release workflow completes.
+- Portable gate: Go 1.26.0 normal tests and vet passed locally. Forgejo
+  [Actions run 30](https://forge.harakara.site/littleisland/henji/actions/runs/30)
+  (API run 172/job 193) passed test, vet, all five builds, checksums and upload.
+- [Release v2.1.10](https://forge.harakara.site/littleisland/henji/releases/tag/v2.1.10)
+  was published from `09081ee0d8ae8ff05c95cd255f39e40fb7e4fb33` with five
+  binaries and `SHA256SUMS`, `draft=false`, `prerelease=false`. The downloaded
+  Linux/amd64 binary reports `henji version v2.1.10`; its SHA-256 matches the
+  published checksum list:
+  `2302a0618ad5d2c03756ee17bacff2d0835a0ad2db9b40e4d196be6ba98ccf2a`.
 
 ### v2.1.9 — 2026-09-13
 
