@@ -104,6 +104,17 @@ There are three levels, from loosest to strictest:
    `--json-schema` and `--output json` compose: the validated JSON document is
    delivered as a string inside the envelope's `content[0].text`.
 
+For application integration, `-q --no-cache --json-schema <file>` without
+`--output json` writes only the validated model JSON followed by a newline to
+stdout, with no `content` or `error` envelope. Success exits with status 0.
+If preparation, API calls, or response validation ultimately fail, henji exits
+with status 1, leaves stdout empty, and writes a human-readable error to stderr.
+`-q` suppresses progress messages, but does not suppress errors.
+
+`--json-schema-retries 0` disables regeneration after validation failures.
+It does not disable HTTP/API retries for transient failures such as rate
+limiting; those are handled separately by `max-retries` and the provider client.
+
 Structured-output pitfalls:
 
 - Google's schema dialect is an OpenAPI 3.0 subset. It rejects
@@ -196,6 +207,13 @@ be an `http(s)://` or `file://` URL whose contents become system prompt text.
 
 Some tuning knobs intentionally have no flag and are config/environment-only:
 `temp`, `topp`, `topk`, `stop`, `max-retries`, `word-wrap`, and `http-proxy`.
+
+For OpenAI-compatible APIs, set `max-completion-tokens` in YAML (globally or
+per model), or use `HENJI_MAX_COMPLETION_TOKENS`; there is no dedicated CLI flag.
+If both `max-tokens` and `max-completion-tokens` are configured, both fields
+are sent. CLI `--max-tokens` does not clear an inherited `max-completion-tokens`
+value. The provider determines how it handles the two fields, so `--max-tokens`
+alone does not establish the effective limit.
 
 `max-input-chars` (global or per-model) is a byte limit on the combined prompt,
 including separators between text parts. Truncation stops at a UTF-8 character

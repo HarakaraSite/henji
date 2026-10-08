@@ -55,8 +55,19 @@ henji はこの経路でも API キーを送るため、検証しないサーバ
     git diff | henji --output json "suggest a commit message" | jq -r '.content[0].text'
     henji --json-schema review.json "review this diff" < diff.patch | jq '.findings[]'
 
+アプリ連携では、`-q --no-cache --json-schema <file>` を使い、`--output json` を指定しなければ、
+成功時の stdout は検証済みのモデル JSON と末尾改行だけで、`content` や `error` のラッパーは
+付きません。終了コードは 0 です。準備・API 呼び出し・応答検証が最終的に失敗した場合は、
+終了コード 1、stdout は空、stderr に人間向けのエラー詳細を出します。
+`-q` は進捗表示を抑制しますが、エラーは抑制しません。
+`--json-schema` と `--output json` を併用すると、検証済みの JSON は envelope の
+`content[0].text` に文字列として入ります。
+
 `--json-schema` は失敗時に検証エラーを示して修正を依頼し、`--json-schema-retries`（既定 2）まで
-再試行します。Google 用スキーマでは `additionalProperties` を使えません。OpenAI strict mode では
+再生成します。`--json-schema-retries 0` はこの再生成だけを無効にします。レート制限などに対する
+HTTP/API 再試行は別で、`max-retries` とプロバイダークライアントが処理します。
+
+Google 用スキーマでは `additionalProperties` を使えません。OpenAI strict mode では
 各 object に `"additionalProperties": false` が必要です。小型ローカルモデルがコードフェンスを
 付ける場合は、`raw JSON only, no code fences` をプロンプトに加えてください。
 
@@ -97,6 +108,12 @@ henji はこの経路でも API キーを送るため、検証しないサーバ
 変数で上書きできます。`apis` と `roles` は YAML で設定します。`max-input-chars` はバイト数の
 上限です。結合したプロンプトとテキスト間の区切りを数え、UTF-8 の文字境界で切り詰めます。
 画像はこの上限に含めません。`--no-limit` はこの切り詰めを無効にします。
+
+OpenAI 互換 API 向けの `max-completion-tokens` は YAML（全体またはモデルごと）、または
+`HENJI_MAX_COMPLETION_TOKENS` で設定し、専用 CLI フラグはありません。
+`max-tokens` と両方設定すると両方を送信します。CLI の `--max-tokens` は、継承した
+`max-completion-tokens` の値を解除しません。両フィールドの扱いはプロバイダーによるため、
+`--max-tokens` だけで実際の上限は確定しません。
 
 API キーは `api-key-cmd`、`api-key-env`、`api-key`、プロバイダー既定環境変数の順で解決します。
 `api-key-cmd` はシェルを通さないため、`$USER` や `$(...)` は展開されません。stdout だけを
