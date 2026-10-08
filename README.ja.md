@@ -21,19 +21,20 @@
 | Ollama | ストリーム取消時のチャネルリークとデッドロック |
 | Google | リクエスト失敗時の nil panic と response body リーク |
 | 全プロバイダー | `cancelRequest` goroutine リークを `defer cancel` に置換 |
-| 全プロバイダー | o1 系で `max-completion-tokens` を API へ正しく渡すよう修正 |
-| 全プロバイダー | 文書どおり `api-key-env` を `api-key-cmd` より優先 |
+| OpenAI 互換 API | o1 系で `max-completion-tokens` を API へ正しく渡すよう修正 |
+| 全プロバイダー | API キーを `api-key-cmd`、`api-key-env`、`api-key`、プロバイダー既定環境変数の順で解決 |
 
 ### セキュリティ
 
 - `henji.yml` は `0600` で作成します。既存ファイルの権限が緩い場合は読む前に `0600` へ制限し、別ユーザー所有なら拒否します（Unix のみ。Windows は未対応）。
 - Google API キーを URL クエリではなく `x-goog-api-key` ヘッダーで渡します。
-- `henji.yml` と `*.bak` を `.gitignore` に追加しています。
+- 設定は既定でリポジトリ外（macOS/Linux では `~/.config/henji/henji.yml`）に保存します。`*.bak` は Git の対象外ですが、リポジトリ内にコピーした `henji.yml` は自動では除外されません。
 
 ### 依存関係と削除した機能
 
-依存関係は `x/net`、`x/crypto` のセキュリティ更新を含めて更新しました。ネイティブ Ollama
-クライアントは削除し、OpenAI 互換の経路（`base-url: http://localhost:11434/v1`）を使います。
+依存バージョンは [`go.mod`](go.mod) と `go.sum` に固定し、セキュリティ更新を含めて保守します。
+ネイティブ Ollama クライアントは削除し、OpenAI 互換の経路（`base-url: http://localhost:11434/v1`）を使います。
+Azure OpenAI と Azure AD の対応も削除済みで、`azure` / `azure-ad` の API 設定はエラーになります。
 未使用の UI・プロンプト表示・スピナー調整フラグは削除しました。`--temp`、`--topp`、
 `--topk`、`--stop`、`--max-retries`、`--word-wrap`、`--http-proxy` は `henji.yml` または
 `HENJI_*` 環境変数で引き続き設定できます。
@@ -45,16 +46,22 @@ henji CLI は通常の Unix フィルターに戻し、ファイルやネット�
 
 ## インストール
 
+### リリースバイナリ
+
+[Forgejo Releases](https://forge.harakara.site/littleisland/henji/releases) から、環境に合う
+バイナリをダウンロードできます。タグリリースでは Linux・macOS の amd64/arm64 と、Windows の
+amd64 を配布します。`henji`（Windows は `henji.exe`）へ名前を変更し、`PATH` の通った
+ディレクトリに配置してください。macOS/Linux では `chmod +x henji` で実行権限を付けます。
+
 ### ソースからビルド
+
+[`go.mod`](go.mod) の指定に従い、Go 1.26 以降を使います。
 
 ```sh
 git clone https://forge.harakara.site/littleisland/henji.git
 cd henji
 go build -o henji .
 ```
-
-このリポジトリはまだ公開されていないため、現在はローカル clone からのビルドだけをサポート
-しています。
 
 ### シェル補完
 
@@ -97,8 +104,10 @@ ls -la | henji summarize these files
 
 ### API キー管理
 
-優先順位は `api-key-cmd`、`api-key-env`、`api-key`、プロバイダー既定の環境変数です。
-`api-key-cmd` はシェルを介さず直接実行するため、`$USER` や `$(whoami)` は展開されません。
+最初の空でないキーを、`api-key-cmd`、`api-key-env`、`api-key`、プロバイダー既定の環境変数の
+順で採用します。`api-key-cmd` はシェルを介さず直接実行するため、`$USER` や `$(whoami)` は
+展開されません。コマンドの stdout と stderr はまとめて取得するため、stdout にはキーだけを
+出力し、stderr には診断を出さないでください。コマンドが失敗した場合はエラー終了します。
 macOS では Keychain を使えます。
 
 ```sh
@@ -142,6 +151,10 @@ henji --continue <id-or-title> "now propose the smallest fix"
 選択）、`--text` / `--image`（現在のリクエストだけに添付）、`--continue`、`--list`、
 `--show`、`--delete`、`--no-cache`、`--output json`、`--json-schema` です。
 
+`--no-limit` は `max-input-chars` による入力の切り詰めを無効にします。応答トークン数の上限は
+変わりません。OpenAI 互換の推論モデル向け `max-completion-tokens` は YAML（全体または
+モデルごと）、または `HENJI_MAX_COMPLETION_TOKENS` で設定し、専用 CLI フラグはありません。
+
 `--text` は UTF-8 テキストを 1 つ、`--image` は JPEG/PNG/WebP を 1 つ受け取り、どちらも
 上限は 3 MiB です。添付内容は会話履歴に保存されないため、継続時に必要なら再度指定します。
 画像を使うモデルには設定で `vision: true` が必要です。
@@ -157,6 +170,10 @@ henji --show <id-or-title>
 henji --continue <id-or-title> "follow-up prompt"
 henji --delete <id-or-title>
 ```
+
+`--continue` の ID・タイトルが存在しない、または複数件に一致する場合はエラーになります。
+最新会話へは自動で切り替わりません。最新会話には明示的に `--continue-last` を使います。
+継続時には、保存されている API とモデルを復元します。
 
 長い会話の継続は履歴全体を再送するため、入力量と料金が増えます。過去の文脈が不要なら新規の
 会話を始めてください。

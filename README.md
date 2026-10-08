@@ -22,23 +22,27 @@ needed.
 | Ollama | Channel leak / deadlock on stream cancellation |
 | Google | nil panic and response body leak on request failure |
 | All providers | `cancelRequest` goroutine leak replaced with `defer cancel` |
-| All providers | `max-completion-tokens` (o1 models) now correctly wired through to the API |
-| All providers | `api-key-env` priority over `api-key-cmd` restored to match documented order |
+| OpenAI-compatible APIs | `max-completion-tokens` (o1 models) now correctly wired through to the API |
+| All providers | Consistent API key resolution: `api-key-cmd`, `api-key-env`, `api-key`, then the provider's default environment variable |
 
 ### Security
 
 - `henji.yml` is created with `0600` permissions (was `0644`); an existing file with looser permissions (e.g. inherited from a pre-v2 install) is restricted to `0600` automatically before it's read, and refused outright if it's owned by another user (Unix only; not yet enforced on Windows)
 - Google API key moved from URL query parameter to `x-goog-api-key` header, preventing key exposure in transport error messages
-- `henji.yml` and `*.bak` added to `.gitignore`
+- Settings live outside the repository by default (`~/.config/henji/henji.yml` on macOS/Linux). `*.bak` files are ignored by Git; a `henji.yml` copied into the repository is not automatically ignored.
 
 ### Dependencies
 
-All dependencies updated to current versions, including security patches for `x/net` and `x/crypto`.
+Dependency versions are pinned in [`go.mod`](go.mod) and `go.sum` and updated
+as part of maintenance, including security updates.
 
 ### Removals
 
 - `Config.System` field removed (was unused)
 - Native Ollama client removed; Ollama is served by the OpenAI-compatible path (`base-url: http://localhost:11434/v1`)
+- Azure OpenAI and Azure AD support removed; `azure` and `azure-ad` API entries are rejected.
+- Interactive prompt/model selection and conversation selection UI removed;
+  requests run synchronously, and `--list` prints a plain list.
 - Rarely-used flags removed to keep `--help` and the code small:
   - `--ask-model`, `--show-last`, `--delete-older-than`, `--dirs`, `--reset-settings`, `--theme` (features removed)
   - `-P`/`--prompt`, `-p`/`--prompt-args` prompt-echo modes (features removed)
@@ -59,16 +63,24 @@ All dependencies updated to current versions, including security patches for `x/
 
 ## Installation
 
+### Release binaries
+
+Download a binary for your platform from
+[Forgejo Releases](https://forge.harakara.site/littleisland/henji/releases).
+Tagged releases provide Linux and macOS binaries for amd64/arm64, and a
+Windows amd64 binary. Rename it to `henji` (`henji.exe` on Windows) and place
+it in a directory on your `PATH`. On macOS/Linux, make it executable with
+`chmod +x henji`.
+
 ### Build from source
+
+Use Go 1.26 or later, as specified in [`go.mod`](go.mod).
 
 ```sh
 git clone https://forge.harakara.site/littleisland/henji.git
 cd henji
 go build -o henji .
 ```
-
-> This repository is not yet publicly accessible, so `go install` isn't
-> available; building from a local clone is the only supported path for now.
 
 ### Shell completions
 
@@ -111,9 +123,9 @@ ls -la | henji summarize these files
 
 ### API key management
 
-Preferred order (most secure first):
+Resolution order (first non-empty key wins):
 
-1. **`api-key-cmd`** — directly executed command whose stdout is the key; keys never touch disk
+1. **`api-key-cmd`** — directly executed command whose output supplies the key, without storing it in `henji.yml`
 
    ```yaml
    api-key-cmd: op read "op://vault/openai/key"
@@ -121,7 +133,9 @@ Preferred order (most secure first):
    api-key-cmd: rbw get -f OPENAI_API_KEY chat.openai.com
    ```
 
-   The command must write only the key to stdout. If it fails or exits
+   The command must write only the key to stdout and no diagnostics to stderr
+   (henji captures both together). It runs without a shell, so `$USER` and
+   `$(...)` are not expanded. If it fails or exits
    non-zero, henji CLI reports an error rather than silently falling back to a
    lower-priority source.
 
@@ -181,7 +195,7 @@ patterns. A Japanese version of this README is [README.ja.md](README.ja.md).
 |---|---|
 | `-m`, `--model` | Select a configured model ID or alias |
 | `-a`, `--api` | Select a configured API endpoint; pair it with `--model` |
-| `--text` | Attach one UTF-8 text file to the prompt |
+| `--text` | Attach one UTF-8 text file to the prompt (max 3 MiB) |
 | `--image` | Attach one JPEG, PNG, or WebP image to the prompt (max 3 MiB; requires `vision: true`) |
 | `--format` | Ask the LLM to format the response (e.g. markdown, json) |
 | `--format-as` | Specify output format (used with `--format`) |
@@ -194,7 +208,7 @@ patterns. A Japanese version of this README is [README.ja.md](README.ja.md).
 | `--list-roles` | List roles defined in your configuration file |
 | `--list-models` | List configured APIs and their models (respects `--output json`; see the [cookbook](docs/cookbook.md#discovering-whats-configured)) |
 | `--max-tokens` | Maximum tokens in response |
-| `--no-limit` | Do not limit response tokens |
+| `--no-limit` | Disable client-side input truncation by `max-input-chars` |
 | `-h`, `--help` | Show help and exit |
 | `-v`, `--version` | Show version and exit |
 
@@ -202,6 +216,10 @@ Tuning knobs that rarely change between runs — sampling parameters (`temp`,
 `topp`, `topk`, `stop`), `max-retries`, `word-wrap`, and `http-proxy` — have
 no dedicated flags; set them in `henji.yml` or override per run with the
 corresponding `HENJI_*` environment variable (e.g. `HENJI_TEMP=0.2`).
+
+For OpenAI-compatible reasoning models, set `max-completion-tokens` in YAML
+(globally or per model), or use `HENJI_MAX_COMPLETION_TOKENS`. It has no
+dedicated CLI flag. `--no-limit` does not change response token limits.
 
 `--text` accepts exactly one UTF-8 text file up to 3 MiB. `--image` accepts
 exactly one JPEG, PNG, or WebP image up to 3 MiB and requires `vision: true`
@@ -246,6 +264,10 @@ henji --list
 henji --show a1b2c3d
 henji --continue a1b2c3d "now suggest fixes"
 ```
+
+An unknown or ambiguous `--continue` ID/title is an error; it never falls back
+to the latest conversation. Use `--continue-last` explicitly for that. A
+continued conversation restores its saved API and model when present.
 
 For bulk cleanup, use SQLite only to select IDs and let `henji --delete`
 remove both the database row and the matching conversation-body cache file:
@@ -348,10 +370,11 @@ Notes:
 
 ## Generate, review, then run
 
-henji CLI doesn't call tools or touch your filesystem on its own — it reads
-stdin and writes stdout, nothing else. When a task needs file access, a
-network request, or a shell command, ask henji CLI to generate that command and
-run it yourself:
+henji CLI sends your input to the configured LLM and prints its response. It
+reads configured inputs and manages conversation storage, but it does not
+execute commands or tool calls proposed by the model. When a task needs an
+additional file operation, network request, or shell command, ask henji CLI
+to generate that command and run it yourself:
 
 ```sh
 henji -R shell "find the 10 largest files under the current directory"
