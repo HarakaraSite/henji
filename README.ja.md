@@ -53,6 +53,17 @@ henji CLI は通常の Unix フィルターに戻し、ファイルやネット�
 amd64 を配布します。`henji`（Windows は `henji.exe`）へ名前を変更し、`PATH` の通った
 ディレクトリに配置してください。macOS/Linux では `chmod +x henji` で実行権限を付けます。
 
+v2.1.10 以降は `SHA256SUMS` も配布します。バイナリと一緒にダウンロードし、名前を変更する前に
+チェックサムを確認してください。Linux では次を実行します。
+
+```sh
+sha256sum --ignore-missing --check SHA256SUMS
+```
+
+macOS では `shasum -a 256 <binary>`、Windows では PowerShell の
+`Get-FileHash <binary> -Algorithm SHA256` でハッシュを求め、`SHA256SUMS` の該当ファイル名の
+値と比較してください。
+
 ### ソースからビルド
 
 [`go.mod`](go.mod) の指定に従い、Go 1.26 以降を使います。
@@ -157,6 +168,10 @@ henji --continue <id-or-title> "now propose the smallest fix"
 変わりません。OpenAI 互換の推論モデル向け `max-completion-tokens` は YAML（全体または
 モデルごと）、または `HENJI_MAX_COMPLETION_TOKENS` で設定し、専用 CLI フラグはありません。
 
+OpenAI 互換 API では、`max-tokens` と `max-completion-tokens` を両方設定すると両方を送信します。
+CLI の `--max-tokens` は、継承した `max-completion-tokens` の値を解除しません。
+両フィールドの扱いはプロバイダーによるため、`--max-tokens` だけで実際の上限は確定しません。
+
 `--text` は UTF-8 テキストを 1 つ、`--image` は JPEG/PNG/WebP を 1 つ受け取り、どちらも
 上限は 3 MiB です。添付内容は会話履歴に保存されないため、継続時に必要なら再度指定します。
 画像を使うモデルには設定で `vision: true` が必要です。
@@ -194,6 +209,16 @@ Anthropic と Google はネイティブプロトコルを使い、それ以外�
 小さなローカルモデルでは JSON をコードフェンスで囲むことがあるため、プロンプトに
 `raw JSON only, no code fences` と添えると役立ちます。Google 向けスキーマでは
 `additionalProperties` を使わないでください。
+
+アプリ連携では、`-q --no-cache --json-schema <file>` を使い、`--output json` を指定しなければ、
+成功時の stdout は検証済みのモデル JSON と末尾改行だけで、`content` や `error` のラッパーは
+付きません。終了コードは 0 です。準備・API 呼び出し・応答検証が最終的に失敗した場合は、
+終了コード 1、stdout は空、stderr に人間向けのエラー詳細を出します。
+`-q` は進捗表示を抑制しますが、エラーは抑制しません。
+
+`--json-schema-retries` は検証失敗後の再生成回数で、既定値は 2、`0` で再生成を無効にします。
+レート制限などに対する HTTP/API 再試行は別で、`max-retries` とプロバイダークライアントが
+処理するため、`--json-schema-retries 0` でも無効にはなりません。
 
 ```sh
 git diff | henji --json-schema review.json "review this diff" | jq '.findings[]'

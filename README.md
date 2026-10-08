@@ -72,6 +72,17 @@ Windows amd64 binary. Rename it to `henji` (`henji.exe` on Windows) and place
 it in a directory on your `PATH`. On macOS/Linux, make it executable with
 `chmod +x henji`.
 
+Starting with v2.1.10, releases also include `SHA256SUMS`. Download it alongside
+the binary and verify the checksum before renaming the binary. On Linux, run:
+
+```sh
+sha256sum --ignore-missing --check SHA256SUMS
+```
+
+On macOS, use `shasum -a 256 <binary>`; on Windows, use
+`Get-FileHash <binary> -Algorithm SHA256` in PowerShell. Compare the resulting
+hash with the entry for that filename in `SHA256SUMS`.
+
 ### Build from source
 
 Use Go 1.26 or later, as specified in [`go.mod`](go.mod).
@@ -224,6 +235,11 @@ For OpenAI-compatible reasoning models, set `max-completion-tokens` in YAML
 (globally or per model), or use `HENJI_MAX_COMPLETION_TOKENS`. It has no
 dedicated CLI flag. `--no-limit` does not change response token limits.
 
+For OpenAI-compatible APIs, if both `max-tokens` and `max-completion-tokens`
+are configured, both fields are sent. CLI `--max-tokens` does not clear an
+inherited `max-completion-tokens` value. The provider determines how it handles
+the two fields, so `--max-tokens` alone does not establish the effective limit.
+
 `--text` accepts exactly one UTF-8 text file up to 3 MiB. `--image` accepts
 exactly one JPEG, PNG, or WebP image up to 3 MiB and requires `vision: true`
 on the selected model. The attachment limit remains in force with `--no-limit`.
@@ -355,6 +371,13 @@ feature (Anthropic's `output_config.format`, the OpenAI-compatible
 Google's `generationConfig.responseSchema`) and additionally validates the
 response against the schema client-side before printing it.
 
+For application integration, `-q --no-cache --json-schema <file>` without
+`--output json` writes only the validated model JSON followed by a newline to
+stdout, with no `content` or `error` envelope. Success exits with status 0.
+If preparation, API calls, or response validation ultimately fail, henji exits
+with status 1, leaves stdout empty, and writes a human-readable error to stderr.
+`-q` suppresses progress messages, but does not suppress errors.
+
 ```sh
 henji --json-schema review-schema.json "review this diff for security issues" < diff.patch
 ```
@@ -362,6 +385,10 @@ henji --json-schema review-schema.json "review this diff for security issues" < 
 If the response fails validation, henji CLI tells the model what was wrong and
 asks it to try again (up to `--json-schema-retries` times, default 2) instead
 of silently resending the same prompt.
+
+`--json-schema-retries 0` disables regeneration after validation failures.
+It does not disable HTTP/API retries for transient failures such as rate
+limiting; those are handled separately by `max-retries` and the provider client.
 
 Notes:
 
