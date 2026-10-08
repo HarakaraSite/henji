@@ -1,5 +1,8 @@
 # mods フォーク 修正ロードマップ
 
+2026-10-08 追加: [再現確認済みの修正対象5件](fix-targets-2026-10-08.md) のうち、
+会話保存失敗時の履歴保持とエラー時の stdin 待機を修正済み。JSON 出力、UTF-8、API キー取得は未着手。
+
 作成日: 2026-06-21  
 更新日: 2026-07-05 v12（**MCP機能を完全削除**。`mcp-security-design-discussion.md`のOption Aを採用し、
 `mcp.go`・provider tool-call経路・`proto`/`stream`のtool-call型・`MaxToolCalls`系config/flag・

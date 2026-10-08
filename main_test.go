@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
@@ -10,6 +14,33 @@ import (
 
 	manualdocs "forge.harakara.site/littleisland/henji/v2/internal/docs"
 )
+
+func TestHandleErrorDoesNotWaitForStdin(t *testing.T) {
+	if os.Getenv("HENJI_TEST_HANDLE_ERROR") == "1" {
+		handleError(newFlagParseError(errors.New("unknown flag: --invalid-review-flag")))
+		os.Exit(1)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHandleErrorDoesNotWaitForStdin$")
+	cmd.Env = append(os.Environ(), "HENJI_TEST_HANDLE_ERROR=1")
+	stdin, err := cmd.StdinPipe()
+	requireNoError(t, err)
+	defer stdin.Close()
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if ctx.Err() != nil {
+		t.Fatal("error handling waited for EOF on an open stdin pipe")
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+		t.Fatalf("expected error exit 1, got %v", err)
+	}
+	if !strings.Contains(stderr.String(), "invalid-review-flag") {
+		t.Fatalf("missing flag diagnostic: %q", stderr.String())
+	}
+}
 
 func TestConversationUpdatedAtUsesLocalTime(t *testing.T) {
 	original := time.Local

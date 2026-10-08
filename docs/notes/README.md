@@ -11,6 +11,7 @@
 
 - `overview.md` — プロジェクト全体像
 - `fix-roadmap.md` — 修正ロードマップ（一次情報。PR番号・未着手項目はここ）
+- [fix-targets-2026-10-08.md](fix-targets-2026-10-08.md) — 2026-10-08 に再現確認した修正対象5件（保存、エラー処理、JSON 出力、UTF-8、API キー取得）
 - `feature-requirements.md` — 機能要件メモ
 - `potential-bugs.md` — 洗い出したバグ候補
 - `json-output-plan.md` — `--output json` 設計メモ

@@ -269,6 +269,10 @@ An unknown or ambiguous `--continue` ID/title is an error; it never falls back
 to the latest conversation. Use `--continue-last` explicitly for that. A
 continued conversation restores its saved API and model when present.
 
+Operations on the same conversation wait for one another, from reading its
+history through saving the response. Different conversations can run in
+parallel. Ctrl-C cancels a request waiting for a conversation lock.
+
 For bulk cleanup, use SQLite only to select IDs and let `henji --delete`
 remove both the database row and the matching conversation-body cache file:
 

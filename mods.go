@@ -33,14 +33,15 @@ import (
 // Mods executes one henji request and retains the response for output and
 // conversation caching. It deliberately has no terminal event loop.
 type Mods struct {
-	Output        string
-	Input         string
-	Styles        styles
-	retries       int
-	schemaRetries int
-	messages      []proto.Message
-	inputParts    []proto.ContentPart
-	rawInput      string
+	Output            string
+	Input             string
+	Styles            styles
+	retries           int
+	schemaRetries     int
+	messages          []proto.Message
+	inputParts        []proto.ContentPart
+	rawInput          string
+	conversationLocks []io.Closer
 
 	db     *convoDB
 	cache  *cache.Conversations
@@ -64,6 +65,19 @@ func (m *Mods) run() error {
 	details, err := m.findCacheOpsDetails()
 	if err != nil {
 		return err
+	}
+	if err := m.lockCacheOps(details); err != nil {
+		return err
+	}
+	// A preceding request may have changed the saved provider while we waited.
+	if details.ReadID != "" {
+		found, err := m.db.Find(details.ReadID)
+		if err != nil {
+			return modsError{err, "Could not find the conversation."}
+		}
+		if found.API != nil && found.Model != nil {
+			details.API, details.Model = *found.API, *found.Model
+		}
 	}
 	m.Config.cacheWriteToID = details.WriteID
 	m.Config.cacheWriteToTitle = details.Title
@@ -95,6 +109,38 @@ func (m *Mods) run() error {
 		return nil
 	}
 	return m.complete(input)
+}
+
+func (m *Mods) lockCacheOps(details cacheDetailsMsg) error {
+	if m.Config.NoCache && m.Config.Show == "" {
+		return nil
+	}
+	ids := []string{details.ReadID}
+	if m.Config.Show == "" {
+		ids = append(ids, details.WriteID)
+	}
+	// Branches can read one ID and write another; always use the same order.
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		lock, err := m.cache.Lock(m.ctx, id)
+		if err != nil {
+			m.closeConversationLocks()
+			return modsError{err, "Could not lock the conversation."}
+		}
+		m.conversationLocks = append(m.conversationLocks, lock)
+	}
+	return nil
+}
+
+func (m *Mods) closeConversationLocks() {
+	for i := len(m.conversationLocks) - 1; i >= 0; i-- {
+		_ = m.conversationLocks[i].Close()
+	}
+	m.conversationLocks = nil
 }
 
 // HasImage reports whether the current request has an image attachment.

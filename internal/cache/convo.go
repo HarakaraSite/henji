@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -33,10 +34,22 @@ func (c *Conversations) Read(id string, messages *[]proto.Message) error {
 }
 
 func (c *Conversations) Write(id string, messages *[]proto.Message) error {
-	return c.cache.Write(id, func(w io.Writer) error {
+	return c.WriteWithCommit(id, messages, nil)
+}
+
+// WriteWithCommit keeps the previous body when its metadata cannot be saved.
+// Concurrent callers must hold Lock from reading the history through saving it.
+func (c *Conversations) WriteWithCommit(id string, messages *[]proto.Message, commitFn func() error) error {
+	return c.cache.WriteWithCommit(id, func(w io.Writer) error {
 		sanitized := proto.MessagesForCache(*messages)
 		return encode(w, &sanitized)
-	})
+	}, commitFn)
+}
+
+// Lock serializes operations on one conversation across processes. The caller
+// must close the returned handle after the conversation has been saved.
+func (c *Conversations) Lock(ctx context.Context, id string) (io.Closer, error) {
+	return c.cache.lockWrite(ctx, id)
 }
 
 // Delete a conversation.

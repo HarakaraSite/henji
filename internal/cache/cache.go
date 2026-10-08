@@ -61,21 +61,94 @@ func (c *Cache[T]) Read(id string, readFn func(io.Reader) error) error {
 }
 
 func (c *Cache[T]) Write(id string, writeFn func(io.Writer) error) error {
+	return c.WriteWithCommit(id, writeFn, nil)
+}
+
+// WriteWithCommit replaces a body only after its complete contents are staged.
+// If commitFn fails, the previous body is restored, or a new body is removed.
+func (c *Cache[T]) WriteWithCommit(id string, writeFn func(io.Writer) error, commitFn func() error) error {
 	if id == "" {
 		return fmt.Errorf("write: %w", errInvalidID)
 	}
-
-	file, err := os.Create(filepath.Join(c.dir(), id+cacheExt))
+	staged, err := c.stageWrite(writeFn)
 	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(staged) }()
+
+	target := filepath.Join(c.dir(), id+cacheExt)
+	var backup string
+	if commitFn != nil {
+		previous, err := os.Open(target)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("read previous body: %w", err)
+		}
+		if err == nil {
+			backup, err = c.stageWrite(func(w io.Writer) error {
+				_, err := io.Copy(w, previous)
+				return err
+			})
+			_ = previous.Close()
+			if err != nil {
+				return fmt.Errorf("back up previous body: %w", err)
+			}
+		}
+	}
+	keepBackup := false
+	defer func() {
+		if backup != "" && !keepBackup {
+			_ = os.Remove(backup)
+		}
+	}()
+
+	if err := os.Rename(staged, target); err != nil {
 		return fmt.Errorf("write: %w", err)
 	}
-	defer file.Close() //nolint:errcheck
 
-	if err := writeFn(file); err != nil {
-		return fmt.Errorf("write: %w", err)
+	if commitFn != nil {
+		if err := commitFn(); err != nil {
+			var restoreErr error
+			if backup != "" {
+				restoreErr = os.Rename(backup, target)
+				if restoreErr != nil {
+					// Do not remove the surviving original if restoring it fails.
+					keepBackup = true
+					restoreErr = fmt.Errorf("restore previous body (backup retained at %s): %w", backup, restoreErr)
+				}
+			} else {
+				restoreErr = os.Remove(target)
+				if restoreErr != nil {
+					restoreErr = fmt.Errorf("remove unsaved body: %w", restoreErr)
+				}
+			}
+			return fmt.Errorf("commit: %w", errors.Join(err, restoreErr))
+		}
 	}
-
 	return nil
+}
+
+func (c *Cache[T]) stageWrite(writeFn func(io.Writer) error) (name string, err error) {
+	file, err := os.CreateTemp(c.dir(), ".henji-cache-*")
+	if err != nil {
+		return "", fmt.Errorf("stage write: %w", err)
+	}
+	name = file.Name()
+	defer func() {
+		_ = file.Close()
+		if err != nil {
+			_ = os.Remove(name)
+		}
+	}()
+	if err := writeFn(file); err != nil {
+		return name, fmt.Errorf("stage write: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		return name, fmt.Errorf("sync staged body: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return name, fmt.Errorf("close staged body: %w", err)
+	}
+	return name, nil
 }
 
 // Delete removes a cached item by its ID.

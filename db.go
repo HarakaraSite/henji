@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -27,20 +28,37 @@ func handleSqliteErr(err error) error {
 }
 
 func openDB(ds string) (*convoDB, error) {
-	db, err := sqlx.Open("sqlite", ds)
+	// Apply the timeout to every connection, including connections opened later
+	// by the pool. Serialize schema changes across simultaneous CLI startups.
+	separator := "?"
+	if strings.Contains(ds, "?") {
+		separator = "&"
+	}
+	db, err := sqlx.Open("sqlite", ds+separator+"_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
 		return nil, fmt.Errorf(
 			"could not create db: %w",
 			handleSqliteErr(err),
 		)
 	}
+	initialized := false
+	defer func() {
+		if !initialized {
+			_ = db.Close()
+		}
+	}()
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf(
 			"could not ping db: %w",
 			handleSqliteErr(err),
 		)
 	}
-	if _, err := db.Exec(`
+	tx, err := db.Beginx()
+	if err != nil {
+		return nil, fmt.Errorf("could not begin db migration: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`
 		CREATE TABLE
 		  IF NOT EXISTS conversations (
 		    id string NOT NULL PRIMARY KEY,
@@ -52,38 +70,42 @@ func openDB(ds string) (*convoDB, error) {
 	`); err != nil {
 		return nil, fmt.Errorf("could not migrate db: %w", err)
 	}
-	if _, err := db.Exec(`
+	if _, err := tx.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_conv_id ON conversations (id)
 	`); err != nil {
 		return nil, fmt.Errorf("could not migrate db: %w", err)
 	}
-	if _, err := db.Exec(`
+	if _, err := tx.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_conv_title ON conversations (title)
 	`); err != nil {
 		return nil, fmt.Errorf("could not migrate db: %w", err)
 	}
 
-	if !hasColumn(db, "model") {
-		if _, err := db.Exec(`
+	if !hasColumn(tx, "model") {
+		if _, err := tx.Exec(`
 			ALTER TABLE conversations ADD COLUMN model string
 		`); err != nil {
 			return nil, fmt.Errorf("could not migrate db: %w", err)
 		}
 	}
-	if !hasColumn(db, "api") {
-		if _, err := db.Exec(`
+	if !hasColumn(tx, "api") {
+		if _, err := tx.Exec(`
 			ALTER TABLE conversations ADD COLUMN api string
 		`); err != nil {
 			return nil, fmt.Errorf("could not migrate db: %w", err)
 		}
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("could not commit db migration: %w", err)
+	}
+	initialized = true
 	return &convoDB{db: db}, nil
 }
 
-func hasColumn(db *sqlx.DB, col string) bool {
+func hasColumn(tx *sqlx.Tx, col string) bool {
 	var count int
-	if err := db.Get(&count, `
+	if err := tx.Get(&count, `
 		SELECT count(*)
 		FROM pragma_table_info('conversations') c
 		WHERE c.name = $1

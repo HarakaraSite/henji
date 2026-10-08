@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,4 +170,58 @@ func TestConvoDB(t *testing.T) {
 			fmt.Sprintf("%s\t%s", testid1, title1),
 		}, results)
 	})
+}
+
+// A first launch must not race another process adding the model/API columns.
+func TestConcurrentDatabaseInitialization(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "henji.db")
+	start := make(chan struct{})
+	results := make(chan error, 8)
+	var workers sync.WaitGroup
+	for range cap(results) {
+		workers.Go(func() {
+			<-start
+			db, err := openDB(path)
+			if err == nil {
+				err = db.Close()
+			}
+			results <- err
+		})
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+	for err := range results {
+		require.NoError(t, err)
+	}
+}
+
+func TestDatabaseStartupWaitsForWriter(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "henji.db")
+	first, err := openDB(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Close() })
+	tx, err := first.db.Beginx()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tx.Rollback() })
+	result := make(chan error, 1)
+	go func() {
+		db, err := openDB(path)
+		if err == nil {
+			err = db.Close()
+		}
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		t.Fatalf("startup returned before the writer released its lock: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, tx.Commit())
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(6 * time.Second):
+		t.Fatal("startup did not resume after the writer released its lock")
+	}
 }

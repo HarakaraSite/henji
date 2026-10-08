@@ -135,6 +135,9 @@ Structured-output pitfalls:
 Successful model conversations are saved automatically (metadata in SQLite,
 message bodies on disk) unless `--no-cache` is set.
 
+Operations on the same conversation wait for one another through saving;
+different conversations can run in parallel. Ctrl-C also cancels lock waits.
+
 - `-l` prints a tab-separated list of saved conversations with their last save
   time in local time (`YYYY-MM-DD HH:MM:SS TZ`); `-t <title>` names one at save
   time. It never opens an interactive selector.

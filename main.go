@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -145,7 +144,7 @@ var (
 			}
 
 			if len(config.Delete) > 0 {
-				return deleteConversations()
+				return deleteConversations(cmd.Context())
 			}
 
 			cache, err := cache.NewConversations(config.CachePath)
@@ -153,6 +152,7 @@ var (
 				return modsError{err, "Couldn't initialize conversation cache."}
 			}
 			mods := newMods(cmd.Context(), &config, db, cache)
+			defer mods.closeConversationLocks()
 			if err := mods.run(); err != nil {
 				if config.Output == "json" {
 					var merr modsError
@@ -403,10 +403,6 @@ func maybeWriteMemProfile() {
 
 func handleError(err error) {
 	maybeWriteMemProfile()
-	// exhaust stdin
-	if !isInputTTY() {
-		_, _ = io.ReadAll(os.Stdin)
-	}
 
 	format := "\n%s\n\n"
 
@@ -442,26 +438,30 @@ func handleError(err error) {
 	fmt.Fprintf(os.Stderr, format, args...)
 }
 
-func deleteConversations() error {
+func deleteConversations(ctx context.Context) error {
 	for _, del := range config.Delete {
 		convo, err := db.Find(del)
 		if err != nil {
 			return modsError{err, "Couldn't find conversation to delete."}
 		}
-		if err := deleteConversation(convo); err != nil {
+		if err := deleteConversation(ctx, convo); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func deleteConversation(convo *Conversation) error {
-	if err := db.Delete(convo.ID); err != nil {
-		return modsError{err, "Couldn't delete conversation."}
-	}
-
+func deleteConversation(ctx context.Context, convo *Conversation) error {
 	cache, err := cache.NewConversations(config.CachePath)
 	if err != nil {
+		return modsError{err, "Couldn't delete conversation."}
+	}
+	lock, err := cache.Lock(ctx, convo.ID)
+	if err != nil {
+		return modsError{err, "Couldn't lock conversation to delete."}
+	}
+	defer func() { _ = lock.Close() }()
+	if err := db.Delete(convo.ID); err != nil {
 		return modsError{err, "Couldn't delete conversation."}
 	}
 	if err := cache.Delete(convo.ID); err != nil {
@@ -581,11 +581,9 @@ func saveConversation(mods *Mods) error {
 	if err != nil {
 		return modsError{err, errReason}
 	}
-	if err := cache.Write(id, &mods.messages); err != nil {
-		return modsError{err, errReason}
-	}
-	if err := db.Save(id, title, config.API, config.Model); err != nil {
-		_ = cache.Delete(id) // remove leftovers
+	if err := cache.WriteWithCommit(id, &mods.messages, func() error {
+		return db.Save(id, title, config.API, config.Model)
+	}); err != nil {
 		return modsError{err, errReason}
 	}
 
