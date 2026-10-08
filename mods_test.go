@@ -13,7 +13,7 @@ import (
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"forge.harakara.site/littleisland/henji/v2/internal/stream"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/require"
 )
 

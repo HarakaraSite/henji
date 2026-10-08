@@ -8,11 +8,11 @@ import (
 
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"forge.harakara.site/littleisland/henji/v2/internal/stream"
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/packages/param"
-	"github.com/openai/openai-go/packages/ssestream"
-	"github.com/openai/openai-go/shared"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
+	"github.com/openai/openai-go/v3/packages/ssestream"
+	"github.com/openai/openai-go/v3/shared"
 )
 
 var _ stream.Client = &Client{}
@@ -40,7 +40,7 @@ func DefaultConfig(authToken string) Config {
 
 // New creates a new [Client] with the given [Config].
 func New(config Config) *Client {
-	opts := []option.RequestOption{option.WithMiddleware(ignoreEmptySSEEvents)}
+	opts := []option.RequestOption{option.WithMiddleware(preserveLegacyRetryAfter)}
 
 	if config.HTTPClient != nil {
 		opts = append(opts, option.WithHTTPClient(config.HTTPClient))

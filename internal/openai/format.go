@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 )
 
 func fromProtoMessages(input []proto.Message) []openai.ChatCompletionMessageParamUnion {

@@ -13,7 +13,7 @@ import (
 
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"forge.harakara.site/littleisland/henji/v2/internal/stream"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 )
 
 var _ stream.Client = &Client{}
@@ -189,8 +189,7 @@ func (c *Client) handleErrorResp(resp *http.Response) error {
 		}
 	}
 	errRes.StatusCode = resp.StatusCode
-	// Request/Response are required by (*openai.Error).Error(); without them
-	// it panics on a nil pointer dereference when the error is rendered.
+	// Henji's API diagnostics include the original request URL and status.
 	errRes.Request = resp.Request
 	errRes.Response = resp
 	return &errRes

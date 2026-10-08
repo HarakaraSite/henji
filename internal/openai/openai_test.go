@@ -7,7 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"github.com/stretchr/testify/require"
@@ -236,4 +239,101 @@ func TestStreamKeepsAPIErrorAfterComment(t *testing.T) {
 
 	require.False(t, s.Next())
 	require.ErrorContains(t, s.Err(), "upstream failed")
+}
+
+func TestRequestThroughProxyPreservesConversation(t *testing.T) {
+	requests := make(chan *http.Request, 1)
+	bodies := make(chan []byte, 1)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		requests <- r
+		bodies <- body
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, ": keepalive\n\n")
+		fmt.Fprint(w, "data: {\"id\":\"chat-proxy\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"続き\"}}]}\n\n")
+		fmt.Fprint(w, ": keepalive\r\n\r\n")
+		fmt.Fprint(w, "data: {\"id\":\"chat-proxy\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"の回答\"},\"finish_reason\":\"stop\"}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(proxy.Close)
+	proxyURL, err := url.Parse(proxy.URL)
+	require.NoError(t, err)
+	transport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	t.Cleanup(transport.CloseIdleConnections)
+	cfg := DefaultConfig("test-key")
+	cfg.BaseURL = "http://provider.example/v1"
+	cfg.HTTPClient = &http.Client{Transport: transport}
+	history := []proto.Message{
+		{Role: proto.RoleSystem, Content: "日本語で回答"},
+		{Role: proto.RoleUser, Content: "前の質問"},
+		{Role: proto.RoleAssistant, Content: "前の回答"},
+		{Role: proto.RoleUser, Content: "続けて"},
+	}
+	temperature, topP := 0.0, 0.8
+	s := New(cfg).Request(context.Background(), proto.Request{
+		API: "openrouter", Model: "test", User: "test-user", Messages: history,
+		Temperature: &temperature, TopP: &topP, Stop: []string{"END"},
+	})
+	t.Cleanup(func() { _ = s.Close() })
+	var output string
+	for s.Next() {
+		chunk, err := s.Current()
+		require.NoError(t, err)
+		output += chunk.Content
+	}
+	require.NoError(t, s.Err())
+	require.Equal(t, "続きの回答", output)
+	require.Equal(t, append(history, proto.Message{Role: proto.RoleAssistant, Content: output}), s.Messages())
+	r := <-requests
+	require.Equal(t, http.MethodPost, r.Method)
+	require.Equal(t, "http://provider.example/v1/chat/completions", r.URL.String())
+	require.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+	require.JSONEq(t, `{"model":"test","user":"test-user","stream":true,"temperature":0,"top_p":0.8,"stop":["END"],"messages":[{"role":"system","content":"日本語で回答"},{"role":"user","content":"前の質問"},{"role":"assistant","content":"前の回答"},{"role":"user","content":"続けて"}]}`, string(<-bodies))
+}
+
+func TestStreamRetriesWithLongRetryAfter(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		headers map[string]string
+	}{
+		{"minute", map[string]string{"Retry-After": "60"}},
+		{"above v3 limit", map[string]string{"Retry-After": "121"}},
+		{"milliseconds", map[string]string{"Retry-After-Ms": "60000"}},
+		{"milliseconds precedence", map[string]string{"Retry-After-Ms": "60000", "Retry-After": "0.25"}},
+		{"HTTP date", map[string]string{"Retry-After": time.Now().Add(2 * time.Minute).UTC().Format(time.RFC1123)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if requests.Add(1) == 1 {
+					for name, value := range tc.headers {
+						w.Header().Set(name, value)
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					fmt.Fprint(w, `{"error":{"message":"try again","code":"rate_limit_exceeded"}}`)
+					return
+				}
+				w.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(w, "data: {\"id\":\"chat-retry\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n")
+			}))
+			t.Cleanup(srv.Close)
+			cfg := DefaultConfig("test-key")
+			cfg.BaseURL = srv.URL
+			// A long SDK delay must not reach the caller's deadline.
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			s := New(cfg).Request(ctx, proto.Request{Model: "test"})
+			t.Cleanup(func() { _ = s.Close() })
+			var output string
+			for s.Next() {
+				chunk, err := s.Current()
+				require.NoError(t, err)
+				output += chunk.Content
+			}
+			require.NoError(t, s.Err())
+			require.Equal(t, "ok", output)
+			require.EqualValues(t, 2, requests.Load())
+		})
+	}
 }
