@@ -1,12 +1,24 @@
 # henji の機能
 
+## 意思決定モデル
+
+`henji decision` はOpenRouter・OpenAIの専用Decisions APIに対応します。一回の起動で
+一つの対象を判断し、API応答全体のJSONを返す一問一答です。同じ対象への複数質問は一緒に
+送れます。履歴・キャッシュ・会話継続は使いません。連続実行はシェルループを想定し、前の
+結果が必要な場合は呼び出し元が次の入力を作ります。意思決定の出力はGlowを使いません。
+[README](README.ja.md#decisions-apiによるテキスト画像判断)と
+[cookbookの例](docs/cookbook.ja.md#decisions-apiによる判断)を参照してください。
+
 ## 基本的な使い方
 
 デフォルトでは：
 
 - モデルの応答は`STDOUT`、進捗・状態メッセージは`STDERR`に出力される
 - 成功したモデル会話は、`--no-cache`を指定しない限り最初のプロンプトの1行目をタイトルとして保存される
-- `STDOUT`がTTYの場合、デフォルトでglamourによる整形が使われる
+- 通常の端末表示では、全文生成後に`PATH`上の外部`glow`でMarkdownを整形する。
+  Glowがない場合や失敗時は元のMarkdownを表示する
+- `--raw`やstdoutのパイプ・リダイレクトはGlowを使わず逐次出力する。
+  JSON・JSON Schema出力もGlowを使わない
 - TTYでのリクエスト待機中は、`STDERR`に小さな`Generating`スピナーが表示される
 
 ### 基本形

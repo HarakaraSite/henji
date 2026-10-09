@@ -12,6 +12,18 @@ open an input form or a model picker: provide a prompt as arguments, `--text`,
 and/or stdin, and select a configured model with `--model` / `--api` when
 needed.
 
+## Changes in v2.2.0
+
+This release includes:
+
+- **Decision models:** `henji decision` supports the dedicated OpenRouter and
+  OpenAI Decisions APIs, including models such as Typesafe Jev. Each invocation
+  judges one input and returns the provider's complete JSON response. Run
+  repeated judgments in a shell loop; no conversation is continued.
+- **Terminal Markdown:** formatting uses an optional external `glow` executable
+  on `PATH`, instead of an embedded renderer. Without Glow, henji prints the
+  original Markdown. JSON and pipeline output do not use Glow.
+
 ## What Changed from Upstream
 
 ### Bug fixes
@@ -92,6 +104,21 @@ git clone https://forge.harakara.site/littleisland/henji.git
 cd henji
 go build -o henji .
 ```
+
+### Optional: Glow for terminal Markdown
+
+Henji is one executable. For formatted Markdown in a terminal, install
+[Glow](https://github.com/charmbracelet/glow#installation) separately and put
+`glow` on `PATH`. Glow is not bundled with Henji. With Go installed:
+
+```sh
+go install charm.land/glow/v3@latest
+glow --version
+```
+
+Add Go's executable directory (`go env GOBIN`, or `$(go env GOPATH)/bin` when
+`GOBIN` is empty) to `PATH`. Glow is unnecessary for plain Markdown, pipelines,
+JSON output, and decisions. See [terminal rendering](#terminal-markdown-rendering).
 
 ### Shell completions
 
@@ -201,8 +228,11 @@ patterns. A Japanese version of this README is [README.ja.md](README.ja.md).
 
 ### Decisions: text and image classification
 
-`henji decision` calls the dedicated OpenRouter or OpenAI Decisions API. It
-reads evidence from stdin and a provider-native questions file:
+`henji decision` calls the dedicated OpenRouter or OpenAI Decisions API and
+uses decision models for classification and routing. Each invocation is one
+question-and-answer turn: evidence comes from stdin, and questions come from a
+provider-native JSON file. Multiple questions about that same input can be
+answered together; there is no conversational continuation.
 
 ```sh
 henji decision -a openrouter -m typesafe/jev-1.13 \
@@ -235,10 +265,30 @@ can be smaller. Henji does not resize images or shorten text. Clef/Clef Flash,
 for example, recommend images under about 300 KB and read only roughly the
 first 2,000 tokens of state text. See the [provider's current limits](https://openrouter.ai/docs/guides/community/multimodal-decisions).
 
-For independent inputs, invoke the command in a shell loop. For gateway,
+Repeated execution is intended to use a shell loop. For dependent judgments,
+the caller interprets the result and constructs the next input. For gateway,
 image, and loop examples, see the [cookbook](docs/cookbook.md#decisions-with-native-json-output).
 Run `henji decision --help` for its dedicated flags. The existing generation
 command keeps its output and error contracts.
+
+### Terminal Markdown rendering
+
+Markdown formatting depends on an external `glow` found on `PATH`. Normal
+terminal text is buffered until generation completes, then rendered by Glow.
+If Glow is missing or fails, henji prints the original Markdown.
+
+| Output destination or mode | Behavior |
+|---|---|
+| Normal terminal text | Render the complete response with Glow, with raw Markdown as fallback |
+| `--raw` or stdout piped/redirected | Stream text chunks as received, without Glow |
+| JSON, JSON Schema, or `henji decision` | Preserve the corresponding JSON contract, without Glow |
+
+A pipe into **stdin** still uses Glow when stdout is a terminal. A pipe or
+redirection from **stdout** skips it. `word-wrap` / `HENJI_WORD_WRAP` controls
+width (default 80); `GLAMOUR_STYLE` selects the style (default `auto`). Pager
+and TUI modes are disabled. Henji no longer embeds a Markdown renderer, reducing
+startup work for repeated invocations. See the [cookbook](docs/cookbook.md#optional-terminal-rendering-with-glow)
+for a Markdown display example.
 
 ### Generation flags
 
@@ -271,14 +321,6 @@ Tuning knobs that rarely change between runs — sampling parameters (`temp`,
 `topp`, `topk`, `stop`), `max-retries`, `word-wrap`, and `http-proxy` — have
 no dedicated flags; set them in `henji.yml` or override per run with the
 corresponding `HENJI_*` environment variable (e.g. `HENJI_TEMP=0.2`).
-
-Normal terminal text is rendered after generation by an external `glow` found
-on `PATH`. Glow is optional: if it is missing or fails, henji prints the original
-Markdown. `word-wrap` controls its width, and `GLAMOUR_STYLE` selects its style
-(default `auto`). Pager and TUI modes are disabled for this rendering step.
-Pipes and `--raw` keep streaming; JSON, JSON Schema, and `henji decision` output
-never use Glow. Henji no longer embeds a Markdown renderer, reducing startup
-work for repeated invocations.
 
 For OpenAI-compatible reasoning models, set `max-completion-tokens` in YAML
 (globally or per model), or use `HENJI_MAX_COMPLETION_TOKENS`. It has no

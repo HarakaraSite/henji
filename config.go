@@ -396,6 +396,9 @@ func usageFunc(cmd *cobra.Command) error {
 			)
 		}
 	}
+	fmt.Println("Terminal Markdown: external glow on PATH, after generation; raw Markdown if unavailable.")
+	fmt.Println("Piped/raw text streams without Glow; JSON and decision output never use Glow.")
+	fmt.Println()
 	fmt.Printf("Full manual:\n  %s\n", cheapHighlighting(stdoutStyles(), "henji docs"))
 
 	return nil

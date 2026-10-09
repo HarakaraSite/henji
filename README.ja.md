@@ -11,6 +11,17 @@
 
 [English README](README.md)
 
+## v2.2.0の主な変更
+
+v2.2.0には次の変更が入っています。
+
+- **意思決定モデルへの対応:** `henji decision` でOpenRouter・OpenAIの専用Decisions APIを
+  呼び出し、Typesafe Jevなどで判断できます。一回の起動で一つの対象を判断し、API応答全体の
+  JSONを返す一問一答です。連続実行はシェルループを想定し、会話は継続しません。
+- **端末のMarkdown整形:** 内蔵レンダラーを外し、`PATH` 上の外部 `glow` に依存する方式へ
+  変更しました。Glowは任意で、ない場合は元のMarkdownを表示します。JSON・パイプ出力には
+  Glowを使いません。
+
 ## upstream からの主な変更
 
 ### バグ修正
@@ -38,12 +49,6 @@ Azure OpenAI と Azure AD の対応も削除済みで、`azure` / `azure-ad` の
 未使用の UI・プロンプト表示・スピナー調整フラグは削除しました。`--temp`、`--topp`、
 `--topk`、`--stop`、`--max-retries`、`--word-wrap`、`--http-proxy` は `henji.yml` または
 `HENJI_*` 環境変数で引き続き設定できます。
-
-通常の端末表示では、生成完了後に `PATH` 上の外部 `glow` でMarkdownを整形します。
-Glowは任意で、未インストール・実行失敗時は元のMarkdownを表示します。`word-wrap` は
-整形幅、`GLAMOUR_STYLE` はスタイル（既定 `auto`）を指定します。ページャとTUIは起動しません。
-パイプ・`--raw` の逐次出力、およびJSON・JSON Schema・`henji decision` の出力はGlowを使いません。
-内蔵Markdownレンダラーを外し、繰り返し起動時の初期化処理を減らしています。
 
 MCP（Model Context Protocol）対応も完全に削除しました。信頼できない文章を処理した際に、
 モデルが外部ツールを承認・読み書きの区別なく呼び出せる設計には実害のあるリスクがありました。
@@ -79,6 +84,21 @@ git clone https://forge.harakara.site/littleisland/henji.git
 cd henji
 go build -o henji .
 ```
+
+### 任意: 端末のMarkdown整形用にGlowをインストール
+
+Henjiの実行ファイルは一つです。端末でMarkdownを整形するには、別途
+[Glow](https://github.com/charmbracelet/glow#installation)をインストールし、`glow` を `PATH` に
+配置してください。Henjiには同梱しません。Goを使う場合:
+
+```sh
+go install charm.land/glow/v3@latest
+glow --version
+```
+
+Goの実行ファイル配置先（`go env GOBIN`、未設定なら `$(go env GOPATH)/bin`）を `PATH` に
+追加します。原文のMarkdown・パイプ・JSON・意思決定の出力にはGlowは不要です。
+詳しくは[端末のMarkdown表示](#端末のmarkdown表示)を参照してください。
 
 ### シェル補完
 
@@ -164,7 +184,9 @@ henji --continue <id-or-title> "now propose the smallest fix"
 
 ### Decisions APIによるテキスト・画像判断
 
-独立した `henji decision` でOpenRouter・OpenAIのDecisions APIを呼び出します。
+独立した `henji decision` でOpenRouter・OpenAIの専用Decisions APIを呼び出し、意思決定モデルで
+分類・振り分けなどを行います。一回の起動で一つの対象を判断する一問一答です。同じ対象への
+複数質問は一緒に送れますが、会話を継続する機能はありません。
 
 ```sh
 henji decision -a openrouter -m typesafe/jev-1.13 \
@@ -179,7 +201,8 @@ stdinは判断対象の自然文です。`--questions` はOpenRouterなら名前
 
 成功時はAPI応答全体のJSONをstdoutへ出し、正常応答に含まれるrefusalも終了コード0です。
 失敗時は終了コード1、stdoutは空、詳細はstderrです。Henjiのラッパーは付けず、`output` 設定にも
-左右されません。会話履歴・キャッシュ・DBは作成せず、連続処理はshell側で繰り返し起動します。
+左右されません。会話履歴・キャッシュ・DBは作成せず、連続実行はシェルループを想定しています。
+前の判断に依存する処理では、呼び出し元が結果を解釈して次の入力を作ります。
 
 認証は既存のキー取得設定を使い、既定環境変数は `OPENROUTER_API_KEY` / `OPENAI_API_KEY` です。
 生成用 `base-url` とは独立した `decision-base-url` と `decision-protocol` を使い、標準2社は省略できます。
@@ -191,6 +214,23 @@ stdinは判断対象の自然文です。`--questions` はOpenRouterなら名前
 行いません。Clef系の画像サイズや文章切り詰めなど、[モデル固有の制約](https://openrouter.ai/docs/guides/community/multimodal-decisions)を確認してください。
 
 専用フラグは `henji decision --help`、設定・画像・ループの例は[cookbook](docs/cookbook.ja.md#decisions-apiによる判断)を参照してください。
+
+### 端末のMarkdown表示
+
+Markdownの整形は `PATH` 上の外部 `glow` に依存します。通常の端末表示では全文の生成完了を
+待ち、Glowで整形してから表示します。Glowがない場合や実行失敗時は元のMarkdownを表示します。
+
+| 出力先・モード | 挙動 |
+|---|---|
+| 通常の端末へのテキスト | 全文をGlowで整形。使えなければ元のMarkdownを表示 |
+| `--raw`、stdoutのパイプ・リダイレクト | 受信した断片を逐次出力。Glowは使わない |
+| JSON・JSON Schema・`henji decision` | 各JSON出力契約を維持。Glowは使わない |
+
+**stdin**へのパイプ入力でも、stdoutが端末ならGlowを使います。**stdout**をパイプやファイルへ
+送る場合は使いません。整形幅は `word-wrap` / `HENJI_WORD_WRAP`（既定80）、スタイルは
+`GLAMOUR_STYLE`（既定 `auto`）で指定し、ページャ・TUIは起動しません。
+内蔵Markdownレンダラーを外し、繰り返し起動時の初期化処理を減らしています。
+Markdown表示の確認例は[cookbook](docs/cookbook.ja.md#glowによる任意の端末整形)を参照してください。
 
 ### 通常の生成で使う重要なフラグ
 

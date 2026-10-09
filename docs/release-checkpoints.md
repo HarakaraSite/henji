@@ -46,6 +46,21 @@ profile requires:
 actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
 ```
 
+## Next release: v2.2.0 (planned)
+
+Scope agreed on 2026-10-09:
+
+- Dedicated OpenRouter/OpenAI Decisions API support in `henji decision`.
+  Each invocation judges one input and returns the full native response JSON;
+  repeated execution uses shell loops, with no conversational continuation.
+- External, optional Glow for terminal Markdown formatting, replacing the
+  embedded renderer. Missing/failed Glow falls back to the original Markdown;
+  raw, pipeline, JSON, JSON Schema, and decision output bypass Glow.
+- Updated help and embedded manuals, README, feature lists, and cookbook.
+
+This is the planned release scope, not a completed release checkpoint.
+Record the pre-tag check results when preparing v2.2.0.
+
 ## Results
 
 ### v2.1.10 — 2026-10-08

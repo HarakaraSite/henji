@@ -1,5 +1,5 @@
-henji はパイプライン向けのコマンドライン LLM クライアントです。このマニュアルは作業単位で
-使い方と注意点を説明します。フラグの一行一覧は `henji -h` を実行してください。
+henji は文章生成と意思決定モデルに対応するコマンドライン LLM クライアントです。
+このマニュアルは使い方と注意点を説明します。フラグは `henji -h` / `henji decision -h` で確認できます。
 
 ## 基本の実行方法
 
@@ -23,9 +23,9 @@ henji はパイプライン向けのコマンドライン LLM クライアント
 - **stdout はモデル応答だけ**です。`--output json` 時は JSON envelope だけを出します。
 - 進捗、保存通知、エラー詳細は **stderr** です。`-q` はエラー以外を抑制します。
 - stdout が端末でない場合は ANSI なしのプレーンテキストです。
-- 通常の端末表示は生成完了後に外部 `glow` で整形します。Glowがない場合や失敗時は原文を
-  表示します。パイプ・`--raw` は逐次出力し、JSON・Schema・decisionはGlowを使いません。
-  表示設定はcookbookを参照してください。
+- 端末のMarkdown整形は、別途インストールした `PATH` 上の外部 `glow` に依存します。
+  生成完了後に整形し、Glowがない場合や失敗時は原文を表示します。パイプ・`--raw` は逐次出力し、
+  JSON・Schema・decisionはGlowを使いません。導入・表示設定はREADMEとcookbookを参照してください。
 - 成功時の終了ステータスは `0`、失敗時は非 0 です。
 - JSON 出力を選択した後の準備・生成・保存の失敗は、一行の `error` envelope に反映します。
   保存失敗時も生成済みの `content` を保持します。出力形式の選択前に設定読込が失敗した場合は
@@ -84,10 +84,11 @@ Google 用スキーマでは `additionalProperties` を使えません。OpenAI 
 - OpenRouter: `{"urgent":{"type":"noul","instructions":"Is it urgent?"}}`
 - OpenAI: `[{"name":"urgent","type":"predicate","instructions":"Is it urgent?"}]`
 
-OpenAIでは `-a openai -m gpt-6-luna` を使います。同じ対象への複数質問を一回の要求で送ります。
+OpenAIでは `-a openai -m gpt-6-luna` を使います。一回の起動で一つの対象を判断する一問一答です。
+同じ対象への複数質問は一緒に送れます。会話の継続はなく、連続実行はシェルループを想定します。
 成功時はAPI応答全体のJSONをstdoutへ出し、正常refusalも終了コード0です。失敗時は終了コード1、
 stdoutは空、詳細はstderrです。`output` 設定に左右されず、履歴・DB・キャッシュは作りません。
-連続処理はshellループで行います。stdinの文章はインデント・切り詰めをせず送ります。
+前の判断に依存する処理では呼び出し元が次の入力を作ります。stdinの文章は加工せず送ります。
 
 `--image` は1枚・JPEG/PNG/WebP・3MiB以内で、モデル設定の `vision: true` が必要です。
 3MiBは読込み上限であり、モデルの受理上限は別です。自動縮小・再圧縮は行いません。

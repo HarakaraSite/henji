@@ -19,11 +19,14 @@ func newDecisionCmd() *cobra.Command {
 	var apiName, modelName, questionsPath, imagePath string
 	cmd := &cobra.Command{
 		Use:   "decision -m MODEL --questions FILE [-a API] [--image FILE]",
-		Short: "Evaluate text or an image with a Decisions API",
+		Short: "Judge one text or image input with OpenRouter or OpenAI Decisions",
 		Long: "Read evidence from stdin and questions from a provider-native JSON file.\n" +
+			"One question-and-answer turn per invocation; multiple questions may share an input.\n" +
+			"No conversation continuation: use a shell loop for repeated judgments.\n" +
 			"Print the complete native response JSON; no conversation is saved.\n" +
 			"Normal refusals exit 0. Failures leave stdout empty and exit 1.",
-		Example:      "  henji decision -a openrouter -m typesafe/jev-1.13 --questions questions.json < input.txt",
+		Example: "  henji decision -a openrouter -m typesafe/jev-1.13 --questions router-questions.json < input.txt\n" +
+			"  henji decision -a openai -m gpt-6-luna --questions openai-questions.json < input.txt",
 		SilenceUsage: true,
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -46,7 +49,7 @@ func newDecisionCmd() *cobra.Command {
 		return fmt.Errorf("%w (see henji decision --help)", err)
 	})
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  %s\n\nOptions:\n%s\nFull manual: henji docs\n", cmd.UseLine(), cmd.LocalFlags().FlagUsages())
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  %s\n\nOptions:\n%s\nExamples:\n%s\n\nFull manual: henji docs\n", cmd.UseLine(), cmd.LocalFlags().FlagUsages(), cmd.Example)
 		return err
 	})
 	return cmd

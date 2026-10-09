@@ -31,6 +31,10 @@ messages use stderr only when stdout is a TTY; `--quiet` hides them. This keeps
 
 ### Optional terminal rendering with Glow
 
+Terminal Markdown formatting depends on a separately installed Glow executable;
+Henji does not bundle it. See the [installation instructions](../README.md#optional-glow-for-terminal-markdown).
+Plain Markdown and machine-readable output work without it.
+
 For normal text on a terminal, henji buffers the response and passes it to an
 external [`glow`](https://github.com/charmbracelet/glow) on `PATH` after generation.
 If Glow is missing or exits with an error, the original Markdown is printed.
@@ -51,6 +55,17 @@ is not bundled into henji; its startup cost is paid only for terminal rendering.
 henji --raw "explain this error" < error.log
 GLAMOUR_STYLE=light henji "explain this error" < error.log
 ```
+
+To check Markdown formatting, run this with stdout connected to your terminal:
+
+```sh
+henji --no-cache --max-tokens 512 'Create a short Markdown display sample with a heading, bold bullet points, a blockquote, a three-row table, inline code, and a Python code block. Do not wrap the whole response in a code fence.'
+```
+
+Generation completes before the formatted result appears. Add `--raw` to see
+Markdown source as it arrives. Piping input into stdin still allows Glow;
+piping or redirecting stdout skips it. This example makes a billed request
+when you use a paid provider.
 
 ## Setting up a new provider
 
@@ -198,8 +213,12 @@ needs it.
 ## Decisions with native JSON output
 
 `henji decision` sends one input to the dedicated OpenRouter or OpenAI
-Decisions API. Choose `-m` explicitly; generation defaults are not inherited.
-Text model IDs need no YAML registration. Configured model aliases also work.
+Decisions API for decision models, including Typesafe Jev on OpenRouter.
+Each invocation is a single question-and-answer turn, with no conversational
+continuation. Multiple questions about the same input can be answered together.
+Repeated execution is intended to use a shell loop, as shown below.
+Choose `-m` explicitly; generation defaults are not inherited. Text model IDs
+need no YAML registration. Configured model aliases also work.
 
 Create an OpenRouter questions file (`router-questions.json`):
 
@@ -223,6 +242,22 @@ henji decision -a openai -m gpt-6-luna --questions openai-questions.json < reque
 For multiple questions about the same evidence, add entries to the native
 object/array. [OpenRouter](examples/decision-openrouter-questions.json) and
 [OpenAI](examples/decision-openai-questions.json) examples include two questions.
+
+For a concrete urgency/routing example, run these from the repository root.
+The example question files ask whether a request is urgent and whether it
+should go to `review` or `skip`. `jq` selects the native `answers` field;
+OpenRouter returns an object, while OpenAI returns an array.
+
+```sh
+printf 'The production service is down. Please investigate immediately.\n' |
+  henji decision -a openrouter -m typesafe/jev-1.13 \
+    --questions docs/examples/decision-openrouter-questions.json | jq '.answers'
+
+printf 'The production service is down. Please investigate immediately.\n' |
+  henji decision -a openai -m gpt-6-luna \
+    --questions docs/examples/decision-openai-questions.json | jq '.answers'
+```
+
 The complete native response goes to stdout, with a final newline and no Henji
 envelope. Normal refusals exit 0; callers interpret answers and refusals.
 Failures leave stdout empty, write details to stderr, and exit 1, even with

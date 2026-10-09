@@ -1,6 +1,6 @@
-henji is an LLM client for the command line, built for pipelines. This
-manual is task-oriented and lists the pitfalls behind each task. For the
-one-line flag reference, run `henji -h`.
+henji is a command-line LLM client for generation and decision models.
+This manual covers tasks and pitfalls; run `henji -h` or `henji decision -h`
+for flags.
 
 ## Invocation basics
 
@@ -19,9 +19,8 @@ from the instruction supplied as arguments.
 binary-looking files are rejected.
 `--image` accepts one JPEG, PNG, or WebP image up to 3 MiB; the selected model
 must set `vision: true` in configuration. The 3 MiB attachment limit remains
-in force with `--no-limit`. Inputs are ordered as arguments, text, image, then
-stdin. For multiple text files, concatenate them with the shell and pipe the
-result to stdin. Text and image attachments are not stored in saved
+in force with `--no-limit`. Concatenate multiple text files with the shell
+and pipe the result to stdin. Text and image attachments are not stored in saved
 conversations; reattach them with `--text` or `--image` when continuing a
 conversation that needs them.
 
@@ -31,9 +30,10 @@ Output contract for generation:
   `--output json`). It is safe to pipe or capture.
 - A progress spinner, "Conversation saved" notices, and error details go to
   **stderr**. `-q` silences non-error stderr chatter.
-- Pipes and `-r` stream plain text. Other TTY text uses external `glow` after
-  completion, or raw Markdown if Glow is missing or fails. JSON, schemas, and
-  decisions bypass Glow. See the cookbook for rendering settings.
+- Terminal Markdown formatting depends on separately installed `glow` on
+  `PATH`, after generation completes; missing/failed Glow falls back to raw
+  Markdown. Pipes and `-r` stream without Glow. JSON, schemas and decisions
+  bypass it. The README/cookbook covers installation and rendering settings.
 - Exit status is `0` on success and non-zero on failure.
 - Once JSON output is selected, preparation, model execution, and save failures
   produce one error envelope on stdout and a non-zero exit status. Save failures
@@ -139,9 +139,11 @@ Structured-output pitfalls:
 `[{"name":"urgent","type":"predicate","instructions":"Is it urgent?"}]`.
 For OpenAI use `-a openai -m gpt-6-luna`.
 
-One input, multiple questions, native response JSON; normal refusals exit 0.
+One question-and-answer turn per invocation, with multiple questions allowed
+for that input. Full native response JSON; normal refusals exit 0.
 Failures: exit 1, empty stdout, details on stderr, regardless of `output`.
-No history/DB/cache; use shell loops. Input stays unchanged. `--image` requires
+No history/DB/cache or continuation; repeated execution uses shell loops.
+Input stays unchanged. `--image` requires
 `vision: true`; 3 MiB is a reading limit, not a model guarantee. No resizing.
 Clef reads roughly 2,000 text tokens; keep its images under about 300 KB.
 
@@ -176,12 +178,8 @@ different conversations can run in parallel. Ctrl-C also cancels lock waits.
 - `-s <id-or-title>` prints a saved conversation without calling a model.
 - `-d <id-or-title>` deletes a conversation.
 
-Two equally valid ways to name a conversation for continuation:
-
-- Title-based: `-t <title>` at save time, then `-c <title>` to continue it.
-- ID-based: capture `conversation_id` from `--output json` (see "Getting
-  machine-readable output" and "A typical agent loop"), then `-c <id>`.
-  Convenient when scripting, since the ID is already in hand.
+Continue by title (`-t <title>` at save time, then `-c <title>`) or by ID
+(capture `conversation_id` from `--output json`, then `-c <id>`).
 
     henji --list
     henji --show <id-or-title>

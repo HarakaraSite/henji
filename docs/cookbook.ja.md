@@ -34,6 +34,10 @@ henji --output json "..." | jq -r '.content[0].text'
 
 ### Glowによる任意の端末整形
 
+端末のMarkdown整形は、別途インストールしたGlowの実行ファイルに依存します。Henjiには
+同梱しません。[導入方法](../README.ja.md#任意-端末のmarkdown整形用にglowをインストール)を参照してください。
+Glowがなくても、原文のMarkdownや機械可読な出力は利用できます。
+
 通常の端末へのテキスト出力では、全文の生成完了後に `PATH` 上の外部
 [`glow`](https://github.com/charmbracelet/glow) で整形します。未インストール・実行失敗時は元の
 Markdownを表示します。整形結果は一旦受け取り、失敗時に途中の表示と原文が重複することを防ぎます。
@@ -50,6 +54,16 @@ Glow設定のページャ・TUIは、この表示時には無効にします。
 henji --raw "explain this error" < error.log
 GLAMOUR_STYLE=light henji "explain this error" < error.log
 ```
+
+Markdownの整形を確認するには、stdoutを端末へ出して次を実行します。
+
+```sh
+henji --no-cache --max-tokens 512 'Markdown表示の確認用に、見出し、太字入りの箇条書き、引用、3行の表、インラインコード、Pythonのコードブロックを含む短いサンプルを作ってください。回答全体をコードフェンスで囲まないでください。'
+```
+
+全文の生成完了後に整形結果が表示されます。`--raw` を追加すればMarkdownの原文を受信ごとに
+表示します。stdinへのパイプ入力でもGlowは使いますが、stdoutのパイプ・リダイレクトでは
+使いません。有料プロバイダーを選ぶ場合、この確認にもAPI利用料金が発生します。
 
 ## 新しいプロバイダーを設定する
 
@@ -164,7 +178,10 @@ cat docs/*.md | henji "find contradictions across these documents"
 
 ## Decisions APIによる判断
 
-`henji decision` は一つの対象をOpenRouter・OpenAIの専用Decisions APIへ送ります。
+`henji decision` は一つの対象をOpenRouter・OpenAIの専用Decisions APIへ送り、
+OpenRouterのTypesafe Jevなどの意思決定モデルで判断します。一回の起動で一つの対象を判断する
+一問一答で、会話は継続しません。同じ対象への複数質問は一緒に送れます。
+連続実行はシェルループを想定しています（後述の例を参照）。
 `-m` は明示指定し、生成用の既定モデルを継承しません。テキスト用モデルIDはYAMLへの
 事前登録が不要で、設定済みの別名も使えます。
 
@@ -189,6 +206,21 @@ henji decision -a openai -m gpt-6-luna --questions openai-questions.json < reque
 
 同じ対象への複数質問は、オブジェクト・配列に質問を追加して一回の要求で送ります。
 [OpenRouter](examples/decision-openrouter-questions.json)・[OpenAI](examples/decision-openai-questions.json)の例には二つの質問があります。
+
+緊急度と振り分けの具体例です。リポジトリのルートから実行してください。上記の質問ファイルで
+「緊急対応が必要か」「`review` / `skip` のどちらへ振り分けるか」を同じ入力に対して判断します。
+`jq` はAPI応答の `answers` だけを取り出します。OpenRouterではオブジェクト、OpenAIでは配列です。
+
+```sh
+printf 'The production service is down. Please investigate immediately.\n' |
+  henji decision -a openrouter -m typesafe/jev-1.13 \
+    --questions docs/examples/decision-openrouter-questions.json | jq '.answers'
+
+printf 'The production service is down. Please investigate immediately.\n' |
+  henji decision -a openai -m gpt-6-luna \
+    --questions docs/examples/decision-openai-questions.json | jq '.answers'
+```
+
 成功時はAPI応答全体のJSONと末尾改行をstdoutへ出し、Henjiのラッパーを付けません。
 正常応答のrefusalも終了コード0で、意味の解釈は呼び出し元が行います。
 失敗時はstdoutが空、詳細はstderr、終了コード1です。`output` 設定にも左右されません。

@@ -1,5 +1,16 @@
 # henji Features
 
+## Decision models
+
+`henji decision` supports dedicated OpenRouter and OpenAI Decisions APIs.
+Each invocation judges one input, optionally answering multiple questions about
+it, and writes the complete native JSON response. It is a single
+question-and-answer turn with no history, cache, or conversation continuation.
+Repeated execution is intended to use shell loops; the caller builds any next
+input from previous results. Glow is never used for decisions.
+See the [README](README.md#decisions-text-and-image-classification) and
+[cookbook examples](docs/cookbook.md#decisions-with-native-json-output).
+
 ## Regular usage
 
 By default:
@@ -7,7 +18,10 @@ By default:
 - model responses go to `STDOUT`; progress and status messages go to `STDERR`
 - successful model conversations are saved with the first prompt line as the
   title, unless `--no-cache` is set
-- glamour is used by default if `STDOUT` is a TTY
+- normal TTY text is formatted after generation by external `glow` on `PATH`;
+  if Glow is missing or fails, the original Markdown is printed
+- `--raw` and piped/redirected stdout stream text without Glow; JSON and
+  JSON Schema output also bypass Glow
 - a small `Generating` spinner is shown on `STDERR` while a TTY request waits
 
 ### Basic
