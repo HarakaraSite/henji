@@ -133,7 +133,8 @@ func runDecision(cmd *cobra.Command, apiName, modelName, questionsPath, imagePat
 	if err != nil {
 		return fmt.Errorf("could not read --questions file: %w", err)
 	}
-	if err := decision.ValidateQuestions(api.DecisionProtocol, questions); err != nil {
+	parsedQuestions, err := decision.ParseQuestions(api.DecisionProtocol, questions)
+	if err != nil {
 		return fmt.Errorf("invalid --questions file: %w", err)
 	}
 	image, err := readImageInput(imagePath)
@@ -184,7 +185,7 @@ func runDecision(cmd *cobra.Command, apiName, modelName, questionsPath, imagePat
 	response, err := decision.Execute(cmd.Context(), decision.Config{
 		Protocol: api.DecisionProtocol, BaseURL: api.DecisionBaseURL,
 		APIKey: key, HTTPClient: client, MaxRetries: config.MaxRetries,
-	}, decision.Request{Model: model.Name, Text: string(input), Questions: questions, Image: image})
+	}, decision.Request{Model: model.Name, Text: string(input), Questions: parsedQuestions, Image: image})
 	if err != nil {
 		return fmt.Errorf("decision request failed: %w", err)
 	}

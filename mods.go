@@ -19,7 +19,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"charm.land/glamour/v2"
 	"forge.harakara.site/littleisland/henji/v2/internal/anthropic"
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	"forge.harakara.site/littleisland/henji/v2/internal/google"
@@ -589,29 +588,28 @@ func (m *Mods) appendToOutput(s string) {
 }
 
 // printTextOutput finishes text-mode output after a request completes.
-func (m *Mods) printTextOutput() {
+func (m *Mods) printTextOutput() error {
 	if m.Config.jsonSchemaValidator != nil {
 		fmt.Println(m.Output)
-		return
+		return nil
 	}
 	if !isOutputTTY() {
 		fmt.Println()
-		return
+		return nil
 	}
 	if m.Config.Raw {
-		return
+		return nil
 	}
-	renderer, err := glamour.NewTermRenderer(glamour.WithEnvironmentConfig(), glamour.WithWordWrap(m.Config.WordWrap))
+	rendered, err := renderMarkdownWithGlow(m.ctx, m.Output, m.Config.WordWrap)
 	if err != nil {
+		if m.ctx != nil && m.ctx.Err() != nil {
+			return m.ctx.Err()
+		}
 		fmt.Println(m.Output)
-		return
+		return nil
 	}
-	rendered, err := renderer.Render(m.Output)
-	if err != nil {
-		fmt.Println(m.Output)
-		return
-	}
-	fmt.Println(strings.TrimRightFunc(rendered, unicode.IsSpace))
+	fmt.Println(strings.TrimRightFunc(string(rendered), unicode.IsSpace))
+	return nil
 }
 
 // ensureKey resolves the API key to use, most secure source first.

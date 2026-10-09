@@ -179,7 +179,9 @@ var (
 			// Text output keeps its streaming behavior. JSON is emitted only
 			// after saving, so a save error can retain the generated content.
 			if config.Output != "json" {
-				mods.printTextOutput()
+				if err := mods.printTextOutput(); err != nil {
+					return err
+				}
 			}
 			if config.Show == "" && config.cacheWriteToID != "" {
 				if err := saveConversation(mods); err != nil {
@@ -203,31 +205,31 @@ func initFlags() {
 	}
 
 	flags := rootCmd.Flags()
-	flags.StringVarP(&config.Model, "model", "m", config.Model, stdoutStyles().FlagDesc.Render(help["model"]))
-	flags.StringVarP(&config.API, "api", "a", config.API, stdoutStyles().FlagDesc.Render(help["api"]))
-	flags.BoolVar(&config.Format, "format", config.Format, stdoutStyles().FlagDesc.Render(help["format"]))
-	flags.Var(&singlePathValue{path: &config.textPath, name: "text"}, "text", stdoutStyles().FlagDesc.Render(help["text"]))
-	flags.Var(&singlePathValue{path: &config.imagePath, name: "image"}, "image", stdoutStyles().FlagDesc.Render(help["image"]))
-	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, stdoutStyles().FlagDesc.Render(help["format-as"]))
-	flags.StringVar(&config.JSONSchemaPath, "json-schema", config.JSONSchemaPath, stdoutStyles().FlagDesc.Render(help["json-schema"]))
-	flags.IntVar(&config.JSONSchemaRetries, "json-schema-retries", config.JSONSchemaRetries, stdoutStyles().FlagDesc.Render(help["json-schema-retries"]))
-	flags.BoolVarP(&config.Raw, "raw", "r", config.Raw, stdoutStyles().FlagDesc.Render(help["raw"]))
-	flags.StringVar(&config.Output, "output", config.Output, stdoutStyles().FlagDesc.Render(help["output"]))
-	flags.StringVarP(&config.Continue, "continue", "c", "", stdoutStyles().FlagDesc.Render(help["continue"]))
-	flags.BoolVarP(&config.ContinueLast, "continue-last", "C", false, stdoutStyles().FlagDesc.Render(help["continue-last"]))
-	flags.BoolVarP(&config.List, "list", "l", config.List, stdoutStyles().FlagDesc.Render(help["list"]))
-	flags.StringVarP(&config.Title, "title", "t", config.Title, stdoutStyles().FlagDesc.Render(help["title"]))
-	flags.StringArrayVarP(&config.Delete, "delete", "d", config.Delete, stdoutStyles().FlagDesc.Render(help["delete"]))
-	flags.StringVarP(&config.Show, "show", "s", config.Show, stdoutStyles().FlagDesc.Render(help["show"]))
-	flags.BoolVarP(&config.Quiet, "quiet", "q", config.Quiet, stdoutStyles().FlagDesc.Render(help["quiet"]))
-	flags.BoolVarP(&config.ShowHelp, "help", "h", false, stdoutStyles().FlagDesc.Render(help["help"]))
-	flags.BoolVarP(&config.Version, "version", "v", false, stdoutStyles().FlagDesc.Render(help["version"]))
-	flags.BoolVar(&config.NoLimit, "no-limit", config.NoLimit, stdoutStyles().FlagDesc.Render(help["no-limit"]))
-	flags.Int64Var(&config.MaxTokens, "max-tokens", config.MaxTokens, stdoutStyles().FlagDesc.Render(help["max-tokens"]))
-	flags.BoolVar(&config.NoCache, "no-cache", config.NoCache, stdoutStyles().FlagDesc.Render(help["no-cache"]))
-	flags.StringVarP(&config.Role, "role", "R", config.Role, stdoutStyles().FlagDesc.Render(help["role"]))
-	flags.BoolVar(&config.ListRoles, "list-roles", config.ListRoles, stdoutStyles().FlagDesc.Render(help["list-roles"]))
-	flags.BoolVar(&config.ListModels, "list-models", config.ListModels, stdoutStyles().FlagDesc.Render(help["list-models"]))
+	flags.StringVarP(&config.Model, "model", "m", config.Model, help["model"])
+	flags.StringVarP(&config.API, "api", "a", config.API, help["api"])
+	flags.BoolVar(&config.Format, "format", config.Format, help["format"])
+	flags.Var(&singlePathValue{path: &config.textPath, name: "text"}, "text", help["text"])
+	flags.Var(&singlePathValue{path: &config.imagePath, name: "image"}, "image", help["image"])
+	flags.StringVar(&config.FormatAs, "format-as", config.FormatAs, help["format-as"])
+	flags.StringVar(&config.JSONSchemaPath, "json-schema", config.JSONSchemaPath, help["json-schema"])
+	flags.IntVar(&config.JSONSchemaRetries, "json-schema-retries", config.JSONSchemaRetries, help["json-schema-retries"])
+	flags.BoolVarP(&config.Raw, "raw", "r", config.Raw, help["raw"])
+	flags.StringVar(&config.Output, "output", config.Output, help["output"])
+	flags.StringVarP(&config.Continue, "continue", "c", "", help["continue"])
+	flags.BoolVarP(&config.ContinueLast, "continue-last", "C", false, help["continue-last"])
+	flags.BoolVarP(&config.List, "list", "l", config.List, help["list"])
+	flags.StringVarP(&config.Title, "title", "t", config.Title, help["title"])
+	flags.StringArrayVarP(&config.Delete, "delete", "d", config.Delete, help["delete"])
+	flags.StringVarP(&config.Show, "show", "s", config.Show, help["show"])
+	flags.BoolVarP(&config.Quiet, "quiet", "q", config.Quiet, help["quiet"])
+	flags.BoolVarP(&config.ShowHelp, "help", "h", false, help["help"])
+	flags.BoolVarP(&config.Version, "version", "v", false, help["version"])
+	flags.BoolVar(&config.NoLimit, "no-limit", config.NoLimit, help["no-limit"])
+	flags.Int64Var(&config.MaxTokens, "max-tokens", config.MaxTokens, help["max-tokens"])
+	flags.BoolVar(&config.NoCache, "no-cache", config.NoCache, help["no-cache"])
+	flags.StringVarP(&config.Role, "role", "R", config.Role, help["role"])
+	flags.BoolVar(&config.ListRoles, "list-roles", config.ListRoles, help["list-roles"])
+	flags.BoolVar(&config.ListModels, "list-models", config.ListModels, help["list-models"])
 	flags.SortFlags = false
 
 	flags.BoolVar(&memprofile, "memprofile", false, "Write memory profiles to CWD")

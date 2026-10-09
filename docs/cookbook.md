@@ -29,6 +29,29 @@ Model responses always use stdout. A small progress spinner and cache-status
 messages use stderr only when stdout is a TTY; `--quiet` hides them. This keeps
 `henji --output json ... | jq ...` safe for scripts.
 
+### Optional terminal rendering with Glow
+
+For normal text on a terminal, henji buffers the response and passes it to an
+external [`glow`](https://github.com/charmbracelet/glow) on `PATH` after generation.
+If Glow is missing or exits with an error, the original Markdown is printed.
+Renderer output is buffered so a failed rendering cannot leave partial output
+before the original text. `Ctrl-C` cancels Glow without dumping the original.
+The renderer's diagnostics do not change henji's stderr output.
+
+`word-wrap` / `HENJI_WORD_WRAP` controls the rendering width (default 80).
+`GLAMOUR_STYLE` is passed as Glow's style; if unset, `auto` is selected explicitly.
+This keeps formatted output when the renderer's stdout is captured.
+Glow's pager and TUI settings are overridden for this display step.
+
+Pipes and `--raw` keep streaming as chunks arrive. JSON output, JSON Schema
+output, and `henji decision` never launch or look up Glow. Glow is optional and
+is not bundled into henji; its startup cost is paid only for terminal rendering.
+
+```sh
+henji --raw "explain this error" < error.log
+GLAMOUR_STYLE=light henji "explain this error" < error.log
+```
+
 ## Setting up a new provider
 
 Every provider is just an entry under `apis:` in `henji.yml`. The pattern is

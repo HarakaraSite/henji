@@ -13,6 +13,7 @@
 - `fix-roadmap.md` — 修正ロードマップ（一次情報。PR番号・未着手項目はここ）
 - [fix-targets-2026-10-08.md](fix-targets-2026-10-08.md) — 2026-10-08 に再現確認した修正対象5件（保存、エラー処理、JSON 出力、UTF-8、API キー取得）
 - [decision-implementation-plan-2026-10-09.md](decision-implementation-plan-2026-10-09.md) — `henji decision` の合意要件、OpenRouter・OpenAI Decisions API対応の実装計画
+- [decision-performance-2026-10-09.md](decision-performance-2026-10-09.md) — Glow表示への移行、質問検証・初期化の整理、起動時間の比較計測
 - `feature-requirements.md` — 機能要件メモ
 - `potential-bugs.md` — 洗い出したバグ候補
 - `json-output-plan.md` — `--output json` 設計メモ

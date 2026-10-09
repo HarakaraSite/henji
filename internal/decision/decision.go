@@ -39,12 +39,71 @@ type Config struct {
 	MaxRetries int
 }
 
+// Questions is a validated provider-native question envelope. Its contents are
+// sealed after parsing so Execute can rely on validation without parsing again.
+type Questions struct {
+	protocol string
+	raw      json.RawMessage
+}
+
+// ParseQuestions validates one provider-native question envelope and takes an
+// owned copy of its bytes. Provider-specific question semantics remain the
+// provider's responsibility.
+func ParseQuestions(protocol string, raw json.RawMessage) (Questions, error) {
+	if protocol != ProtocolOpenAI && protocol != ProtocolOpenRouter {
+		return Questions{}, fmt.Errorf("decision: unsupported protocol %q", protocol)
+	}
+	if !utf8.Valid(raw) {
+		return Questions{}, errors.New("decision: questions must be valid UTF-8 JSON")
+	}
+
+	owned := append(json.RawMessage(nil), raw...)
+	switch protocol {
+	case ProtocolOpenAI:
+		var list []json.RawMessage
+		if err := json.Unmarshal(owned, &list); err != nil {
+			var syntaxErr *json.SyntaxError
+			if errors.As(err, &syntaxErr) {
+				return Questions{}, errors.New("decision: questions must contain one valid JSON value")
+			}
+			return Questions{}, errors.New("decision: OpenAI questions must be a non-empty array")
+		}
+		if len(list) == 0 {
+			return Questions{}, errors.New("decision: OpenAI questions must be a non-empty array")
+		}
+		for i, question := range list {
+			if !isJSONObject(question) {
+				return Questions{}, fmt.Errorf("decision: OpenAI question %d must be an object", i+1)
+			}
+		}
+	case ProtocolOpenRouter:
+		var named map[string]json.RawMessage
+		if err := json.Unmarshal(owned, &named); err != nil {
+			var syntaxErr *json.SyntaxError
+			if errors.As(err, &syntaxErr) {
+				return Questions{}, errors.New("decision: questions must contain one valid JSON value")
+			}
+			return Questions{}, errors.New("decision: OpenRouter questions must be a non-empty object")
+		}
+		if len(named) == 0 {
+			return Questions{}, errors.New("decision: OpenRouter questions must be a non-empty object")
+		}
+		for name, question := range named {
+			if !isJSONObject(question) {
+				return Questions{}, fmt.Errorf("decision: OpenRouter question %q must be an object", name)
+			}
+		}
+	}
+
+	return Questions{protocol: protocol, raw: owned}, nil
+}
+
 // Request is one decision request. Questions stays in the provider's native JSON
 // format so fields unknown to this package pass through unchanged.
 type Request struct {
 	Model     string
 	Text      string
-	Questions json.RawMessage
+	Questions Questions
 	Image     *proto.Image
 }
 
@@ -63,8 +122,11 @@ func Execute(ctx context.Context, cfg Config, req Request) (json.RawMessage, err
 	if cfg.APIKey == "" {
 		return nil, errors.New("decision: API key is empty")
 	}
-	if err := ValidateQuestions(cfg.Protocol, req.Questions); err != nil {
-		return nil, err
+	if req.Questions.protocol == "" || len(req.Questions.raw) == 0 {
+		return nil, errors.New("decision: questions must be parsed with ParseQuestions")
+	}
+	if req.Questions.protocol != cfg.Protocol {
+		return nil, fmt.Errorf("decision: questions protocol %q does not match request protocol %q", req.Questions.protocol, cfg.Protocol)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -103,54 +165,16 @@ func Execute(ctx context.Context, cfg Config, req Request) (json.RawMessage, err
 
 // ValidateQuestions checks the JSON envelope needed to send native questions.
 // Provider-specific question semantics remain the provider's responsibility.
+// ParseQuestions should be used when the validated value will be sent in a
+// request, so Execute does not need to parse it again.
 func ValidateQuestions(protocol string, questions json.RawMessage) error {
-	if protocol != ProtocolOpenAI && protocol != ProtocolOpenRouter {
-		return fmt.Errorf("decision: unsupported protocol %q", protocol)
-	}
-	if !utf8.Valid(questions) {
-		return errors.New("decision: questions must be valid UTF-8 JSON")
-	}
-	if !json.Valid(questions) {
-		return errors.New("decision: questions must contain one valid JSON value")
-	}
-
-	switch protocol {
-	case ProtocolOpenAI:
-		var list []json.RawMessage
-		if err := json.Unmarshal(questions, &list); err != nil || list == nil {
-			return errors.New("decision: OpenAI questions must be a non-empty array")
-		}
-		if len(list) == 0 {
-			return errors.New("decision: OpenAI questions must be a non-empty array")
-		}
-		for i, question := range list {
-			if !isJSONObject(question) {
-				return fmt.Errorf("decision: OpenAI question %d must be an object", i+1)
-			}
-		}
-	case ProtocolOpenRouter:
-		var named map[string]json.RawMessage
-		if err := json.Unmarshal(questions, &named); err != nil || named == nil {
-			return errors.New("decision: OpenRouter questions must be a non-empty object")
-		}
-		if len(named) == 0 {
-			return errors.New("decision: OpenRouter questions must be a non-empty object")
-		}
-		for name, question := range named {
-			if !isJSONObject(question) {
-				return fmt.Errorf("decision: OpenRouter question %q must be an object", name)
-			}
-		}
-	}
-	return nil
+	_, err := ParseQuestions(protocol, questions)
+	return err
 }
 
 func isJSONObject(raw json.RawMessage) bool {
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &object); err != nil {
-		return false
-	}
-	return object != nil
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && trimmed[0] == '{'
 }
 
 func executeOpenAI(ctx context.Context, cfg Config, baseURL string, req Request) (json.RawMessage, error) {
@@ -183,7 +207,7 @@ func executeOpenAI(ctx context.Context, cfg Config, baseURL string, req Request)
 		Model: req.Model,
 		Input: input,
 	}
-	decision, err := client.New(ctx, params, option.WithJSONSet("questions", json.RawMessage(req.Questions)))
+	decision, err := client.New(ctx, params, option.WithJSONSet("questions", json.RawMessage(req.Questions.raw)))
 	if err != nil {
 		if capture.status >= 400 {
 			return nil, responseError(ProtocolOpenAI, cfg.APIKey, capture.status, capture.body)
@@ -223,7 +247,7 @@ func executeOpenRouter(ctx context.Context, cfg Config, baseURL string, req Requ
 		Model     string          `json:"model"`
 		State     json.RawMessage `json:"state"`
 		Questions json.RawMessage `json:"questions"`
-	}{Model: req.Model, State: state, Questions: req.Questions})
+	}{Model: req.Model, State: state, Questions: req.Questions.raw})
 	if err != nil {
 		return nil, fmt.Errorf("decision: encode OpenRouter request: %w", err)
 	}

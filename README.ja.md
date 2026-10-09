@@ -39,6 +39,12 @@ Azure OpenAI と Azure AD の対応も削除済みで、`azure` / `azure-ad` の
 `--topk`、`--stop`、`--max-retries`、`--word-wrap`、`--http-proxy` は `henji.yml` または
 `HENJI_*` 環境変数で引き続き設定できます。
 
+通常の端末表示では、生成完了後に `PATH` 上の外部 `glow` でMarkdownを整形します。
+Glowは任意で、未インストール・実行失敗時は元のMarkdownを表示します。`word-wrap` は
+整形幅、`GLAMOUR_STYLE` はスタイル（既定 `auto`）を指定します。ページャとTUIは起動しません。
+パイプ・`--raw` の逐次出力、およびJSON・JSON Schema・`henji decision` の出力はGlowを使いません。
+内蔵Markdownレンダラーを外し、繰り返し起動時の初期化処理を減らしています。
+
 MCP（Model Context Protocol）対応も完全に削除しました。信頼できない文章を処理した際に、
 モデルが外部ツールを承認・読み書きの区別なく呼び出せる設計には実害のあるリスクがありました。
 henji CLI は通常の Unix フィルターに戻し、ファイルやネットワークへのアクセスは周囲の `cat`、

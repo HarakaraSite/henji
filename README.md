@@ -254,7 +254,7 @@ command keeps its output and error contracts.
 | `--json-schema-retries` | Times to ask the model to correct a response that fails schema validation (default 2) |
 | `--output` | Output format: `text` or `json` (single-line JSON envelope for scripting/agents; see the [cookbook](docs/cookbook.md#--output-json-for-scripting-and-ai-agents)) |
 | `-q`, `--quiet` | Hide the stderr spinner and non-error status messages |
-| `-r`, `--raw` | Print raw text instead of Markdown rendering on a TTY |
+| `-r`, `--raw` | Stream raw text on a TTY without using Glow |
 | `-R`, `--role` | Specify a custom role (system prompt) |
 | `--list-roles` | List roles defined in your configuration file |
 | `--list-models` | List configured APIs and their models (respects `--output json`; see the [cookbook](docs/cookbook.md#discovering-whats-configured)) |
@@ -271,6 +271,14 @@ Tuning knobs that rarely change between runs — sampling parameters (`temp`,
 `topp`, `topk`, `stop`), `max-retries`, `word-wrap`, and `http-proxy` — have
 no dedicated flags; set them in `henji.yml` or override per run with the
 corresponding `HENJI_*` environment variable (e.g. `HENJI_TEMP=0.2`).
+
+Normal terminal text is rendered after generation by an external `glow` found
+on `PATH`. Glow is optional: if it is missing or fails, henji prints the original
+Markdown. `word-wrap` controls its width, and `GLAMOUR_STYLE` selects its style
+(default `auto`). Pager and TUI modes are disabled for this rendering step.
+Pipes and `--raw` keep streaming; JSON, JSON Schema, and `henji decision` output
+never use Glow. Henji no longer embeds a Markdown renderer, reducing startup
+work for repeated invocations.
 
 For OpenAI-compatible reasoning models, set `max-completion-tokens` in YAML
 (globally or per model), or use `HENJI_MAX_COMPLETION_TOKENS`. It has no

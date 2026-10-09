@@ -87,13 +87,13 @@ var help = map[string]string{
 	"roles":                 "List of predefined system messages that can be used as roles",
 	"list-roles":            "List the roles defined in your configuration file",
 	"list-models":           "List configured APIs and their models (respects --output json)",
-	"raw":                   "Render output as raw text when connected to a TTY",
+	"raw":                   "Stream raw text on a TTY without using Glow",
 	"quiet":                 "Hide the progress spinner and non-error status messages on stderr",
 	"help":                  "Show help and exit",
 	"version":               "Show version and exit",
 	"max-retries":           "Maximum number of times to retry API calls",
 	"no-limit":              "Turn off the client-side input size limit",
-	"word-wrap":             "Wrap formatted output at specific width (default is 80)",
+	"word-wrap":             "Wrap Glow output at specific width (default is 80)",
 	"max-tokens":            "Maximum number of tokens in response (does not clear configured max-completion-tokens)",
 	"max-completion-tokens": "Completion token limit (sent alongside max-tokens when both are set; provider determines handling)",
 	"temp":                  "Temperature (randomness) of results, from 0.0 to 2.0, -1.0 to disable",
@@ -251,11 +251,6 @@ func readConfig() (Config, error) {
 	sp := filepath.Join(configHome, "henji", "henji.yml")
 	c.SettingsPath = sp
 
-	dir := filepath.Dir(sp)
-	if dirErr := os.MkdirAll(dir, 0o700); dirErr != nil { //nolint:mnd
-		return c, modsError{dirErr, "Could not create cache directory."}
-	}
-
 	if dirErr := writeConfigFile(sp); dirErr != nil {
 		return c, dirErr
 	}
@@ -299,6 +294,9 @@ func prepareConversationConfig(c *Config) error {
 func writeConfigFile(path string) error {
 	info, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil { //nolint:mnd
+			return modsError{err, "Could not create cache directory."}
+		}
 		return createConfigFile(path)
 	} else if err != nil {
 		return modsError{err, "Could not stat path."}

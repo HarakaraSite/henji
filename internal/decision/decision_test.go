@@ -32,6 +32,10 @@ func TestExecuteNativeProtocolContracts(t *testing.T) {
 			if protocol == ProtocolOpenRouter {
 				responseBody = `{"id":"dec-1","answers":{"first":{"type":"refusal","reason":"provider refusal"}},"native_extra":{"kept":true}}`
 			}
+			parsedQuestions, err := ParseQuestions(protocol, json.RawMessage(questions))
+			if err != nil {
+				t.Fatalf("ParseQuestions: %v", err)
+			}
 			var calls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls.Add(1)
@@ -143,7 +147,7 @@ func TestExecuteNativeProtocolContracts(t *testing.T) {
 			}, Request{
 				Model:     "test-model",
 				Text:      text,
-				Questions: json.RawMessage(questions),
+				Questions: parsedQuestions,
 				Image:     &proto.Image{MediaType: "image/png", Data: imageBytes},
 			})
 			if err != nil {
@@ -229,6 +233,64 @@ func TestValidateQuestions(t *testing.T) {
 				t.Fatalf("ValidateQuestions error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestParseQuestionsOwnsRawBytes(t *testing.T) {
+	tests := []struct {
+		protocol string
+		input    []byte
+	}{
+		{protocol: ProtocolOpenAI, input: []byte(" [ { \"type\" : \"future\", \"vendor\" : { \"n\" : 1 } } ] ")},
+		{protocol: ProtocolOpenRouter, input: []byte(" { \"q\" : { \"type\" : \"future\", \"vendor\" : { \"n\" : 1 } } } ")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.protocol, func(t *testing.T) {
+			want := bytes.Clone(tt.input)
+			questions, err := ParseQuestions(tt.protocol, json.RawMessage(tt.input))
+			if err != nil {
+				t.Fatalf("ParseQuestions: %v", err)
+			}
+
+			for i := range tt.input {
+				tt.input[i] = 'x'
+			}
+			if !bytes.Equal(questions.raw, want) {
+				t.Fatalf("owned questions = %q, want original bytes %q", questions.raw, want)
+			}
+		})
+	}
+}
+
+func TestExecuteRequiresParsedQuestionsForMatchingProtocol(t *testing.T) {
+	serverCalls := atomic.Int32{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"answers":[]}`)
+	}))
+	defer server.Close()
+
+	for _, tt := range []struct {
+		name      string
+		questions Questions
+		wantError string
+	}{
+		{name: "zero value", wantError: "questions must be parsed"},
+		{name: "protocol mismatch", questions: questionsFor(ProtocolOpenRouter), wantError: "does not match request protocol"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Execute(context.Background(), Config{
+				Protocol: ProtocolOpenAI, BaseURL: server.URL + "/v1", APIKey: testAPIKey,
+				HTTPClient: server.Client(),
+			}, Request{Model: "m", Questions: tt.questions})
+			if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+				t.Fatalf("Execute error = %v, want %q", err, tt.wantError)
+			}
+		})
+	}
+	if got := serverCalls.Load(); got != 0 {
+		t.Fatalf("HTTP calls = %d, want 0", got)
 	}
 }
 
@@ -453,11 +515,18 @@ func (temporaryTestError) Error() string   { return "temporary network error" }
 func (temporaryTestError) Timeout() bool   { return false }
 func (temporaryTestError) Temporary() bool { return true }
 
-func questionsFor(protocol string) json.RawMessage {
+func questionsFor(protocol string) Questions {
+	var raw json.RawMessage
 	if protocol == ProtocolOpenAI {
-		return json.RawMessage(`[{"type":"predicate","instructions":"q"}]`)
+		raw = json.RawMessage(`[{"type":"predicate","instructions":"q"}]`)
+	} else {
+		raw = json.RawMessage(`{"q":{"type":"noul","instructions":"q"}}`)
 	}
-	return json.RawMessage(`{"q":{"type":"noul","instructions":"q"}}`)
+	questions, err := ParseQuestions(protocol, raw)
+	if err != nil {
+		panic(err)
+	}
+	return questions
 }
 
 func mapKeys(values map[string]json.RawMessage) []string {

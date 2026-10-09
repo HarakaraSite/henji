@@ -4,9 +4,7 @@ one-line flag reference, run `henji -h`.
 
 ## Invocation basics
 
-The prompt is assembled from arguments, optional text and image attachments,
-and stdin, in that
-order:
+Generation input order: arguments, text and image attachments, then stdin:
 
     henji "explain this error"                # args only
     cat error.log | henji                     # stdin only
@@ -17,9 +15,8 @@ order:
 Piped input is indented before it is appended, so it remains visually distinct
 from the instruction supplied as arguments.
 
-`--text` accepts one UTF-8 text file up to 3 MiB. A second `--text` is an
-error, and binary-looking files are rejected rather than silently being
-mangled.
+`--text` accepts one UTF-8 file up to 3 MiB. Repeated `--text` and
+binary-looking files are rejected.
 `--image` accepts one JPEG, PNG, or WebP image up to 3 MiB; the selected model
 must set `vision: true` in configuration. The 3 MiB attachment limit remains
 in force with `--no-limit`. Inputs are ordered as arguments, text, image, then
@@ -34,8 +31,9 @@ Output contract for generation:
   `--output json`). It is safe to pipe or capture.
 - A progress spinner, "Conversation saved" notices, and error details go to
   **stderr**. `-q` silences non-error stderr chatter.
-- When stdout is not a terminal, the response is plain text with no ANSI
-  codes. Markdown rendering only happens on a TTY (`-r` disables it there too).
+- Pipes and `-r` stream plain text. Other TTY text uses external `glow` after
+  completion, or raw Markdown if Glow is missing or fails. JSON, schemas, and
+  decisions bypass Glow. See the cookbook for rendering settings.
 - Exit status is `0` on success and non-zero on failure.
 - Once JSON output is selected, preparation, model execution, and save failures
   produce one error envelope on stdout and a non-zero exit status. Save failures

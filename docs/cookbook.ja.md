@@ -32,6 +32,25 @@ stderr に出ます。`--quiet` はエラー以外の stderr 出力を隠しま�
 henji --output json "..." | jq -r '.content[0].text'
 ```
 
+### Glowによる任意の端末整形
+
+通常の端末へのテキスト出力では、全文の生成完了後に `PATH` 上の外部
+[`glow`](https://github.com/charmbracelet/glow) で整形します。未インストール・実行失敗時は元の
+Markdownを表示します。整形結果は一旦受け取り、失敗時に途中の表示と原文が重複することを防ぎます。
+`Ctrl-C` でGlowも取消し、その場合は原文を追加表示しません。Glowの診断はHenjiのstderrへ出しません。
+
+`word-wrap` / `HENJI_WORD_WRAP` は整形幅（既定80）、`GLAMOUR_STYLE` はGlowへ渡すスタイルです。
+未設定なら `auto` を明示指定し、整形結果の受取り中も端末用の表示を維持します。
+Glow設定のページャ・TUIは、この表示時には無効にします。
+
+パイプ・`--raw` は断片の受信ごとの逐次出力を維持します。JSON・JSON Schema・`henji decision`
+ではGlowの検索も起動も行いません。Glowは任意でHenjiに同梱せず、起動コストは端末の整形時だけです。
+
+```sh
+henji --raw "explain this error" < error.log
+GLAMOUR_STYLE=light henji "explain this error" < error.log
+```
+
 ## 新しいプロバイダーを設定する
 
 すべてのプロバイダーは `henji.yml` の `apis:` に置きます。必要なのは `base-url`、API キーの
