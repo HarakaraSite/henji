@@ -46,22 +46,47 @@ profile requires:
 actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
 ```
 
-## Next release: v2.2.0 (planned)
-
-Scope agreed on 2026-10-09:
-
-- Dedicated OpenRouter/OpenAI Decisions API support in `henji decision`.
-  Each invocation judges one input and returns the full native response JSON;
-  repeated execution uses shell loops, with no conversational continuation.
-- External, optional Glow for terminal Markdown formatting, replacing the
-  embedded renderer. Missing/failed Glow falls back to the original Markdown;
-  raw, pipeline, JSON, JSON Schema, and decision output bypass Glow.
-- Updated help and embedded manuals, README, feature lists, and cookbook.
-
-This is the planned release scope, not a completed release checkpoint.
-Record the pre-tag check results when preparing v2.2.0.
-
 ## Results
+
+### v2.2.0 — 2026-10-09 (pre-tag checks)
+
+- Source changes: dedicated OpenRouter/OpenAI Decisions APIs, one input per
+  invocation with native response JSON and shell loops for repeated execution;
+  optional external Glow replaces embedded Markdown rendering; duplicate
+  question validation and common initialization reduced; help and bilingual
+  manuals, README, feature lists, and cookbook updated.
+- Portable checks: `go test ./...` and `go vet ./...` passed locally with
+  Go 1.27.1. The current workflow and a temporary profile-rendered candidate
+  both passed actionlint with the documented `forgejo.*` exclusion.
+- race: passed `go test -race ./...` with Go 1.27.1 and `CGO_ENABLED=1`, using
+  the temporary GCC 14.2 toolchain from the prior release. Its library path
+  was supplied through `LD_LIBRARY_PATH`; no system packages were installed
+  and no compiler setup was added to the workflow.
+- openrouter-e2e: all five checks in `scripts/e2e-openrouter-test.sh` passed
+  with `MODEL=google/gemini-2.5-flash-lite`: short/long JSON success,
+  invalid-model JSON error, unset-input-limit regression, and UTF-8 text
+  attachment. Settings and data were isolated. The user explicitly authorized
+  these billed checks for v2.2.0. The invalid model returned HTTP 400 with
+  provider details preserved in stderr and the JSON error envelope.
+- Decisions: previously authorized real requests to OpenRouter
+  `typesafe/jev-1.13` and OpenAI `gpt-6-luna` passed; native response JSON,
+  exit 0, empty stderr, and absence of history/DB use were confirmed. These
+  requests were not repeated for this release. See
+  `notes/decision-implementation-plan-2026-10-09.md`.
+- Glow: real Glow v3.0.0 terminal rendering, missing/failed renderer fallback,
+  and raw output were verified before the performance commit; JSON/schema/
+  decision bypass is covered by local tests. See
+  `notes/decision-performance-2026-10-09.md`.
+- Profile review used `apply-forgejo-go-release-profile`: version 2,
+  mandatory checksums, native logs, automatic Forgejo contexts, and five
+  CGO-free targets remain suitable. Rendering a candidate changed comments
+  and equivalent ldflags placement only; profile/workflow regeneration is
+  unnecessary.
+- Forgejo: `16.0.3+gitea-1.22.0`; authentication succeeded and native run 172
+  ZIP logs and job 193 text logs both returned HTTP 200.
+- A local CGO-free binary built with the release ldflags reports
+  `henji version v2.2.0`. Forgejo build/upload and published asset verification
+  are recorded after the tag-triggered workflow completes.
 
 ### v2.1.10 — 2026-10-08
 
