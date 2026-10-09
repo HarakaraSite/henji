@@ -616,6 +616,10 @@ func (m *Mods) printTextOutput() {
 
 // ensureKey resolves the API key to use, most secure source first.
 func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
+	return m.ensureKeyContext(context.Background(), api, defaultEnv, docsURL)
+}
+
+func (m Mods) ensureKeyContext(ctx context.Context, api API, defaultEnv, docsURL string) (string, error) {
 	var key string
 	if api.APIKeyCmd != "" {
 		args, err := shellwords.Parse(api.APIKeyCmd)
@@ -625,7 +629,7 @@ func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 		if len(args) == 0 {
 			return "", modsError{errors.New("command is empty"), "Failed to parse api-key-cmd"}
 		}
-		out, err := exec.Command(args[0], args[1:]...).Output() //nolint:gosec
+		out, err := exec.CommandContext(ctx, args[0], args[1:]...).Output() //nolint:gosec
 		if err != nil {
 			return "", modsError{err, "Cannot exec api-key-cmd"}
 		}

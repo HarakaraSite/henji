@@ -68,6 +68,9 @@ apis:
     # (https://openrouter.ai/models) under one API key, useful for trying
     # several current models without configuring each provider separately.
     base-url: https://openrouter.ai/api/v1
+    # henji decision uses a separate endpoint; these standard defaults may be omitted.
+    # decision-protocol: openrouter
+    # decision-base-url: https://openrouter.ai/api/alpha
     api-key:
     api-key-env: OPENROUTER_API_KEY
     # api-key-cmd: security find-generic-password -s OPENROUTER-API -w
@@ -98,6 +101,9 @@ apis:
         max-completion-tokens: 4096
   openai:
     base-url: https://api.openai.com/v1
+    # henji decision uses /decisions under this separate base URL.
+    # decision-protocol: openai
+    # decision-base-url: https://api.openai.com/v1
     api-key:
     api-key-env: OPENAI_API_KEY
     # api-key-cmd: security find-generic-password -s OPENAI-API -w

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "urgent",
+    "type": "predicate",
+    "instructions": "Does this request need urgent attention?"
+  },
+  {
+    "name": "route",
+    "type": "choice",
+    "instructions": "How should this request be handled?",
+    "choices": [
+      {"value": "review", "description": "A person should review the request."},
+      {"value": "skip", "description": "The request does not need further action."}
+    ]
+  }
+]

@@ -143,6 +143,83 @@ cat docs/*.md | henji "find contradictions across these documents"
 `vision: true` を設定してください。テキスト・画像の添付は会話履歴に保存されないため、継続時に
 必要ならもう一度添付します。
 
+## Decisions APIによる判断
+
+`henji decision` は一つの対象をOpenRouter・OpenAIの専用Decisions APIへ送ります。
+`-m` は明示指定し、生成用の既定モデルを継承しません。テキスト用モデルIDはYAMLへの
+事前登録が不要で、設定済みの別名も使えます。
+
+OpenRouterの質問ファイル（`router-questions.json`）:
+
+```json
+{"urgent":{"type":"noul","instructions":"Does this request need urgent attention?"}}
+```
+
+OpenAIの質問ファイル（`openai-questions.json`）:
+
+```json
+[{"name":"urgent","type":"predicate","instructions":"Does this request need urgent attention?"}]
+```
+
+判断対象はUTF-8の自然文でstdinへ渡します。
+
+```sh
+henji decision -a openrouter -m typesafe/jev-1.13 --questions router-questions.json < request.txt
+henji decision -a openai -m gpt-6-luna --questions openai-questions.json < request.txt
+```
+
+同じ対象への複数質問は、オブジェクト・配列に質問を追加して一回の要求で送ります。
+[OpenRouter](examples/decision-openrouter-questions.json)・[OpenAI](examples/decision-openai-questions.json)の例には二つの質問があります。
+成功時はAPI応答全体のJSONと末尾改行をstdoutへ出し、Henjiのラッパーを付けません。
+正常応答のrefusalも終了コード0で、意味の解釈は呼び出し元が行います。
+失敗時はstdoutが空、詳細はstderr、終了コード1です。`output` 設定にも左右されません。
+
+既存のキー取得設定を使い、既定環境変数は `OPENROUTER_API_KEY` / `OPENAI_API_KEY` です。
+proxyは `http-proxy` / `HENJI_HTTP_PROXY` を使います。`max-retries` / `HENJI_MAX_RETRIES` は
+初回後の追加試行回数で、0なら要求は一回だけです。APIの一時的な失敗はキャンセル可能な
+backoffで再試行します。モデルのフォールバックや質問の再生成は行いません。
+
+独自gatewayの設定例:
+
+```yaml
+apis:
+  decision-gateway:
+    decision-protocol: openrouter
+    decision-base-url: http://localhost:8080/proxy/api/alpha
+    api-key-env: GATEWAY_API_KEY
+```
+
+送信先には末尾の `decisions` が付加されるため、設定値には `/decisions` を含めません。
+生成用の `base-url` は独立しています。上記は `-a decision-gateway` で選びます。
+
+画像を使う場合は、選択モデルに `vision: true` を追加してください。既存のAPI設定と
+キー取得設定は保持して、例えばOpenAIモデルの `models` に次を追加します。
+
+```yaml
+gpt-6-luna:
+  vision: true
+```
+
+```sh
+henji decision -a openai -m gpt-6-luna --questions openai-questions.json --image photo.png < request.txt
+```
+
+stdinが空なら画像だけでも判断できます。JPEG/PNG/WebPを1枚、3MiBまで受け付けますが、
+モデルの受理上限は別です。Henjiは画像の自動縮小・再圧縮・文章切り詰めを行いません。
+Clef系は約300KB未満の画像を推奨し、文章は先頭約2,000トークン以降を黙って切り捨てます。
+[現行のモデル制約](https://openrouter.ai/docs/guides/community/multimodal-decisions)を確認してください。
+
+会話DB・履歴・キャッシュは利用しません。複数の独立した入力はshellループで処理します。
+
+```sh
+for input in inputs/*.txt; do
+  henji decision -a openrouter -m typesafe/jev-1.13 --questions router-questions.json < "$input" || exit
+done
+```
+
+先行判断に依存する処理は、呼び出し元が結果を解釈して次の入力を作ります。
+専用フラグは `henji decision --help` で確認してください。
+
 ## 会話の一覧・再開
 
 `--list` は選択 UI ではなくプレーンな一覧です。ID またはタイトルを次のコマンドへコピーします。

@@ -156,7 +156,37 @@ henji --continue <id-or-title> "now propose the smallest fix"
 用例は [examples.ja.md](examples.ja.md)（[English](examples.md)）、機能一覧は
 [features.ja.md](features.ja.md)（[English](features.md)）を参照してください。
 
-### 重要なフラグ
+### Decisions APIによるテキスト・画像判断
+
+独立した `henji decision` でOpenRouter・OpenAIのDecisions APIを呼び出します。
+
+```sh
+henji decision -a openrouter -m typesafe/jev-1.13 \
+  --questions docs/examples/decision-openrouter-questions.json < input.txt
+henji decision -a openai -m gpt-6-luna \
+  --questions docs/examples/decision-openai-questions.json < input.txt
+```
+
+stdinは判断対象の自然文です。`--questions` はOpenRouterなら名前付きオブジェクト、OpenAIなら
+配列で指定します。同じ対象への複数質問を一回の要求で送ります。`-m` は必須で生成用の既定モデルを
+継承せず、テキスト用モデルIDは設定への事前登録が不要です。設定済みの別名も利用できます。
+
+成功時はAPI応答全体のJSONをstdoutへ出し、正常応答に含まれるrefusalも終了コード0です。
+失敗時は終了コード1、stdoutは空、詳細はstderrです。Henjiのラッパーは付けず、`output` 設定にも
+左右されません。会話履歴・キャッシュ・DBは作成せず、連続処理はshell側で繰り返し起動します。
+
+認証は既存のキー取得設定を使い、既定環境変数は `OPENROUTER_API_KEY` / `OPENAI_API_KEY` です。
+生成用 `base-url` とは独立した `decision-base-url` と `decision-protocol` を使い、標準2社は省略できます。
+`http-proxy` と `max-retries` は設定・環境変数から利用します。decisionの `max-retries` は初回後の
+追加試行回数で、0なら要求は一回だけです。
+
+`--image` はJPEG/PNG/WebPを1枚、3MiBまで受け付け、モデル設定の `vision: true` が必要です。
+この値はHenjiの読込み上限であり、モデルの受理上限は別です。自動縮小・再圧縮・文章切り詰めは
+行いません。Clef系の画像サイズや文章切り詰めなど、[モデル固有の制約](https://openrouter.ai/docs/guides/community/multimodal-decisions)を確認してください。
+
+専用フラグは `henji decision --help`、設定・画像・ループの例は[cookbook](docs/cookbook.ja.md#decisions-apiによる判断)を参照してください。
+
+### 通常の生成で使う重要なフラグ
 
 `henji -h` が完全な一覧です。代表的なものは、`--api` / `--model`（プロバイダーとモデルの
 選択）、`--text` / `--image`（現在のリクエストだけに添付）、`--continue`、`--list`、

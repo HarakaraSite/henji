@@ -28,7 +28,7 @@ result to stdin. Text and image attachments are not stored in saved
 conversations; reattach them with `--text` or `--image` when continuing a
 conversation that needs them.
 
-Output contract for model invocations:
+Output contract for generation:
 
 - **stdout carries only the model's response** (or the JSON envelope with
   `--output json`). It is safe to pipe or capture.
@@ -130,6 +130,26 @@ Structured-output pitfalls:
   only, no code fences" to the prompt can help weaker models comply.
 - Live output is suppressed while validating. The response is printed once,
   only after it passes validation.
+
+## Decisions
+
+    henji decision -a openrouter -m typesafe/jev-1.13 --questions q.json < input.txt
+
+`-m` is required; model IDs need no registration, and configured aliases work.
+`-a` defaults to the configured API. Questions are native JSON: OpenRouter
+`{"urgent":{"type":"noul","instructions":"Is it urgent?"}}`; OpenAI
+`[{"name":"urgent","type":"predicate","instructions":"Is it urgent?"}]`.
+For OpenAI use `-a openai -m gpt-6-luna`.
+
+One input, multiple questions, native response JSON; normal refusals exit 0.
+Failures: exit 1, empty stdout, details on stderr, regardless of `output`.
+No history/DB/cache; use shell loops. Input stays unchanged. `--image` requires
+`vision: true`; 3 MiB is a reading limit, not a model guarantee. No resizing.
+Clef reads roughly 2,000 text tokens; keep its images under about 300 KB.
+
+Keys, proxy and retries use config; retries count extra attempts (0: one call).
+Gateways set `decision-protocol` and `decision-base-url` (without `/decisions`),
+independent of generation `base-url`. Run `henji decision -h` for flags.
 
 ## A typical agent loop
 

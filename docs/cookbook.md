@@ -172,6 +172,92 @@ The attached file is sent only for the current request and is not saved in
 conversation history. Reattach it with `--text` when a continued conversation
 needs it.
 
+## Decisions with native JSON output
+
+`henji decision` sends one input to the dedicated OpenRouter or OpenAI
+Decisions API. Choose `-m` explicitly; generation defaults are not inherited.
+Text model IDs need no YAML registration. Configured model aliases also work.
+
+Create an OpenRouter questions file (`router-questions.json`):
+
+```json
+{"urgent":{"type":"noul","instructions":"Does this request need urgent attention?"}}
+```
+
+For OpenAI, create `openai-questions.json` instead:
+
+```json
+[{"name":"urgent","type":"predicate","instructions":"Does this request need urgent attention?"}]
+```
+
+Then send evidence as plain UTF-8 text:
+
+```sh
+henji decision -a openrouter -m typesafe/jev-1.13 --questions router-questions.json < request.txt
+henji decision -a openai -m gpt-6-luna --questions openai-questions.json < request.txt
+```
+
+For multiple questions about the same evidence, add entries to the native
+object/array. [OpenRouter](examples/decision-openrouter-questions.json) and
+[OpenAI](examples/decision-openai-questions.json) examples include two questions.
+The complete native response goes to stdout, with a final newline and no Henji
+envelope. Normal refusals exit 0; callers interpret answers and refusals.
+Failures leave stdout empty, write details to stderr, and exit 1, even with
+`output: json` or `HENJI_OUTPUT=json`.
+
+Existing key settings work; default environments are `OPENROUTER_API_KEY` and
+`OPENAI_API_KEY`. Proxies use `http-proxy` / `HENJI_HTTP_PROXY`.
+`max-retries` / `HENJI_MAX_RETRIES` counts extra attempts after the first
+(0: one request). Retryable HTTP failures and temporary transport failures
+use cancellable backoff; there is no model fallback or question regeneration.
+
+Standard API names use dedicated default endpoints. An independent gateway
+can set its protocol and base URL without changing the generation endpoint:
+
+```yaml
+apis:
+  decision-gateway:
+    decision-protocol: openrouter
+    decision-base-url: http://localhost:8080/proxy/api/alpha
+    api-key-env: GATEWAY_API_KEY
+```
+
+The client appends `decisions` to this base URL. Omit `/decisions` from the
+setting. Select the entry with `-a decision-gateway`.
+
+For an image, configure the selected model's capability (merge this into the
+existing API entry, retaining its key settings):
+
+```yaml
+apis:
+  openai:
+    models:
+      gpt-6-luna:
+        vision: true
+```
+
+```sh
+henji decision -a openai -m gpt-6-luna --questions openai-questions.json --image photo.png < request.txt
+```
+
+An image alone also works when stdin is empty. One JPEG/PNG/WebP up to 3 MiB
+is accepted by Henji; model limits can be smaller. No image resizing or text
+truncation is performed. Clef/Clef Flash recommend images under about 300 KB
+and silently drop text after roughly 2,000 tokens. Check the [current model
+limits](https://openrouter.ai/docs/guides/community/multimodal-decisions).
+
+No conversation DB, cache, or history is used. Run independent inputs in a
+shell loop; each invocation emits one native JSON value:
+
+```sh
+for input in inputs/*.txt; do
+  henji decision -a openrouter -m typesafe/jev-1.13 --questions router-questions.json < "$input" || exit
+done
+```
+
+For dependent judgments, let the caller interpret the first response and
+construct the next input. `henji decision --help` lists the dedicated flags.
+
 ## Attaching one image with `--image`
 
 `--image` accepts one JPEG, PNG, or WebP file up to 3 MiB. Enable it only for

@@ -148,7 +148,11 @@ func TestManualLongFlagsExist(t *testing.T) {
 			continue
 		}
 		seen[name] = true
-		if rootCmd.Flags().Lookup(name) == nil {
+		known := rootCmd.Flags().Lookup(name) != nil
+		for _, command := range rootCmd.Commands() {
+			known = known || command.Flags().Lookup(name) != nil
+		}
+		if !known {
 			t.Errorf("manual documents unknown flag --%s", name)
 		}
 	}

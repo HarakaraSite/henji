@@ -124,14 +124,16 @@ type Model struct {
 
 // API represents an API endpoint and its models.
 type API struct {
-	Name      string
-	APIKey    string           `yaml:"api-key"`
-	APIKeyEnv string           `yaml:"api-key-env"`
-	APIKeyCmd string           `yaml:"api-key-cmd"`
-	Version   string           `yaml:"version"` // XXX: not used anywhere
-	BaseURL   string           `yaml:"base-url"`
-	Models    map[string]Model `yaml:"models"`
-	User      string           `yaml:"user"`
+	Name             string
+	APIKey           string           `yaml:"api-key"`
+	APIKeyEnv        string           `yaml:"api-key-env"`
+	APIKeyCmd        string           `yaml:"api-key-cmd"`
+	Version          string           `yaml:"version"` // XXX: not used anywhere
+	BaseURL          string           `yaml:"base-url"`
+	Models           map[string]Model `yaml:"models"`
+	User             string           `yaml:"user"`
+	DecisionProtocol string           `yaml:"decision-protocol,omitempty"`
+	DecisionBaseURL  string           `yaml:"decision-base-url,omitempty"`
 }
 
 // APIs is a type alias to allow custom YAML decoding.
@@ -227,6 +229,17 @@ type Config struct {
 }
 
 func ensureConfig() (Config, error) {
+	c, err := readConfig()
+	if err != nil {
+		return c, err
+	}
+	err = prepareConversationConfig(&c)
+	return c, err
+}
+
+// readConfig loads settings without resolving or creating conversation storage.
+// Commands such as decision need credentials, but do not need a writable cache.
+func readConfig() (Config, error) {
 	// Start from defaults so an omitted setting remains distinguishable from
 	// an explicitly configured zero value. This matters for sampling options:
 	// zero is valid (for example, temp: 0), while -1 means "do not send".
@@ -258,10 +271,18 @@ func ensureConfig() (Config, error) {
 		return c, modsError{err, "Could not parse environment into settings file."}
 	}
 
+	if c.WordWrap == 0 {
+		c.WordWrap = 80
+	}
+
+	return c, nil
+}
+
+func prepareConversationConfig(c *Config) error {
 	if c.CachePath == "" {
 		dataHome, err := dataHomeDir()
 		if err != nil {
-			return c, modsError{err, "Could not find cache path."}
+			return modsError{err, "Could not find cache path."}
 		}
 		c.CachePath = filepath.Join(dataHome, "henji")
 	}
@@ -270,14 +291,9 @@ func ensureConfig() (Config, error) {
 		filepath.Join(c.CachePath, "conversations"),
 		0o700,
 	); err != nil { //nolint:mnd
-		return c, modsError{err, "Could not create cache directory."}
+		return modsError{err, "Could not create cache directory."}
 	}
-
-	if c.WordWrap == 0 {
-		c.WordWrap = 80
-	}
-
-	return c, nil
+	return nil
 }
 
 func writeConfigFile(path string) error {

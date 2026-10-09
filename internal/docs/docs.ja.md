@@ -18,7 +18,7 @@ henji はパイプライン向けのコマンドライン LLM クライアント
 どちらも 3 MiB までです。`--image` を使うモデルには設定で `vision: true` が必要です。添付は
 会話に保存されないため、継続で必要なら再添付してください。
 
-出力の契約は次のとおりです。
+通常の生成の出力契約は次のとおりです。
 
 - **stdout はモデル応答だけ**です。`--output json` 時は JSON envelope だけを出します。
 - 進捗、保存通知、エラー詳細は **stderr** です。`-q` はエラー以外を抑制します。
@@ -70,6 +70,29 @@ HTTP/API 再試行は別で、`max-retries` とプロバイダークライアン
 Google 用スキーマでは `additionalProperties` を使えません。OpenAI strict mode では
 各 object に `"additionalProperties": false` が必要です。小型ローカルモデルがコードフェンスを
 付ける場合は、`raw JSON only, no code fences` をプロンプトに加えてください。
+
+## Decisions APIによる判断
+
+    henji decision -a openrouter -m typesafe/jev-1.13 --questions q.json < input.txt
+
+`-m` は必須で生成用の既定モデルを継承しません。モデルIDの事前登録は不要で、設定済み別名も
+使えます。`-a` は省略時に設定のAPIを使います。質問は各APIのJSON形式を指定します。
+
+- OpenRouter: `{"urgent":{"type":"noul","instructions":"Is it urgent?"}}`
+- OpenAI: `[{"name":"urgent","type":"predicate","instructions":"Is it urgent?"}]`
+
+OpenAIでは `-a openai -m gpt-6-luna` を使います。同じ対象への複数質問を一回の要求で送ります。
+成功時はAPI応答全体のJSONをstdoutへ出し、正常refusalも終了コード0です。失敗時は終了コード1、
+stdoutは空、詳細はstderrです。`output` 設定に左右されず、履歴・DB・キャッシュは作りません。
+連続処理はshellループで行います。stdinの文章はインデント・切り詰めをせず送ります。
+
+`--image` は1枚・JPEG/PNG/WebP・3MiB以内で、モデル設定の `vision: true` が必要です。
+3MiBは読込み上限であり、モデルの受理上限は別です。自動縮小・再圧縮は行いません。
+Clef系は画像約300KB未満を推奨し、文章は先頭約2,000トークン以降を黙って切り捨てます。
+
+認証・proxy・再試行は共通設定を使います。再試行回数は初回後の追加試行回数で、0なら一回です。
+独自gatewayには `decision-protocol` と `decision-base-url`（末尾の `/decisions` は除く）を設定します。
+生成用 `base-url` はこの接続先に使いません。専用フラグは `henji decision -h` で確認できます。
 
 ## 典型的なエージェントの流れ
 

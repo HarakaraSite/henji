@@ -52,7 +52,7 @@ func init() {
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
-	rootCmd.AddCommand(newDocsCmd())
+	rootCmd.AddCommand(newDocsCmd(), newDecisionCmd())
 }
 
 func newDocsCmd() *cobra.Command {
@@ -285,14 +285,18 @@ func main() {
 	}
 
 	var err error
-	config, err = ensureConfig()
+	config, err = readConfig()
+	// Register flags before discovering the command, including on configuration
+	// errors. Find skips flag values, so a model or prompt named "decision" does
+	// not accidentally select the decision output/storage contract.
+	initFlags()
+	if err == nil && !isDecisionCmd(os.Args) {
+		err = prepareConversationConfig(&config)
+	}
 	if err != nil {
 		handleError(modsError{err, "Could not load your configuration file."})
 		os.Exit(1)
 	}
-
-	// XXX: this must come after creating the config.
-	initFlags()
 
 	// Open the database after Cobra parses --output, so initialization errors
 	// use the selected output format as well as normal request errors.
@@ -355,6 +359,9 @@ func main() {
 // Generating a shell completion script does not, but the shell's internal
 // __complete invocation does when completing --continue, --show, or --delete.
 func needsConversationDB(args []string) bool {
+	if isDecisionCmd(args) {
+		return false
+	}
 	if len(args) > 1 && args[1] == "__complete" {
 		return true
 	}
@@ -415,7 +422,7 @@ func maybeWriteMemProfile() {
 
 func handleError(err error) {
 	maybeWriteMemProfile()
-	if config.Output == "json" {
+	if config.Output == "json" && !isDecisionCmd(os.Args) {
 		mods := &Mods{Config: &config}
 		var responseErr jsonResponseError
 		if errors.As(err, &responseErr) {

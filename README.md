@@ -199,7 +199,48 @@ For more worked examples, see [`examples.md`](examples.md)
 ([日本語](docs/cookbook.ja.md)) above for provider setup and scripting/agent
 patterns. A Japanese version of this README is [README.ja.md](README.ja.md).
 
-### Flags
+### Decisions: text and image classification
+
+`henji decision` calls the dedicated OpenRouter or OpenAI Decisions API. It
+reads evidence from stdin and a provider-native questions file:
+
+```sh
+henji decision -a openrouter -m typesafe/jev-1.13 \
+  --questions docs/examples/decision-openrouter-questions.json < input.txt
+henji decision -a openai -m gpt-6-luna \
+  --questions docs/examples/decision-openai-questions.json < input.txt
+```
+
+`-m` is required; the generation default model is not inherited. Text model
+IDs need no config registration, and configured aliases work. `-a` defaults
+to the configured API. OpenRouter questions are a named JSON object; OpenAI
+questions are an array. Both example files ask multiple questions about one
+input. Input text is sent without indentation or client-side truncation.
+
+The complete native response JSON goes to stdout, including provider-specific
+fields; no Henji envelope is added. Normal refusals also exit 0. Failures exit
+1 with empty stdout and details on stderr. `output` / `HENJI_OUTPUT` do not
+change this contract. No history, cache, or conversation DB is created.
+
+The existing key resolution settings apply. Provider default keys are
+`OPENROUTER_API_KEY` and `OPENAI_API_KEY`. Dedicated API settings are
+`decision-protocol: openrouter|openai` and `decision-base-url`; standard API
+names have defaults, independent of the generation `base-url`. Proxies and
+`max-retries` remain config/environment settings. Here `max-retries` counts
+additional attempts after the first (0 means one request).
+
+Add `--image FILE` for one JPEG/PNG/WebP image up to 3 MiB and configure the
+selected model with `vision: true`. This is Henji's reading limit; model limits
+can be smaller. Henji does not resize images or shorten text. Clef/Clef Flash,
+for example, recommend images under about 300 KB and read only roughly the
+first 2,000 tokens of state text. See the [provider's current limits](https://openrouter.ai/docs/guides/community/multimodal-decisions).
+
+For independent inputs, invoke the command in a shell loop. For gateway,
+image, and loop examples, see the [cookbook](docs/cookbook.md#decisions-with-native-json-output).
+Run `henji decision --help` for its dedicated flags. The existing generation
+command keeps its output and error contracts.
+
+### Generation flags
 
 | Flag | Description |
 |---|---|

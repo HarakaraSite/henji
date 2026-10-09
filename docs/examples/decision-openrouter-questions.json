@@ -1,0 +1,14 @@
+{
+  "urgent": {
+    "type": "noul",
+    "instructions": "Does this request need urgent attention?"
+  },
+  "route": {
+    "type": "choice",
+    "instructions": "How should this request be handled?",
+    "criteria": {
+      "review": "A person should review the request.",
+      "skip": "The request does not need further action."
+    }
+  }
+}
