@@ -48,7 +48,7 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
 
 ## Results
 
-### v2.2.0 — 2026-10-09 (pre-tag checks)
+### v2.2.0 — 2026-10-09
 
 - Source changes: dedicated OpenRouter/OpenAI Decisions APIs, one input per
   invocation with native response JSON and shell loops for repeated execution;
@@ -84,9 +84,18 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
   unnecessary.
 - Forgejo: `16.0.3+gitea-1.22.0`; authentication succeeded and native run 172
   ZIP logs and job 193 text logs both returned HTTP 200.
-- A local CGO-free binary built with the release ldflags reports
-  `henji version v2.2.0`. Forgejo build/upload and published asset verification
-  are recorded after the tag-triggered workflow completes.
+- Portable release gate: Forgejo
+  [Actions run 31](https://forge.harakara.site/littleisland/henji/actions/runs/31)
+  (API run 173/job 194) passed tests, vet, all five CGO-free target builds,
+  checksums, and release upload.
+- [Release v2.2.0](https://forge.harakara.site/littleisland/henji/releases/tag/v2.2.0)
+  was published from `16a5b03dc46eeba91ed0bf867c3d89e551dfab20` with five
+  binaries and `SHA256SUMS`, `draft=false`, `prerelease=false`. Release notes
+  describe Decisions, shell loops, external Glow, and output compatibility.
+  The downloaded Linux/amd64 binary reports `henji version v2.2.0`; its
+  SHA-256 matches the published checksum list:
+  `d2a936762e5d6653584cb8c968a77a9402afb4e82beaf88d19a016dee9ef7a76`.
+  Its decision help and Japanese embedded manual were also verified.
 
 ### v2.1.10 — 2026-10-08
 
