@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	charm.land/lipgloss/v2 v2.0.6
-	github.com/anthropics/anthropic-sdk-go v1.79.1
+	github.com/anthropics/anthropic-sdk-go v1.80.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/caarlos0/go-shellwords v1.0.12
 	github.com/charmbracelet/colorprofile v0.4.3
@@ -16,13 +16,13 @@ require (
 	github.com/muesli/mango-cobra v1.3.0
 	github.com/muesli/roff v0.1.0
 	github.com/muesli/termenv v0.16.0
-	github.com/openai/openai-go/v3 v3.74.0
+	github.com/openai/openai-go/v3 v3.76.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/sys v0.48.0
+	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.60.1
 )
 
