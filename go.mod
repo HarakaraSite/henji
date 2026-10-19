@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	charm.land/lipgloss/v2 v2.0.6
-	github.com/anthropics/anthropic-sdk-go v1.79.1
+	github.com/anthropics/anthropic-sdk-go v1.82.0
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/caarlos0/go-shellwords v1.0.12
 	github.com/charmbracelet/colorprofile v0.4.3
@@ -16,13 +16,13 @@ require (
 	github.com/muesli/mango-cobra v1.3.0
 	github.com/muesli/roff v0.1.0
 	github.com/muesli/termenv v0.16.0
-	github.com/openai/openai-go/v3 v3.74.0
+	github.com/openai/openai-go/v3 v3.78.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/sys v0.48.0
+	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.60.1
 )
 
@@ -41,6 +41,8 @@ require (
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
@@ -59,6 +61,10 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/otel v1.33.0 // indirect
+	go.opentelemetry.io/otel/metric v1.33.0 // indirect
+	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.6 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/sync v0.23.0 // indirect
