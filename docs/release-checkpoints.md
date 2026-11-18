@@ -60,6 +60,15 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
   The release workflow passed actionlint with the documented Forgejo exclusion.
 - openrouter-e2e: skipped for this release at the user's direction. Local
   mock servers covered generation, structured output, and Decisions contracts.
+- Forgejo [Actions run 32](https://forge.harakara.site/littleisland/henji/actions/runs/32)
+  (API run 260/job 281) passed tests, vet, the five CGO-free builds, checksums,
+  and upload. The run took 7m06s, including 5m31s for the build step.
+- [Release v2.2.1](https://forge.harakara.site/littleisland/henji/releases/tag/v2.2.1)
+  was published from `908c55e58f5fe71cb855fbede162842fea46f587`.
+  All five downloaded binaries matched `SHA256SUMS` and carried the tagged
+  revision. The Linux/amd64 binary reported `henji version v2.2.1`.
+  Its embedded Japanese manual and JSON model listing also worked with an
+  isolated configuration.
 
 ### v2.2.0 — 2026-10-09
 
