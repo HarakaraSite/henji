@@ -48,6 +48,19 @@ actionlint -ignore 'undefined variable "forgejo"' .forgejo/workflows/release.yml
 
 ## Results
 
+### v2.2.1 — 2026-11-19
+
+- Source changes: updated Go dependencies, deferred conversation storage until
+  the parsed command needs it, avoided waiting for stdin in `--show`, reduced
+  streaming allocations, and consolidated conversation and Decisions processing.
+  Current SQLite schemas use a read-only startup check. Older schemas migrate
+  under a write lock and drop the redundant ID index.
+- Local checks with Go 1.26.0 passed: `go test ./...`, `go vet ./...`,
+  `go test -race ./...`, and CGO-free builds for all five release targets.
+  The release workflow passed actionlint with the documented Forgejo exclusion.
+- openrouter-e2e: skipped for this release at the user's direction. Local
+  mock servers covered generation, structured output, and Decisions contracts.
+
 ### v2.2.0 — 2026-10-09
 
 - Source changes: dedicated OpenRouter/OpenAI Decisions APIs, one input per
