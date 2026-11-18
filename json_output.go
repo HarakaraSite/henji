@@ -44,8 +44,8 @@ func buildJSONOutput(mods *Mods) JSONOutput {
 	if mods.Config.cacheWriteToID != "" {
 		out.ConversationID = mods.Config.cacheWriteToID
 	}
-	if mods.Output != "" {
-		out.Content = []ContentBlock{{Type: "text", Text: mods.Output}}
+	if mods.output.Len() > 0 {
+		out.Content = []ContentBlock{{Type: "text", Text: mods.output.String()}}
 	}
 	return out
 }

@@ -163,8 +163,8 @@ func TestStreamMessagesReturnsCopy(t *testing.T) {
 		messages: []proto.Message{
 			{Role: proto.RoleUser, Content: "prompt"},
 		},
-		content: "response",
 	}
+	s.content.WriteString("response")
 
 	messages := s.Messages()
 	messages[0].Content = "changed"

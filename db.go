@@ -29,7 +29,7 @@ func handleSqliteErr(err error) error {
 
 func openDB(ds string) (*convoDB, error) {
 	// Apply the timeout to every connection, including connections opened later
-	// by the pool. Serialize schema changes across simultaneous CLI startups.
+	// by the pool. Take a write lock only when a schema migration is needed.
 	separator := "?"
 	if strings.Contains(ds, "?") {
 		separator = "&"
@@ -41,78 +41,115 @@ func openDB(ds string) (*convoDB, error) {
 			handleSqliteErr(err),
 		)
 	}
-	initialized := false
-	defer func() {
-		if !initialized {
-			_ = db.Close()
-		}
-	}()
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf(
-			"could not ping db: %w",
-			handleSqliteErr(err),
-		)
+	schema, err := readConversationSchema(db)
+	if err == nil && !schema.current() {
+		err = migrateConversationSchema(db)
 	}
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &convoDB{db: db}, nil
+}
+
+type conversationSchema struct {
+	Table         bool `db:"has_table"`
+	Model         bool `db:"has_model"`
+	API           bool `db:"has_api"`
+	TitleIndex    bool `db:"has_title_index"`
+	LegacyIDIndex bool `db:"has_legacy_id_index"`
+}
+
+func (s conversationSchema) current() bool {
+	return s.Model && s.API && s.TitleIndex && !s.LegacyIDIndex
+}
+
+func readConversationSchema(queryer sqlx.Queryer) (conversationSchema, error) {
+	var schema conversationSchema
+	if err := sqlx.Get(queryer, &schema, `
+		SELECT *
+		FROM (
+		  SELECT
+		    count(*) > 0 AS has_table,
+		    count(*) FILTER (WHERE name = 'model') > 0 AS has_model,
+		    count(*) FILTER (WHERE name = 'api') > 0 AS has_api
+		  FROM pragma_table_info('conversations')
+		)
+		CROSS JOIN (
+		  SELECT
+		    count(*) FILTER (WHERE name = 'idx_conv_title') > 0 AS has_title_index,
+		    count(*) FILTER (WHERE name = 'idx_conv_id') > 0 AS has_legacy_id_index
+		  FROM pragma_index_list('conversations')
+		)
+	`); err != nil {
+		return schema, fmt.Errorf("could not inspect db schema: %w", handleSqliteErr(err))
+	}
+	return schema, nil
+}
+
+func migrateConversationSchema(db *sqlx.DB) error {
 	tx, err := db.Beginx()
 	if err != nil {
-		return nil, fmt.Errorf("could not begin db migration: %w", err)
+		return fmt.Errorf("could not begin db migration: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.Exec(`
-		CREATE TABLE
-		  IF NOT EXISTS conversations (
-		    id string NOT NULL PRIMARY KEY,
-		    title string NOT NULL,
-		    updated_at datetime NOT NULL DEFAULT (strftime ('%Y-%m-%d %H:%M:%f', 'now')),
-		    CHECK (id <> ''),
-		    CHECK (title <> '')
-		  )
-	`); err != nil {
-		return nil, fmt.Errorf("could not migrate db: %w", err)
+
+	// Another process may have migrated the database while this one waited.
+	schema, err := readConversationSchema(tx)
+	if err != nil {
+		return err
 	}
-	if _, err := tx.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_conv_id ON conversations (id)
-	`); err != nil {
-		return nil, fmt.Errorf("could not migrate db: %w", err)
-	}
-	if _, err := tx.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_conv_title ON conversations (title)
-	`); err != nil {
-		return nil, fmt.Errorf("could not migrate db: %w", err)
+	if schema.current() {
+		return nil
 	}
 
-	if !hasColumn(tx, "model") {
+	if !schema.Table {
+		if _, err := tx.Exec(`
+			CREATE TABLE conversations (
+			  id string NOT NULL PRIMARY KEY,
+			  title string NOT NULL,
+			  updated_at datetime NOT NULL DEFAULT (strftime ('%Y-%m-%d %H:%M:%f', 'now')),
+			  model string,
+			  api string,
+			  CHECK (id <> ''),
+			  CHECK (title <> '')
+			)
+		`); err != nil {
+			return fmt.Errorf("could not migrate db: %w", err)
+		}
+	}
+	if schema.Table && !schema.Model {
 		if _, err := tx.Exec(`
 			ALTER TABLE conversations ADD COLUMN model string
 		`); err != nil {
-			return nil, fmt.Errorf("could not migrate db: %w", err)
+			return fmt.Errorf("could not migrate db: %w", err)
 		}
 	}
-	if !hasColumn(tx, "api") {
+	if schema.Table && !schema.API {
 		if _, err := tx.Exec(`
 			ALTER TABLE conversations ADD COLUMN api string
 		`); err != nil {
-			return nil, fmt.Errorf("could not migrate db: %w", err)
+			return fmt.Errorf("could not migrate db: %w", err)
+		}
+	}
+	if !schema.TitleIndex {
+		if _, err := tx.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_conv_title ON conversations (title)
+		`); err != nil {
+			return fmt.Errorf("could not migrate db: %w", err)
+		}
+	}
+	if schema.LegacyIDIndex {
+		// SQLite already indexes the id primary key.
+		if _, err := tx.Exec(`DROP INDEX idx_conv_id`); err != nil {
+			return fmt.Errorf("could not migrate db: %w", err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("could not commit db migration: %w", err)
+		return fmt.Errorf("could not commit db migration: %w", err)
 	}
-	initialized = true
-	return &convoDB{db: db}, nil
-}
-
-func hasColumn(tx *sqlx.Tx, col string) bool {
-	var count int
-	if err := tx.Get(&count, `
-		SELECT count(*)
-		FROM pragma_table_info('conversations') c
-		WHERE c.name = $1
-	`, col); err != nil {
-		return false
-	}
-	return count > 0
+	return nil
 }
 
 type convoDB struct {

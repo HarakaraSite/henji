@@ -38,12 +38,18 @@ func (c *Conversations) Write(id string, messages *[]proto.Message) error {
 }
 
 // WriteWithCommit keeps the previous body when its metadata cannot be saved.
+// The commit function receives the attachment-free messages written to the body.
 // Concurrent callers must hold Lock from reading the history through saving it.
-func (c *Conversations) WriteWithCommit(id string, messages *[]proto.Message, commitFn func() error) error {
+func (c *Conversations) WriteWithCommit(id string, messages *[]proto.Message, commitFn func([]proto.Message) error) error {
+	var sanitized []proto.Message
+	var commit func() error
+	if commitFn != nil {
+		commit = func() error { return commitFn(sanitized) }
+	}
 	return c.cache.WriteWithCommit(id, func(w io.Writer) error {
-		sanitized := proto.MessagesForCache(*messages)
+		sanitized = proto.MessagesForCache(*messages)
 		return encode(w, &sanitized)
-	}, commitFn)
+	}, commit)
 }
 
 // Lock serializes operations on one conversation across processes. The caller

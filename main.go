@@ -16,6 +16,7 @@ import (
 
 	"forge.harakara.site/littleisland/henji/v2/internal/cache"
 	manualdocs "forge.harakara.site/littleisland/henji/v2/internal/docs"
+	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	mcobra "github.com/muesli/mango-cobra"
 	"github.com/muesli/roff"
 	"github.com/spf13/cobra"
@@ -148,6 +149,17 @@ var (
 				listModels()
 				return nil
 			}
+
+			// An uncached continuation still resolves the saved model, and
+			// an existing title can supply the conversation ID in JSON output.
+			if !config.NoCache || config.List || len(config.Delete) > 0 ||
+				config.Show != "" || config.Continue != "" || config.ContinueLast ||
+				(config.Title != "" && !sha1reg.MatchString(config.Title)) {
+				if err := initConversationDB(); err != nil {
+					return err
+				}
+			}
+
 			if config.List {
 				return listConversations(config.Raw)
 			}
@@ -156,17 +168,21 @@ var (
 				return deleteConversations(cmd.Context())
 			}
 
-			cache, err := cache.NewConversations(config.CachePath)
-			if err != nil {
-				return modsError{err, "Couldn't initialize conversation cache."}
+			var conversations *cache.Conversations
+			if !config.NoCache || config.Show != "" {
+				var err error
+				conversations, err = cache.NewConversations(config.CachePath)
+				if err != nil {
+					return modsError{err, "Couldn't initialize conversation cache."}
+				}
 			}
-			mods = newMods(cmd.Context(), &config, db, cache)
+			mods = newMods(cmd.Context(), &config, db, conversations)
 			defer mods.closeConversationLocks()
 			if err := mods.run(); err != nil {
 				return err
 			}
 
-			if mods.Input == "" && !mods.HasImage() && isNoArgs() {
+			if config.Show == "" && config.Prefix == "" && mods.Input == "" && !mods.HasImage() {
 				return modsError{
 					reason: "You haven't provided any prompt input.",
 					err: newUserErrorf(
@@ -237,6 +253,10 @@ func initFlags() {
 
 	for _, name := range []string{"show", "delete", "continue"} {
 		_ = rootCmd.RegisterFlagCompletionFunc(name, func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if err := initConversationDB(); err != nil {
+				cobra.CompError(err.Error())
+				return nil, cobra.ShellCompDirectiveError
+			}
 			results, _ := db.Completions(toComplete)
 			return results, cobra.ShellCompDirectiveDefault
 		})
@@ -292,36 +312,12 @@ func main() {
 	// errors. Find skips flag values, so a model or prompt named "decision" does
 	// not accidentally select the decision output/storage contract.
 	initFlags()
-	if err == nil && !isDecisionCmd(os.Args) {
-		err = prepareConversationConfig(&config)
-	}
 	if err != nil {
 		handleError(modsError{err, "Could not load your configuration file."})
 		os.Exit(1)
 	}
 
-	// Open the database after Cobra parses --output, so initialization errors
-	// use the selected output format as well as normal request errors.
-	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
-		if db != nil || !needsConversationDB(os.Args) {
-			return nil
-		}
-		var err error
-		db, err = openDB(filepath.Join(config.CachePath, "conversations", "henji.db"))
-		if err != nil {
-			return modsError{err, "Could not open database."}
-		}
-		return nil
-	}
 	defer closeDB()
-	// Cobra completes flags without running the target command's pre-run
-	// hooks, so completion candidates still need the database opened here.
-	if isCompletionCmd(os.Args) && needsConversationDB(os.Args) {
-		if err := rootCmd.PersistentPreRunE(rootCmd, nil); err != nil {
-			handleError(err)
-			os.Exit(1)
-		}
-	}
 
 	if isCompletionCmd(os.Args) {
 		// Keep completion initialization explicit. The default completion
@@ -357,23 +353,22 @@ func main() {
 	}
 }
 
-// needsConversationDB reports whether an invocation needs conversation data.
-// Generating a shell completion script does not, but the shell's internal
-// __complete invocation does when completing --continue, --show, or --delete.
-func needsConversationDB(args []string) bool {
-	if isDecisionCmd(args) {
-		return false
+// initConversationDB opens storage for a command or completion that uses it.
+func initConversationDB() error {
+	if db != nil {
+		return nil
 	}
-	if len(args) > 1 && args[1] == "__complete" {
-		return true
+	if err := prepareConversationConfig(&config); err != nil {
+		return err
 	}
-	return !isCompletionCmd(args) && !isManCmd(args) && !isVersionOrHelpCmd(args)
+	var err error
+	db, err = openDB(filepath.Join(config.CachePath, "conversations", "henji.db"))
+	if err != nil {
+		return modsError{err, "Could not open database."}
+	}
+	return nil
 }
 
-// closeDB closes the conversation database if it was opened. db stays nil
-// when the command is a version/help/completion/man invocation (see
-// isVersionOrHelpCmd and friends), so callers on the error path must not
-// assume it was opened.
 func closeDB() {
 	if db != nil {
 		_ = db.Close() //nolint:errcheck
@@ -584,8 +579,9 @@ func conversationUpdatedAt(updatedAt time.Time) string {
 }
 
 func saveConversation(mods *Mods) error {
-	if config.NoCache {
-		if !config.Quiet {
+	cfg := mods.Config
+	if cfg.NoCache {
+		if !cfg.Quiet {
 			fmt.Fprintf(
 				os.Stderr,
 				"\nConversation was not saved because %s or %s is set.\n",
@@ -596,45 +592,30 @@ func saveConversation(mods *Mods) error {
 		return nil
 	}
 
-	// if message is a sha1, use the last prompt instead.
-	id := config.cacheWriteToID
-	title := conversationTitleForCache(config.cacheWriteToTitle, mods.messages)
-
+	id := cfg.cacheWriteToID
 	errReason := fmt.Sprintf(
 		"There was a problem writing %s to the cache. Use %s / %s to disable it.",
-		config.cacheWriteToID,
+		id,
 		stderrStyles().InlineCode.Render("--no-cache"),
 		stderrStyles().InlineCode.Render("NO_CACHE"),
 	)
-	cache, err := cache.NewConversations(config.CachePath)
-	if err != nil {
-		return modsError{err, errReason}
-	}
-	if err := cache.WriteWithCommit(id, &mods.messages, func() error {
-		return db.Save(id, title, config.API, config.Model)
+	var title string
+	if err := mods.cache.WriteWithCommit(id, &mods.messages, func(messages []proto.Message) error {
+		title = conversationTitle(cfg.cacheWriteToTitle, messages)
+		return mods.db.Save(id, title, cfg.API, cfg.Model)
 	}); err != nil {
 		return modsError{err, errReason}
 	}
 
-	if !config.Quiet {
+	if !cfg.Quiet {
 		fmt.Fprintln(
 			os.Stderr,
 			"\nConversation saved:",
-			stderrStyles().InlineCode.Render(config.cacheWriteToID[:sha1short]),
+			stderrStyles().InlineCode.Render(id[:sha1short]),
 			stderrStyles().Comment.Render(title),
 		)
 	}
 	return nil
-}
-
-func isNoArgs() bool {
-	return config.Prefix == "" &&
-		config.Show == "" &&
-		len(config.Delete) == 0 &&
-		!config.ShowHelp &&
-		!config.List &&
-		!config.ListRoles &&
-		!config.ListModels
 }
 
 func warnFileArguments(args []string, hasAttachment bool) {
@@ -694,19 +675,6 @@ func isCompletionCmd(args []string) bool {
 			"--help": nil,
 		}[args[3]]
 		return ok
-	}
-	return false
-}
-
-//nolint:mnd
-func isVersionOrHelpCmd(args []string) bool {
-	if len(args) <= 1 {
-		return false
-	}
-	for _, arg := range args[1:] {
-		if arg == "--version" || arg == "-v" || arg == "--help" || arg == "-h" {
-			return true
-		}
 	}
 	return false
 }

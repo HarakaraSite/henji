@@ -22,12 +22,10 @@ func TestSaveConversation(t *testing.T) {
 				result = "database failure"
 			}
 			t.Run(name+"/"+result, func(t *testing.T) {
-				originalConfig, originalDB := config, db
-				t.Cleanup(func() { config, db = originalConfig, originalDB })
-				db = testDB(t)
+				db := testDB(t)
 				dir := t.TempDir()
 				id := newConversationID()
-				config = Config{
+				cfg := &Config{
 					CachePath: dir, API: "local", Model: "test", Quiet: true,
 					cacheWriteToID: id, cacheWriteToTitle: "new title",
 				}
@@ -51,7 +49,7 @@ func TestSaveConversation(t *testing.T) {
 				}
 				messages := append([]proto.Message{}, oldMessages...)
 				messages = append(messages, proto.Message{Role: proto.RoleAssistant, Content: "new answer"})
-				err = saveConversation(&Mods{messages: messages})
+				err = saveConversation(&Mods{Config: cfg, db: db, cache: conversations, messages: messages})
 				if failDB {
 					require.Error(t, err)
 					if existing {
@@ -91,5 +89,41 @@ func TestSaveConversation(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSaveConversationDerivesTitleFromStoredContent(t *testing.T) {
+	for _, tc := range []struct {
+		name, prompt, title string
+	}{
+		{name: "attachment only", title: defaultConversationTitle},
+		{name: "prompt and attachment", prompt: "review this", title: "review this"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const attachment = "secret attachment first line\nsecond line"
+			parts := []proto.ContentPart{}
+			if tc.prompt != "" {
+				parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: tc.prompt})
+			}
+			parts = append(parts, proto.ContentPart{Type: proto.ContentPartText, Text: attachment, OmitFromCache: true})
+			messages := []proto.Message{{Role: proto.RoleUser, Content: textFromParts(parts), Parts: parts}}
+
+			conversations, err := cache.NewConversations(t.TempDir())
+			require.NoError(t, err)
+			id := newConversationID()
+			db := testDB(t)
+			mods := &Mods{Config: &Config{Quiet: true, cacheWriteToID: id}, db: db, cache: conversations, messages: messages}
+			require.NoError(t, saveConversation(mods))
+
+			index, err := db.Find(id)
+			require.NoError(t, err)
+			require.Equal(t, tc.title, index.Title)
+			var saved []proto.Message
+			require.NoError(t, conversations.Read(id, &saved))
+			require.Equal(t, []proto.Message{{
+				Role: proto.RoleUser, Content: tc.prompt,
+				Parts: []proto.ContentPart{{Type: proto.ContentPartText, TextOmitted: true}},
+			}}, saved)
+		})
 	}
 }

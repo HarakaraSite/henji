@@ -224,18 +224,12 @@ func executeOpenAI(ctx context.Context, cfg Config, baseURL string, req Request)
 	if decision == nil {
 		return nil, errors.New("OpenAI Decisions API returned an empty response")
 	}
-	// The SDK decodes one JSON value without checking for trailing data. Validate
-	// the entire HTTP body before accepting RawJSON, including its UTF-8 bytes.
-	if len(bytes.TrimSpace(capture.body)) == 0 || !utf8.Valid(capture.body) || !json.Valid(capture.body) {
-		return nil, fmt.Errorf("OpenAI Decisions API returned an empty or invalid JSON response (HTTP %d): %s",
-			capture.status, redact(string(capture.body), cfg.APIKey))
+	// The SDK decodes one JSON value without checking for trailing data.
+	// Validate the entire HTTP body and keep the provider's JSON bytes.
+	if err := validateResponse(ProtocolOpenAI, cfg.APIKey, capture.status, capture.body); err != nil {
+		return nil, err
 	}
-	raw := []byte(decision.RawJSON())
-	if len(bytes.TrimSpace(raw)) == 0 || !utf8.Valid(raw) || !json.Valid(raw) {
-		return nil, fmt.Errorf("OpenAI Decisions API returned an empty or invalid JSON response (HTTP %d): %s",
-			capture.status, redact(string(capture.body), cfg.APIKey))
-	}
-	return json.RawMessage(raw), nil
+	return json.RawMessage(bytes.TrimSpace(capture.body)), nil
 }
 
 func executeOpenRouter(ctx context.Context, cfg Config, baseURL string, req Request) (json.RawMessage, error) {
@@ -287,9 +281,8 @@ func executeOpenRouter(ctx context.Context, cfg Config, baseURL string, req Requ
 		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 			return nil, responseError(ProtocolOpenRouter, cfg.APIKey, response.StatusCode, responseBody)
 		}
-		if len(bytes.TrimSpace(responseBody)) == 0 || !utf8.Valid(responseBody) || !json.Valid(responseBody) {
-			return nil, fmt.Errorf("OpenRouter Decisions API returned an empty or invalid JSON response (HTTP %d): %s",
-				response.StatusCode, redact(string(responseBody), cfg.APIKey))
+		if err := validateResponse(ProtocolOpenRouter, cfg.APIKey, response.StatusCode, responseBody); err != nil {
+			return nil, err
 		}
 		return json.RawMessage(responseBody), nil
 	}
@@ -354,6 +347,14 @@ func responseError(protocol, apiKey string, status int, body []byte) error {
 		message: fmt.Sprintf("%s Decisions API returned HTTP %d %s: %s", protocolName(protocol), status,
 			http.StatusText(status), redact(string(body), apiKey)),
 	}
+}
+
+func validateResponse(protocol, apiKey string, status int, body []byte) error {
+	if !utf8.Valid(body) || !json.Valid(body) {
+		return fmt.Errorf("%s Decisions API returned an empty or invalid JSON response (HTTP %d): %s",
+			protocolName(protocol), status, redact(string(body), apiKey))
+	}
+	return nil
 }
 
 func protocolName(protocol string) string {

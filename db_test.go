@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -172,7 +173,6 @@ func TestConvoDB(t *testing.T) {
 	})
 }
 
-// A first launch must not race another process adding the model/API columns.
 func TestConcurrentDatabaseInitialization(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "henji.db")
 	start := make(chan struct{})
@@ -196,12 +196,43 @@ func TestConcurrentDatabaseInitialization(t *testing.T) {
 	}
 }
 
-func TestDatabaseStartupWaitsForWriter(t *testing.T) {
+func TestDatabaseMigrationWaitsForWriter(t *testing.T) {
+	t.Run("legacy columns and index", func(t *testing.T) {
+		testDatabaseMigrationWaitsForWriter(t, false)
+	})
+	t.Run("legacy index only", func(t *testing.T) {
+		testDatabaseMigrationWaitsForWriter(t, true)
+	})
+}
+
+func testDatabaseMigrationWaitsForWriter(t *testing.T, hasMetadataColumns bool) {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "henji.db")
-	first, err := openDB(path)
+	legacy, err := sqlx.Open("sqlite", path+"?_txlock=immediate")
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = first.Close() })
-	tx, err := first.db.Beginx()
+	t.Cleanup(func() { _ = legacy.Close() })
+	_, err = legacy.Exec(`
+		CREATE TABLE conversations (
+		  id string NOT NULL PRIMARY KEY,
+		  title string NOT NULL,
+		  updated_at datetime NOT NULL DEFAULT (strftime ('%Y-%m-%d %H:%M:%f', 'now')),
+		  CHECK (id <> ''),
+		  CHECK (title <> '')
+		);
+		CREATE INDEX idx_conv_id ON conversations (id);
+		CREATE INDEX idx_conv_title ON conversations (title);
+		INSERT INTO conversations (id, title) VALUES ('legacy-id', 'old title');
+	`)
+	require.NoError(t, err)
+	if hasMetadataColumns {
+		_, err = legacy.Exec(`
+			ALTER TABLE conversations ADD COLUMN model string;
+			ALTER TABLE conversations ADD COLUMN api string;
+			UPDATE conversations SET model = 'gpt-4o', api = 'openai';
+		`)
+		require.NoError(t, err)
+	}
+	tx, err := legacy.Beginx()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = tx.Rollback() })
 	result := make(chan error, 1)
@@ -224,4 +255,45 @@ func TestDatabaseStartupWaitsForWriter(t *testing.T) {
 	case <-time.After(6 * time.Second):
 		t.Fatal("startup did not resume after the writer released its lock")
 	}
+
+	conversations := &convoDB{db: legacy}
+	row, err := conversations.Find("legacy-id")
+	require.NoError(t, err)
+	require.Equal(t, "old title", row.Title)
+	if hasMetadataColumns {
+		require.Equal(t, new("gpt-4o"), row.Model)
+		require.Equal(t, new("openai"), row.API)
+	} else {
+		require.Nil(t, row.Model)
+		require.Nil(t, row.API)
+	}
+	require.NoError(t, conversations.Save(row.ID, row.Title, "openai", "gpt-4o"))
+
+	var indexes []string
+	require.NoError(t, legacy.Select(&indexes, `
+		SELECT name FROM pragma_index_list('conversations')
+	`))
+	require.ElementsMatch(t, []string{"idx_conv_title", "sqlite_autoindex_conversations_1"}, indexes)
+}
+
+func TestDatabaseStartupReadsWhileWriterHoldsLock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "henji.db")
+	first, err := openDB(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = first.Close() })
+	require.NoError(t, first.Save("test-id", "committed title", "openai", "gpt-4o"))
+
+	tx, err := first.db.Beginx()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tx.Rollback() })
+	_, err = tx.Exec(`UPDATE conversations SET title = 'uncommitted title' WHERE id = 'test-id'`)
+	require.NoError(t, err)
+
+	second, err := openDB(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = second.Close() })
+	list, err := second.List()
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	require.Equal(t, "committed title", list[0].Title)
 }

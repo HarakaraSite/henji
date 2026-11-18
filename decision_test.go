@@ -42,9 +42,6 @@ func TestDecisionCommandDiscovery(t *testing.T) {
 		t.Run(strings.Join(test.args, " "), func(t *testing.T) {
 			args := append([]string{"henji"}, test.args...)
 			require.Equal(t, test.want, isDecisionCmd(args))
-			if test.want {
-				require.False(t, needsConversationDB(args))
-			}
 		})
 	}
 }
@@ -59,11 +56,11 @@ func TestResolveDecisionAPI(t *testing.T) {
 	_, model, err = resolveDecisionAPI(&cfg, "", "new-model-not-in-catalog")
 	require.NoError(t, err)
 	require.Equal(t, "new-model-not-in-catalog", model.Name)
-	for name, base := range map[string]string{"openai": "https://api.openai.com/v1", "openrouter": "https://openrouter.ai/api/alpha"} {
+	for _, name := range []string{"openai", "openrouter"} {
 		api, _, err := resolveDecisionAPI(&Config{}, name, "test")
 		require.NoError(t, err)
 		require.Equal(t, name, api.DecisionProtocol)
-		require.Equal(t, base, api.DecisionBaseURL)
+		require.Empty(t, api.DecisionBaseURL, "the client supplies the default URL")
 	}
 	_, _, err = resolveDecisionAPI(&cfg, "missing", "test")
 	require.ErrorContains(t, err, "not configured")

@@ -30,8 +30,11 @@ func TestCLIHelperProcess(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(os.Getenv("HENJI_TEST_CLI_ARGS")), &args))
 	os.Args = append([]string{"henji"}, args...)
 	if os.Getenv("HENJI_TEST_CLI_QUERY_ONLY") == "1" {
-		// Make real SQLite writes fail after normal CLI/database initialization.
+		// Make real SQLite writes fail during conversation persistence.
 		rootCmd.PreRunE = func(_ *cobra.Command, _ []string) error {
+			if err := initConversationDB(); err != nil {
+				return err
+			}
 			db.db.SetMaxOpenConns(1)
 			_, err := db.db.Exec("PRAGMA query_only=ON")
 			return err
@@ -282,8 +285,49 @@ func TestCLIJSONResponseFailures(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, oldBody, body)
 			}
+			if len(tc.args) > 0 && tc.args[0] == "--no-cache" {
+				require.NoDirExists(t, dataDir)
+			}
 		})
 	}
+}
+
+func TestCLIStorageInitializationFollowsParsedCommand(t *testing.T) {
+	for _, args := range [][]string{
+		{"--version"}, {"--help"}, {"--list-models", "--output", "json"},
+		{"--list-roles"}, {"__complete", "--role", ""},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			env, dataDir := cliTestEnvironment(t, "{}\n")
+			output, err := cliTestCommand(t, env, args...).CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			require.NoDirExists(t, dataDir)
+		})
+	}
+
+	env, dataDir := cliTestEnvironment(t, "{}\n")
+	conversations, err := cache.NewConversations(dataDir)
+	require.NoError(t, err)
+	id := newConversationID()
+	messages := []proto.Message{{Role: proto.RoleUser, Content: "saved question"}}
+	require.NoError(t, conversations.Write(id, &messages))
+	index, err := openDB(filepath.Join(dataDir, "conversations", "henji.db"))
+	require.NoError(t, err)
+	require.NoError(t, index.Save(id, "--help", "local", "test"))
+	require.NoError(t, index.Close())
+
+	cmd := cliTestCommand(t, env, "--show", "--help", "--text", "missing-attachment.txt")
+	cmd.Stdin = nil
+	stdin, err := cmd.StdinPipe()
+	require.NoError(t, err)
+	defer stdin.Close()
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	require.Contains(t, string(output), "saved question")
+
+	output, err = cliTestCommand(t, env, "__complete", "--continue", id[:5]).CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	require.Contains(t, string(output), id[:sha1short])
 }
 
 // Hayari and Shirushi consume model JSON directly, without --output json.

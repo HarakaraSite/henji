@@ -206,7 +206,7 @@ func TestConsumeCompletionValidatesSchemaAndRetries(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Contains(t, correction, "did not conform")
-	require.Equal(t, `{"ok":true}`, m.Output)
+	require.Equal(t, `{"ok":true}`, m.output.String())
 	require.Equal(t, 1, m.schemaRetries)
 }
 
@@ -269,7 +269,7 @@ func TestCompleteRetriesFallbackModel(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, 2, calls)
-	require.Equal(t, "recovered", m.Output)
+	require.Equal(t, "recovered", m.output.String())
 }
 
 func TestReadFromCacheBuildsShowOutputWithoutStreaming(t *testing.T) {
@@ -281,8 +281,8 @@ func TestReadFromCacheBuildsShowOutputWithoutStreaming(t *testing.T) {
 	m := &Mods{cache: conversations, Config: &Config{Output: "json", cacheReadFromID: "show-id"}}
 	require.NoError(t, m.readFromCache())
 	require.Equal(t, messages, m.messages)
-	require.Contains(t, m.Output, "question")
-	require.Contains(t, m.Output, "answer")
+	require.Contains(t, m.output.String(), "question")
+	require.Contains(t, m.output.String(), "answer")
 }
 
 func TestEnsureKeyPriority(t *testing.T) {
@@ -420,7 +420,7 @@ func TestEnsureKeySeparatesCommandOutput(t *testing.T) {
 			t.Setenv("HENJI_TEST_API_KEY_COMMAND", mode)
 			t.Setenv("HENJI_TEST_FALLBACK_KEY", "env-key")
 			command := fmt.Sprintf("%q -test.run=^TestAPIKeyCommandHelper$", os.Args[0])
-			key, err := (Mods{}).ensureKey(API{APIKeyCmd: command, APIKeyEnv: "HENJI_TEST_FALLBACK_KEY", APIKey: "plain-key"}, "UNSET_TEST_DEFAULT_KEY", "https://example.com")
+			key, err := (&Mods{}).ensureKey(API{APIKeyCmd: command, APIKeyEnv: "HENJI_TEST_FALLBACK_KEY", APIKey: "plain-key"}, "UNSET_TEST_DEFAULT_KEY", "https://example.com")
 			if mode == "fail" {
 				require.Error(t, err)
 				require.Empty(t, key)
@@ -436,7 +436,7 @@ func TestEnsureKeySeparatesCommandOutput(t *testing.T) {
 			}
 		})
 	}
-	_, err := (Mods{}).ensureKey(API{APIKeyCmd: "   "}, "UNSET_TEST_DEFAULT_KEY", "https://example.com")
+	_, err := (&Mods{}).ensureKey(API{APIKeyCmd: "   "}, "UNSET_TEST_DEFAULT_KEY", "https://example.com")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "command is empty")
 }

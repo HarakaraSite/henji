@@ -95,14 +95,7 @@ func resolveDecisionAPI(cfg *Config, apiName, modelName string) (API, Model, err
 		api.DecisionProtocol = apiName
 	}
 	switch api.DecisionProtocol {
-	case "openai":
-		if api.DecisionBaseURL == "" {
-			api.DecisionBaseURL = "https://api.openai.com/v1"
-		}
-	case "openrouter":
-		if api.DecisionBaseURL == "" {
-			api.DecisionBaseURL = "https://openrouter.ai/api/alpha"
-		}
+	case decision.ProtocolOpenAI, decision.ProtocolOpenRouter:
 	default:
 		return API{}, Model{}, newUserErrorf("API %q requires decision-protocol: openai or openrouter", apiName)
 	}

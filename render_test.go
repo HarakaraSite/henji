@@ -127,7 +127,8 @@ func TestTextOutputFallsBackWithoutPartialRendering(t *testing.T) {
 			} else {
 				fakeGlow(t, mode)
 			}
-			m := &Mods{ctx: context.Background(), Config: &Config{WordWrap: 80}, Output: "# original\n"}
+			m := &Mods{ctx: context.Background(), Config: &Config{WordWrap: 80}}
+			m.output.WriteString("# original\n")
 			output, err := captureTextOutput(t, true, m.printTextOutput)
 			require.NoError(t, err)
 			require.Equal(t, "# original\n\n", output)
@@ -163,6 +164,7 @@ func TestTextOutputKeepsRawAndPipedStreaming(t *testing.T) {
 			_, err = io.ReadFull(r, first)
 			require.NoError(t, err, "the first chunk must be visible before completion")
 			m.appendToOutput("second")
+			require.Zero(t, m.output.Len(), "streamed output does not need a buffer")
 			require.NoError(t, m.printTextOutput())
 			require.NoError(t, w.Close())
 			rest, err := io.ReadAll(r)
@@ -194,7 +196,8 @@ func TestGlowCancellationDoesNotDumpOriginalText(t *testing.T) {
 	}()
 	deadline := time.AfterFunc(2*time.Second, cancel)
 	defer deadline.Stop()
-	m := &Mods{ctx: ctx, Config: &Config{WordWrap: 80}, Output: "original should not be dumped"}
+	m := &Mods{ctx: ctx, Config: &Config{WordWrap: 80}}
+	m.output.WriteString("original should not be dumped")
 	output, err := captureTextOutput(t, true, m.printTextOutput)
 	<-ready
 	require.ErrorIs(t, err, context.Canceled)
@@ -223,7 +226,7 @@ func TestStructuredOutputDoesNotUseGlow(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, output)
 	require.NoFileExists(t, record)
-	require.Equal(t, "buffered for JSON envelope", m.Output)
+	require.Equal(t, "buffered for JSON envelope", m.output.String())
 }
 
 func TestCLIDecisionIgnoresInstalledGlow(t *testing.T) {

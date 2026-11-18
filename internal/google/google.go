@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"forge.harakara.site/littleisland/henji/v2/internal/proto"
 	"forge.harakara.site/littleisland/henji/v2/internal/stream"
@@ -217,7 +218,7 @@ type Stream struct {
 	err         error
 	unmarshaler Unmarshaler
 	messages    []proto.Message
-	content     string
+	content     strings.Builder
 
 	httpHeader
 }
@@ -228,10 +229,10 @@ func (s *Stream) Err() error { return s.err }
 // Messages implements stream.Stream.
 func (s *Stream) Messages() []proto.Message {
 	messages := append([]proto.Message(nil), s.messages...)
-	if s.content != "" {
+	if s.content.Len() > 0 {
 		messages = append(messages, proto.Message{
 			Role:    proto.RoleAssistant,
-			Content: s.content,
+			Content: s.content.String(),
 		})
 	}
 	return messages
@@ -312,7 +313,7 @@ func (s *Stream) Current() (proto.Chunk, error) {
 			return proto.Chunk{}, stream.ErrNoContent
 		}
 		content := parts[0].Text
-		s.content += content
+		s.content.WriteString(content)
 
 		return proto.Chunk{
 			Content: content,

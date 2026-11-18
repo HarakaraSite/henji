@@ -32,7 +32,7 @@ import (
 // Mods executes one henji request and retains the response for output and
 // conversation caching. It deliberately has no terminal event loop.
 type Mods struct {
-	Output            string
+	output            strings.Builder
 	Input             string
 	Styles            styles
 	retries           int
@@ -84,6 +84,10 @@ func (m *Mods) run() error {
 	m.Config.API = details.API
 	m.Config.Model = details.Model
 
+	if m.Config.Show != "" {
+		return m.readFromCache()
+	}
+
 	textInput, err := readTextInput(m.Config.textPath)
 	if err != nil {
 		return err
@@ -101,9 +105,6 @@ func (m *Mods) run() error {
 	m.rawInput = input
 	m.inputParts = buildInputParts(textInput, imageInput, stdinInput)
 
-	if m.Config.Show != "" {
-		return m.readFromCache()
-	}
 	if m.Input == "" && !m.HasImage() && m.Config.Prefix == "" {
 		return nil
 	}
@@ -358,7 +359,7 @@ func (m *Mods) checkJSONSchema() (string, error) {
 		if m.schemaRetries > m.Config.JSONSchemaRetries {
 			return "", modsError{err: err, reason: fmt.Sprintf("Response did not match --json-schema after %d attempt(s).", m.schemaRetries)}
 		}
-		m.Output = ""
+		m.output.Reset()
 		return fmt.Sprintf("Your previous response did not conform to the required JSON Schema: %s\nRespond again with ONLY JSON that strictly matches the schema, and nothing else.", err), nil
 	}
 }
@@ -578,11 +579,9 @@ func (m *Mods) readFromCache() error {
 }
 
 func (m *Mods) appendToOutput(s string) {
-	m.Output += s
-	if m.Config.Output == "json" || m.Config.jsonSchemaValidator != nil {
-		return
-	}
-	if !isOutputTTY() || m.Config.Raw {
+	if m.Config.Output == "json" || m.Config.jsonSchemaValidator != nil || (!m.Config.Raw && isOutputTTY()) {
+		m.output.WriteString(s)
+	} else {
 		fmt.Print(s)
 	}
 }
@@ -590,7 +589,7 @@ func (m *Mods) appendToOutput(s string) {
 // printTextOutput finishes text-mode output after a request completes.
 func (m *Mods) printTextOutput() error {
 	if m.Config.jsonSchemaValidator != nil {
-		fmt.Println(m.Output)
+		fmt.Println(m.output.String())
 		return nil
 	}
 	if !isOutputTTY() {
@@ -600,12 +599,13 @@ func (m *Mods) printTextOutput() error {
 	if m.Config.Raw {
 		return nil
 	}
-	rendered, err := renderMarkdownWithGlow(m.ctx, m.Output, m.Config.WordWrap)
+	output := m.output.String()
+	rendered, err := renderMarkdownWithGlow(m.ctx, output, m.Config.WordWrap)
 	if err != nil {
 		if m.ctx != nil && m.ctx.Err() != nil {
 			return m.ctx.Err()
 		}
-		fmt.Println(m.Output)
+		fmt.Println(output)
 		return nil
 	}
 	fmt.Println(strings.TrimRightFunc(string(rendered), unicode.IsSpace))
@@ -613,11 +613,11 @@ func (m *Mods) printTextOutput() error {
 }
 
 // ensureKey resolves the API key to use, most secure source first.
-func (m Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
+func (m *Mods) ensureKey(api API, defaultEnv, docsURL string) (string, error) {
 	return m.ensureKeyContext(context.Background(), api, defaultEnv, docsURL)
 }
 
-func (m Mods) ensureKeyContext(ctx context.Context, api API, defaultEnv, docsURL string) (string, error) {
+func (m *Mods) ensureKeyContext(ctx context.Context, api API, defaultEnv, docsURL string) (string, error) {
 	var key string
 	if api.APIKeyCmd != "" {
 		args, err := shellwords.Parse(api.APIKeyCmd)

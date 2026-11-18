@@ -9,7 +9,8 @@ import (
 func TestBuildJSONOutput(t *testing.T) {
 	cfg := &Config{Model: "gpt-4"}
 	cfg.cacheWriteToID = "abc123"
-	mods := &Mods{Config: cfg, Output: "hello world"}
+	mods := &Mods{Config: cfg}
+	mods.output.WriteString("hello world")
 
 	out := buildJSONOutput(mods)
 
